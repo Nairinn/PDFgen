@@ -76,6 +76,7 @@ reimplementation from the ISO specifications with different priorities:
 | Outline | Bookmarks generated from headings, nested by level |
 | Extraction | `extract_text` pulls text blocks from any PDF, tagged or not, Flate-compressed included |
 | HTML-to-PDF | Structural HTML subset → streamed tagged PDF/UA (headings, lists, tables, images with alt) |
+| Drawing kit | ASME Y14 sheets A–F, tagged title-block table, Y14.5 dimensions, Y14.35 revision block wired to file history — bracket drawing passes veraPDF **942/942** |
 | Layout | Word wrap with real font metrics, page breaks, cross-page paragraphs (MCR), keep-with-next |
 | Content | Headings, paragraphs, bullet lists (`L/LI/Lbl/LBody`), tables (`Table/TR/TH` with `Scope`/`TD`), figures with alt text, PNG + JPEG, header/footer artifacts |
 | Fonts | By-name registry: built-in catalog (Liberation, OFL), system fonts (recursive scan), standard-14 aliases, user-registered files, substitution notes |
@@ -86,8 +87,8 @@ reimplementation from the ISO specifications with different priorities:
 
 ## What's coming next
 
-- **Engineering drawing kit** (ASME Y14 first, then ISO)
 - **More Matterhorn checks** (page/object level: 15-x tables, 16-x headings, 28-x annotations)
+- **ISO drawing conventions** (5457 sheets, 128 lines, 129 dimensions) on the same kit
 - **More catalog fonts** (Noto scripts, accessibility faces), CID subsetting
   for complex scripts
 - **Java 22+ FFM bindings**; Maven Central, PyPI and crates.io publishing
