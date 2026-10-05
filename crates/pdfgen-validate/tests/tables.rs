@@ -1,7 +1,7 @@
 //! Negative case: a table without a header row must be flagged (15-001),
 //! and a TH without Scope must be flagged (15-003).
 
-use pdfgen_core::{Dict, Object, PdfString, PdfVersion, Ref, Stream};
+use pdfgen_core::{Dict, Object, PdfVersion, Stream};
 
 fn out(name: &str) -> String {
     format!("{}/../../tests/output/{name}", env!("CARGO_MANIFEST_DIR"))
