@@ -27,6 +27,7 @@ mod flow;
 mod image;
 mod page;
 mod retag;
+mod stream;
 mod structure;
 mod tounicode;
 
@@ -34,6 +35,7 @@ pub use document::Document;
 pub use flow::Flow;
 pub use image::{Image, ImageError, ImageKind};
 pub use page::Page;
+pub use stream::{StreamError, StreamEvent, StreamWriter};
 pub use structure::Node;
 pub use retag::{TagSession, TextRun};
 pub use pdfgen_font::{FontError, LoadedFont};

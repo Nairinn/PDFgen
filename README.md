@@ -22,6 +22,20 @@ flow.table(
 let report = doc.save("report.pdf")?;              // ALWAYS writes the file
 ```
 
+For massive documents, the streaming writer flushes pages to disk as they
+close — flat memory at any scale:
+
+```rust
+let mut w = pdfgen::StreamWriter::create("mega.pdf", Profile::PdfUa1,
+                                         "Mega Report", "en-US")?;
+w.push(vec![
+    StreamEvent::Begin { tag: "P".into(), alt: None },
+    StreamEvent::Text { text: chunk_of_body_text, font: 0, size: 11.0 },
+    StreamEvent::End,
+])?;                                              // large batches
+let report = w.finish()?;                          // pages already on disk
+```
+
 ## Why
 
 iText is AGPL (or very expensive). PDFBox is Apache-2.0 but Java-only and its
@@ -35,31 +49,46 @@ reimplementation from the ISO specifications with different priorities:
   alt text, …)` — with Matterhorn IDs and fixes. The file simply carries no
   conformance claim until it actually passes.
 - **Both PDF/UA-1 and PDF/UA-2**, end to end, validated against veraPDF.
-- **Version control for PDFs**: revisions, history, diff, revert (in progress).
+- **Streaming, like iText: flat memory at any scale.** Completed pages are
+  flushed to the output file the moment they close — content streams
+  Flate-compressed — instead of holding the document tree in memory. The
+  layout loop is optimized the same way: each word's width is measured once
+  and packed greedily (O(n), no candidate re-measurement), operators go
+  through reusable buffers, and object ids are preallocated so pages never
+  need patching. This is the path for high-volume and massive documents.
 - **Fonts by name.** Call `doc.font("Arial", "Bold")` and get the real Arial
-  from your system — licensed fonts you own work; the built-in catalog
-  ships free look-alikes (Liberation = Helvetica/Times/Courier metrics) so
+  from your system — licensed fonts you own work; the built-in catalog ships
+  free look-alikes (Liberation = Helvetica/Times/Courier metrics) so
   documents work everywhere.
 - **Read and retag existing PDFs.** Open any file — even untagged ones —
   tag it, and save it fully compliant.
+- **Rust, Python and Kotlin** from one core (Java works via the same JNA jar).
 
-## Status
-
-Everything below is **verified by veraPDF 1.30.2**, not self-graded:
+## What's done — verified by veraPDF 1.30.2, not self-graded
 
 | Area | What works today |
 |---|---|
-| Writer | Tagged PDF/UA-1 + PDF/UA-2 output; structure tree; embedded TrueType fonts; XMP metadata |
-| Layout | Word wrap with real font metrics, automatic page breaks, paragraphs that continue across pages as one element |
-| Content | Headings, paragraphs, bullet lists (`L/LI/Lbl/LBody`), tables (`Table/TR/TH` with `Scope`/`TD`), figures with alt text, PNG + JPEG images, header/footer artifacts |
-| Fonts | By-name registry: built-in catalog, system fonts (recursive scan), standard-14 aliases, user-registered files, substitution notes |
+| Writer (in-memory) | Tagged PDF/UA-1 + PDF/UA-2 output; structure tree; embedded TrueType; XMP |
+| Writer (streaming) | Event-oriented chunk API; pages flush to disk as they close; Flate-compressed content; O(n) incremental wrap; 500-section doc → **91,931/91,931 checks** |
+| Layout | Word wrap with real font metrics, page breaks, cross-page paragraphs (MCR), keep-with-next |
+| Content | Headings, paragraphs, bullet lists (`L/LI/Lbl/LBody`), tables (`Table/TR/TH` with `Scope`/`TD`), figures with alt text, PNG + JPEG, header/footer artifacts |
+| Fonts | By-name registry: built-in catalog (Liberation, OFL), system fonts (recursive scan), standard-14 aliases, user-registered files, substitution notes |
 | Reader | Classic + xref-stream + hybrid xref, lazy resolution, repair mode for broken files |
 | Retag | Import any PDF, extract text, auto/manual tagging, save compliant |
-| Reports | Machine checks with Matterhorn IDs + a human-review checklist on every save |
+| Reports | Machine checks with Matterhorn IDs + human-review checklist on every save |
+| Bindings | Python (PyO3, abi3 ≥ 3.9, `PdfUaWarning` on non-compliant saves) and Kotlin/Java (UniFFI + JNA, Java 11+) — both generate veraPDF-valid PDFs |
 
-Not yet: revision history/diff, forms, encryption, CID/complex-script shaping,
-bindings (Kotlin/Java/Python), the engineering-drawing kit. See
-[`docs/PLAN.md`](docs/PLAN.md) for the full roadmap.
+## What's coming next
+
+- **HTML-to-PDF** and richer complex layout (columns, footnotes, TOC, bookmarks)
+- **Text extraction** and interactive **form filling**
+- **Revision control**: incremental saves, history, diff, revert
+- **Validator CLI**: all 87 Matterhorn machine checks + human-review report
+- **Engineering drawing kit** (ASME Y14 first, then ISO)
+- **More catalog fonts** (Noto scripts, accessibility faces), CID subsetting
+  for complex scripts
+- **Java 22+ FFM bindings**; Maven Central, PyPI and crates.io publishing
+- Full plan with milestones: [`docs/PLAN.md`](docs/PLAN.md)
 
 ## Layout
 
@@ -71,7 +100,10 @@ crates/
   pdfgen-fonts     registry: built-in catalog, system fonts, name resolution
   pdfgen-canvas    content streams, marked content (BDC/EMC), artifacts
   pdfgen-profile   PDF/UA-1 + UA-2 profiles, XMP, the save report
-  pdfgen           the public API: Document, Flow, TagSession
+  pdfgen           the public API: Document, Flow, StreamWriter, TagSession
+  pdfgen-api       bindings-friendly facade (owned types, no lifetimes)
+  pdfgen-py        Python bindings (PyO3)
+  pdfgen-uniffi    Kotlin/Java bindings (UniFFI)
 fonts/vendor/      bundled OFL fonts (Liberation family)
 tests/output/      generated PDFs (gitignored) — all veraPDF-validated
 tools/verapdf/     local veraPDF install used as the external checker
@@ -88,7 +120,7 @@ tools/verapdf/verapdf -f ua2 tests/output/hello_ua2.pdf
 
 Pass = `isCompliant="true"`, `failedChecks="0"`.
 
-- **Commits**: Conventional Commits (`feat(writer): …`), enforced by review.
+- **Commits**: Conventional Commits (`feat(writer): …`).
 - **License hygiene**: `deny.toml` allow-lists only MIT/Apache/BSD/ISC/Zlib
   dependencies; vendored fonts are OFL-1.1 with their license files.
 - **veraPDF is a test tool only** — never linked, never bundled in output.
