@@ -43,6 +43,8 @@ and it is built around four goals:
 
 ## 2. Scope (one release, complete)
 
+**New (user-directed) — streaming architecture:** the writer is event-oriented and chunk-by-chunk. Content is processed in large, pre-chunked batches (highly optimized); **completed sections are flushed to the output stream as they finish instead of keeping the whole document tree in memory**. This makes high-volume and massive documents significantly faster and far less resource-heavy. High-level layout elements (Paragraph, Table, List) are first-class; complex layout generation targets modern PDF 2.0/UA; plus HTML-to-PDF, text extraction, interactive form filling, and printing/display.
+
 **Profiles in 1.0:** PDF/UA-1 (PDF 1.7) and PDF/UA-2 (PDF 2.0, including the PDF 2.0 structure namespace and ISO TS 32005 mapping).
 PDF/A is a separate standard and is not part of this plan. The profile system leaves room for it later.
 
