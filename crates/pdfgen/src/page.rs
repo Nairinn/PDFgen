@@ -1,34 +1,19 @@
 //! Per-page data and the absolute-placement page builder.
 
+use crate::structure::Node;
 use pdfgen_font::FontError;
 
-/// A single tagged text block. A block that flows across page breaks has
-/// one piece (page index, MCID within that page) per page it lands on.
-#[derive(Debug, Clone)]
-pub struct Block {
-    /// PDF structure type: `H1`..`H6`, `P`, …
-    pub tag: String,
-    /// Index of the font in the document's font list.
-    pub font: usize,
-    /// Font size in points.
-    pub size: f64,
-    /// Marked-content pieces: (page index, MCID within that page).
-    pub pieces: Vec<(usize, u32)>,
-    /// Original text (pre-encoding) for diagnostics.
-    pub text: String,
-}
-
-/// Per-page accumulated content and blocks.
+/// Per-page accumulated content and structure nodes.
 #[derive(Debug, Default)]
 pub(crate) struct PageData {
     /// The page's content stream under construction.
     pub content: pdfgen_canvas::Content,
-    /// Tagged blocks placed on this page.
-    pub blocks: Vec<Block>,
+    /// Structure nodes placed on this page (top-level; may be groups).
+    pub nodes: Vec<Node>,
 }
 
 /// Builder for one explicitly placed page. Each call places exactly one
-/// line (the flow API wraps); blocks go down the page in call order,
+/// line (the flow API wraps); content goes down the page in call order,
 /// which is also the logical reading order.
 pub struct Page<'a> {
     doc: &'a mut crate::document::Document,
@@ -99,13 +84,9 @@ impl<'a> Page<'a> {
         let mcid = pd
             .content
             .tagged_text(tag, &format!("F{font}"), size, x, y, &encoded);
-        pd.blocks.push(Block {
-            tag: tag.to_string(),
-            font,
-            size,
-            pieces: vec![(self.idx, mcid)],
-            text: text.to_string(),
-        });
+        pd.nodes.push(
+            Node::leaf(tag, text.to_string(), font, size).with_pieces(vec![(self.idx, mcid)]),
+        );
         Ok(())
     }
 

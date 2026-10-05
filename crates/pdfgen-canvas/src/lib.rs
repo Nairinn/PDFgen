@@ -112,6 +112,47 @@ impl Content {
         self.next_mcid
     }
 
+    /// Begin an artifact sequence (page furniture). `subtype` is `Header`,
+    /// `Footer`, or empty for plain decoration (Matterhorn 18-001/18-002).
+    pub fn begin_artifact(&mut self, subtype: &str) {
+        if subtype.is_empty() {
+            self.ops.push_str("/Artifact BDC\n");
+        } else {
+            self.ops.push_str(&format!(
+                "/Artifact <</Type /Pagination /Subtype /{subtype}>> BDC\n"
+            ));
+        }
+    }
+
+    /// End the innermost artifact sequence.
+    pub fn end_artifact(&mut self) {
+        self.ops.push_str("EMC\n");
+    }
+
+    /// Stroke a rectangle (table borders, frames). Must be called inside a
+    /// tag or artifact so the path is not unmarked content.
+    pub fn rect(&mut self, x: f64, y: f64, w: f64, h: f64) {
+        self.ops.push_str(&format!(
+            "0.5 w {} {} {} {} re S\n",
+            fmt_real(x),
+            fmt_real(y),
+            fmt_real(w),
+            fmt_real(h)
+        ));
+    }
+
+    /// Draw an image XObject resource at (x, y) sized w×h. Must be inside
+    /// a tag (Figure) or artifact.
+    pub fn image(&mut self, res: &str, x: f64, y: f64, w: f64, h: f64) {
+        self.ops.push_str(&format!(
+            "q {} 0 0 {} {} {} cm /{res} Do Q\n",
+            fmt_real(w),
+            fmt_real(h),
+            fmt_real(x),
+            fmt_real(y)
+        ));
+    }
+
     /// Finish: return the raw content stream bytes.
     pub fn finish(self) -> Vec<u8> {
         self.ops.into_bytes()

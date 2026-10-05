@@ -1,6 +1,8 @@
 //! The end-to-end document: fonts, pages, structure tree, XMP and save.
 
-use crate::page::{Block, PageData};
+use crate::image::{Image, ImageKind};
+use crate::page::PageData;
+use crate::structure::Node;
 use crate::tounicode;
 use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
 use pdfgen_font::LoadedFont;
@@ -14,12 +16,12 @@ pub struct Document {
     pub meta: Metadata,
     /// Loaded fonts, by index.
     pub(crate) fonts: Vec<LoadedFont>,
-    /// Per-page content and blocks.
+    /// Per-page content and structure nodes.
     pub(crate) pages: Vec<PageData>,
+    /// Loaded images, by index.
+    pub(crate) images: Vec<Image>,
     /// Page size in points (all pages share it for now).
     pub(crate) page_size: (f64, f64),
-    /// Next StructParents key to hand out.
-    pub(crate) next_struct_parents: i64,
 }
 
 impl Document {
@@ -30,8 +32,8 @@ impl Document {
             meta: Metadata::default(),
             fonts: Vec::new(),
             pages: Vec::new(),
+            images: Vec::new(),
             page_size: (612.0, 792.0),
-            next_struct_parents: 0,
         }
     }
 
@@ -52,6 +54,12 @@ impl Document {
         let f = LoadedFont::load(path)?;
         self.fonts.push(f);
         Ok(self.fonts.len() - 1)
+    }
+
+    /// Register an image for later drawing; returns the resource name.
+    pub fn register_image(&mut self, img: &Image) -> String {
+        self.images.push(img.clone());
+        format!("Im{}", self.images.len() - 1)
     }
 
     /// Begin an explicitly placed page; content is placed via the returned
@@ -94,7 +102,7 @@ impl Document {
                 fix: "Call doc.lang(\"en-US\") (or the document's language).".into(),
             });
         }
-        if self.pages.iter().all(|p| p.blocks.is_empty()) {
+        if self.pages.iter().all(|p| p.nodes.is_empty()) {
             v.push(Violation {
                 id: "01-006".into(),
                 message: "No content has been tagged: the structure tree would be empty".into(),
@@ -102,14 +110,44 @@ impl Document {
             });
         }
         for pd in &self.pages {
-            for b in &pd.blocks {
-                if b.tag.starts_with('H') && b.text.trim().is_empty() {
-                    v.push(Violation {
-                        id: "09-003".into(),
-                        message: format!("Heading {} is empty", b.tag),
-                        fix: "Headings must contain text.".into(),
-                    });
-                }
+            for node in &pd.nodes {
+                node.walk(&mut |n| {
+                    if n.tag == "Figure" && n.alt.is_none() && !n.pieces.is_empty() {
+                        v.push(Violation {
+                            id: "13-004".into(),
+                            message: "Figure has no alternative text".into(),
+                            fix: "Pass alt text to flow.figure(img, \"description\", …) \
+                                  or empty string for decorative images."
+                                .into(),
+                        });
+                    }
+                    if n.tag.starts_with('H') && n.text.trim().is_empty() && !n.pieces.is_empty() {
+                        v.push(Violation {
+                            id: "09-003".into(),
+                            message: format!("Heading {} is empty", n.tag),
+                            fix: "Headings must contain text.".into(),
+                        });
+                    }
+                    if n.tag == "TH" && n.scope.is_empty() {
+                        v.push(Violation {
+                            id: "15-003".into(),
+                            message: "Header cell without Scope attribute".into(),
+                            fix: "flow.table() sets Scope=Column automatically.".into(),
+                        });
+                    }
+                    if n.tag == "Table"
+                        && !n
+                            .children
+                            .iter()
+                            .any(|r| r.children.iter().any(|c| c.tag == "TH"))
+                    {
+                        v.push(Violation {
+                            id: "15-001".into(),
+                            message: "Table has no header row".into(),
+                            fix: "Pass a header row to flow.table(header, rows, widths).".into(),
+                        });
+                    }
+                });
             }
         }
         v
@@ -143,6 +181,29 @@ impl Document {
             font_res.set(format!("F{i}"), r);
         }
 
+        // --- Images (XObjects) ------------------------------------------
+        let mut xobj_res = Dict::new();
+        for (i, img) in self.images.iter().enumerate() {
+            let xref = doc.alloc();
+            let mut d = Dict::new();
+            d.set("Type", "XObject");
+            d.set("Subtype", "Image");
+            d.set("Width", img.w as i64);
+            d.set("Height", img.h as i64);
+            d.set("ColorSpace", "DeviceRGB");
+            d.set("BitsPerComponent", 8);
+            match &img.kind {
+                ImageKind::Rgb(rgb) => {
+                    doc.set_stream(xref, Stream::new(d, rgb.clone()));
+                }
+                ImageKind::Jpeg(bytes) => {
+                    d.set("Filter", "DCTDecode");
+                    doc.set_stream(xref, Stream::new(d, bytes.clone()));
+                }
+            }
+            xobj_res.set(format!("Im{i}"), xref);
+        }
+
         // --- Pages -----------------------------------------------------
         let n_pages = self.pages.len();
         let mut page_refs: Vec<Ref> = Vec::with_capacity(n_pages);
@@ -155,7 +216,6 @@ impl Document {
         // --- Structure tree --------------------------------------------
         let struct_root = doc.alloc();
         let doc_elem = doc.alloc();
-        // PDF 2.0 (UA-2): elements live in the standard structure namespace.
         let namespace = if self.profile == Profile::PdfUa2 {
             let ns = doc.alloc();
             doc.set(
@@ -171,50 +231,104 @@ impl Document {
             None
         };
 
-        // One StructElem per block, on every page that has blocks; the
-        // element's K lists its marked-content pieces, each as an MCR
-        // dictionary pointing at the right page and MCID.
-        //
-        // element_refs: (page_idx, block_idx) -> object ref. A block split
-        // across pages gets ONE element whose K references every page.
-        let mut elem_refs: Vec<Vec<Ref>> = self
-            .pages
-            .iter()
-            .map(|pd| pd.blocks.iter().map(|_| doc.alloc()).collect())
-            .collect();
-
-        for (pi, pd) in self.pages.iter().enumerate() {
-            for (bi, b) in pd.blocks.iter().enumerate() {
-                let r = elem_refs[pi][bi];
-                let mut e = Dict::new();
-                e.set("Type", "StructElem");
-                e.set("S", Object::Name(Name::new(b.tag.clone())));
-                if let Some(ns) = namespace {
-                    e.set("NS", ns);
-                }
-                e.set("P", doc_elem);
-                e.set("Pg", page_refs[b.pieces[0].0]);
-                // K: one entry per marked-content piece. Single piece on the
-                // page the element lives on: plain MCID integer. Otherwise
-                // MCR dicts referencing the right page.
-                if b.pieces.len() == 1 && b.pieces[0].0 == pi {
-                    e.set("K", i64::from(b.pieces[0].1));
-                } else {
-                    let kids: Vec<Object> = b
-                        .pieces
-                        .iter()
-                        .map(|&(pgi, mcid)| {
-                            Object::Dict(
-                                Dict::new()
-                                    .with("Type", "MCR")
-                                    .with("Pg", page_refs[pgi])
-                                    .with("MCID", i64::from(mcid)),
-                            )
-                        })
-                        .collect();
-                    e.set("K", Object::Array(kids));
-                }
+        // Recursive emit: allocate refs for children depth-first while
+        // building the parent dict, keeping node<->ref pairs in lockstep.
+        fn emit(
+            doc: &mut pdfgen_core::Document,
+            node: &Node,
+            r: Ref,
+            parent: Ref,
+            page_refs: &[Ref],
+            namespace: Option<Ref>,
+            fallback_page: usize,
+            leaf_map: &mut Vec<(usize, u32, Ref)>,
+        ) {
+            let mut e = Dict::new();
+            e.set("Type", "StructElem");
+            e.set("S", Object::Name(Name::new(node.tag.clone())));
+            if let Some(ns) = namespace {
+                e.set("NS", ns);
+            }
+            e.set("P", parent);
+            if node.pieces.is_empty() && !node.children.is_empty() {
+                e.set("Pg", page_refs[fallback_page]);
+            } else {
+                e.set("Pg", page_refs[node.pieces[0].0]);
+            }
+            if let Some(alt) = &node.alt {
+                e.set("Alt", PdfString::text(alt));
+            }
+            if !node.scope.is_empty() {
+                let mut a = Dict::new();
+                a.set("O", "Table");
+                a.set("Scope", node.scope.as_str());
+                e.set("A", Object::Array(vec![Object::Dict(a)]));
+            }
+            for &(pgi, mcid) in &node.pieces {
+                leaf_map.push((pgi, mcid, r));
+            }
+            if !node.children.is_empty() {
+                let child_refs: Vec<Ref> = node.children.iter().map(|_| doc.alloc()).collect();
+                e.set(
+                    "K",
+                    Object::Array(child_refs.iter().map(|&r| Object::Ref(r)).collect()),
+                );
                 doc.set(r, Object::Dict(e));
+                for (c, cr) in node.children.iter().zip(child_refs) {
+                    let child_fallback = c
+                        .pieces
+                        .first()
+                        .map(|p| p.0)
+                        .or_else(|| {
+                            c.children
+                                .first()
+                                .and_then(|g| g.pieces.first().map(|p| p.0))
+                        })
+                        .unwrap_or(fallback_page);
+                    emit(doc, c, cr, r, page_refs, namespace, child_fallback, leaf_map);
+                }
+            } else if node.pieces.len() == 1 && node.pieces[0].0 == fallback_page {
+                e.set("K", i64::from(node.pieces[0].1));
+                doc.set(r, Object::Dict(e));
+            } else if !node.pieces.is_empty() {
+                let kids: Vec<Object> = node
+                    .pieces
+                    .iter()
+                    .map(|&(pgi, mcid)| {
+                        Object::Dict(
+                            Dict::new()
+                                .with("Type", "MCR")
+                                .with("Pg", page_refs[pgi])
+                                .with("MCID", i64::from(mcid)),
+                        )
+                    })
+                    .collect();
+                e.set("K", Object::Array(kids));
+                doc.set(r, Object::Dict(e));
+            } else {
+                doc.set(r, Object::Dict(e));
+            }
+        }
+
+        let mut leaf_map: Vec<(usize, u32, Ref)> = Vec::new();
+        let mut top_refs: Vec<Vec<Ref>> = Vec::with_capacity(n_pages);
+        for pd in &self.pages {
+            top_refs.push(pd.nodes.iter().map(|_| doc.alloc()).collect());
+        }
+        for (pi, pd) in self.pages.iter().enumerate() {
+            for (ni, node) in pd.nodes.iter().enumerate() {
+                let r = top_refs[pi][ni];
+                let fallback = node
+                    .pieces
+                    .first()
+                    .map(|p| p.0)
+                    .or_else(|| {
+                        node.children
+                            .first()
+                            .and_then(|c| c.pieces.first().map(|p| p.0))
+                    })
+                    .unwrap_or(pi);
+                emit(&mut doc, node, r, doc_elem, &page_refs, namespace, fallback, &mut leaf_map);
             }
         }
 
@@ -227,7 +341,7 @@ impl Document {
         }
         dr.set("P", struct_root);
         let mut kids: Vec<Object> = Vec::new();
-        for pd_refs in &elem_refs {
+        for pd_refs in &top_refs {
             for &r in pd_refs {
                 kids.push(Object::Ref(r));
             }
@@ -235,34 +349,15 @@ impl Document {
         dr.set("K", Object::Array(kids));
         doc.set(doc_elem, Object::Dict(dr));
 
-        // Parent tree: page i's StructParents key -> array of element refs
-        // for blocks that START on page i (MCID-indexed via the page's own
-        // marked content). Elements continued from a previous page appear
-        // in the array of the page where their MCID lives.
+        // Parent tree: page i -> MCID-indexed element refs (leaf_map holds
+        // every (page, mcid, element ref) triple).
         let mut nums: Vec<Object> = Vec::new();
         for pi in 0..n_pages {
-            // MCID-indexed array: position = MCID.
             let n_mcids = self.pages[pi].content.mcid_count();
             let mut by_mcid: Vec<Option<Ref>> = vec![None; n_mcids as usize];
-            for (bi, b) in self.pages[pi].blocks.iter().enumerate() {
-                for &(pgi, mcid) in &b.pieces {
-                    if pgi == pi {
-                        by_mcid[mcid as usize] = Some(elem_refs[pi][bi]);
-                    }
-                }
-            }
-            // Also cover pieces of blocks that started elsewhere.
-            for (other_pi, other_pd) in self.pages.iter().enumerate() {
-                if other_pi == pi {
-                    continue;
-                }
-                for (bi, b) in other_pd.blocks.iter().enumerate() {
-                    for &(pgi, mcid) in &b.pieces {
-                        if pgi == pi {
-                            by_mcid[mcid as usize] =
-                                Some(elem_refs[other_pi][bi]);
-                        }
-                    }
+            for &(pgi, mcid, r) in &leaf_map {
+                if pgi == pi && (mcid as usize) < by_mcid.len() {
+                    by_mcid[mcid as usize] = Some(r);
                 }
             }
             let arr: Vec<Object> = by_mcid
@@ -291,6 +386,13 @@ impl Document {
         // --- Page objects -----------------------------------------------
         let (pw, ph) = self.page_size;
         for pi in 0..n_pages {
+            let mut res = Dict::new();
+            if !font_res.is_empty() {
+                res.set("Font", Object::Dict(font_res.clone()));
+            }
+            if !xobj_res.is_empty() {
+                res.set("XObject", Object::Dict(xobj_res.clone()));
+            }
             let mut pg = Dict::new();
             pg.set("Type", "Page");
             pg.set("Parent", pages_obj);
@@ -303,16 +405,13 @@ impl Document {
                     Object::Real(ph.into()),
                 ]),
             );
-            pg.set("Resources", Object::Dict(Dict::new().with("Font", font_res.clone())));
+            pg.set("Resources", Object::Dict(res));
             pg.set("Contents", contents_refs[pi]);
             pg.set("StructParents", pi as i64);
             pg.set("Tabs", "S");
             doc.set(page_refs[pi], Object::Dict(pg));
             let content_bytes = std::mem::take(&mut self.pages[pi].content).finish();
-            doc.set_stream(
-                contents_refs[pi],
-                Stream::new(Dict::new(), content_bytes),
-            );
+            doc.set_stream(contents_refs[pi], Stream::new(Dict::new(), content_bytes));
         }
 
         doc.set(
@@ -414,10 +513,7 @@ impl Document {
         // Descriptor.
         let mut fd = Dict::new();
         fd.set("Type", "FontDescriptor");
-        fd.set(
-            "FontName",
-            Object::Name(Name::new(f.postscript_name.clone())),
-        );
+        fd.set("FontName", Object::Name(Name::new(f.postscript_name.clone())));
         fd.set("Flags", f.descriptor_flags());
         fd.set(
             "FontBBox",
@@ -440,10 +536,7 @@ impl Document {
         let mut ff = Dict::new();
         ff.set("Type", "Font");
         ff.set("Subtype", "TrueType");
-        ff.set(
-            "BaseFont",
-            Object::Name(Name::new(f.postscript_name.clone())),
-        );
+        ff.set("BaseFont", Object::Name(Name::new(f.postscript_name.clone())));
         ff.set("FirstChar", 0);
         ff.set("LastChar", 255);
         ff.set("Widths", Object::Array(widths));
