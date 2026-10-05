@@ -24,12 +24,15 @@
 
 mod document;
 mod page;
+mod retag;
 mod tounicode;
 
 pub use document::Document;
 pub use page::{Block, Page};
+pub use retag::{TagSession, TextRun};
 pub use pdfgen_font::{FontError, LoadedFont};
 pub use pdfgen_profile::{Metadata, Profile, SaveReport, Status, Violation};
+pub use pdfgen_parse::{ParseError, PdfReader};
 
 /// WinAnsi helpers re-exported for callers that encode text themselves.
 pub use pdfgen_font::winansi;

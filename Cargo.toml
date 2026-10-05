@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/pdfgen-core",
+    "crates/pdfgen-parse",
     "crates/pdfgen-font",
     "crates/pdfgen-canvas",
     "crates/pdfgen-profile",
@@ -20,6 +21,7 @@ pdfgen-core = { path = "crates/pdfgen-core", version = "0.1.0" }
 pdfgen-font = { path = "crates/pdfgen-font", version = "0.1.0" }
 pdfgen-canvas = { path = "crates/pdfgen-canvas", version = "0.1.0" }
 pdfgen-profile = { path = "crates/pdfgen-profile", version = "0.1.0" }
+pdfgen-parse = { path = "crates/pdfgen-parse", version = "0.1.0" }
 ttf-parser = "0.25"
 
 [workspace.lints.rust]

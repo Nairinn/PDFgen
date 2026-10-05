@@ -1,0 +1,16 @@
+[package]
+name = "pdfgen-parse"
+description = "PDF reader: lexer, xref (classic/stream/hybrid), lazy object resolution, repair mode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfgen-core = { workspace = true }
+flate2 = "1"
+thiserror = "2"
+
+[lints]
+workspace = true
