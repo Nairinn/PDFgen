@@ -133,7 +133,8 @@ fn check_no_nested_stream(obj: &Object, container: u32) -> Result<(), CoreError>
     Ok(())
 }
 
-/// Convenience: build a string object from text.
+/// Convenience: build a string object from text. Public for downstream
+/// crates that assemble objects by hand.
 pub fn text(s: &str) -> Object {
     Object::String(crate::PdfString::text(s))
 }

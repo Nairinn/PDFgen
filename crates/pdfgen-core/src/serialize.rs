@@ -1,6 +1,6 @@
 //! Byte-level serialization of PDF objects and whole files.
 
-use crate::{Dict, Name, Object, PdfString, Real, Ref, Stream};
+use crate::{Dict, Name, Object, PdfString, Real, Stream};
 
 /// Format a real number the way PDF requires: plain decimal, no exponent,
 /// no trailing zero past the decimal point, max 4 fractional digits.

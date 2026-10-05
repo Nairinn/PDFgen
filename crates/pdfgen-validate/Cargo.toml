@@ -1,0 +1,16 @@
+[package]
+name = "pdfgen-validate"
+description = "PDF/UA validation: Matterhorn machine checks over any PDF"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfgen-core = { workspace = true }
+pdfgen-parse = { workspace = true }
+pdfgen-profile = { workspace = true }
+
+[lints]
+workspace = true

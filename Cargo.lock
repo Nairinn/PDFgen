@@ -416,6 +416,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdfgen-cli"
+version = "0.1.0"
+dependencies = [
+ "pdfgen-validate",
+]
+
+[[package]]
 name = "pdfgen-core"
 version = "0.1.0"
 dependencies = [
@@ -471,6 +478,15 @@ dependencies = [
  "thiserror",
  "uniffi",
  "uniffi_build",
+]
+
+[[package]]
+name = "pdfgen-validate"
+version = "0.1.0"
+dependencies = [
+ "pdfgen-core",
+ "pdfgen-parse",
+ "pdfgen-profile",
 ]
 
 [[package]]
