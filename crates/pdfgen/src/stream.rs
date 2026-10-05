@@ -952,7 +952,7 @@ fn push_escaped(out: &mut String, bytes: &[u8]) {
 }
 
 /// DEFLATE-compress a page stream (zlib wrapper, as PDF FlateDecode wants).
-fn flate_compress(data: &[u8]) -> Vec<u8> {
+pub(crate) fn flate_compress(data: &[u8]) -> Vec<u8> {
     use flate2::write::ZlibEncoder;
     use flate2::Compression;
     use std::io::Write as _;

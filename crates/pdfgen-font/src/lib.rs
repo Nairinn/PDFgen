@@ -3,6 +3,8 @@ pub use winansi::encode_char as winansi_encode_char;
 pub use winansi::unit_for_byte as winansi_unit_for_byte;
 
 pub mod winansi;
+pub mod cid;
+pub mod ttc;
 
 use std::path::Path;
 use thiserror::Error;
@@ -69,6 +71,13 @@ impl LoadedFont {
 
     /// Load from in-memory bytes.
     pub fn from_bytes(raw: Vec<u8>) -> Result<Self, FontError> {
+        // TTC collections: slice face 0 out into a standalone sfnt so the
+        // embedded FontFile2 is a single TrueType program (PDF requires
+        // this; veraPDF rejects collections).
+        let raw = match crate::ttc::extract_face(&raw, 0) {
+            Some(standalone) => standalone,
+            None => raw,
+        };
         let face = Face::parse(&raw, 0).map_err(|e| FontError::Parse(format!("{e:?}")))?;
 
         let units_per_em = face.units_per_em();
@@ -149,11 +158,29 @@ impl LoadedFont {
 
     /// Advance width of a whole string (WinAnsi encoding) in points.
     pub fn text_width_pt(&self, text: &str, size: f64) -> Result<f64, FontError> {
-        let bytes = winansi::encode(text)?;
+        // WinAnsi-encodable text measures via the byte table (fast path).
+        // Anything else falls back to per-glyph metrics via the cmap.
+        if let Ok(bytes) = winansi::encode(text) {
+            let mut total = 0.0;
+            for b in bytes {
+                if let Some(w) = self.byte_width_pt(b, size) {
+                    total += w;
+                }
+            }
+            return Ok(total);
+        }
+        let face = ttf_parser::Face::parse(&self.raw, 0)
+            .map_err(|e| FontError::Parse(format!("{e:?}")))?;
+        let scale = f64::from(self.units_per_em);
         let mut total = 0.0;
-        for b in bytes {
-            if let Some(w) = self.byte_width_pt(b, size) {
-                total += w;
+        for ch in text.chars() {
+            match face.glyph_index(ch) {
+                Some(g) => {
+                    if let Some(w) = face.glyph_hor_advance(g) {
+                        total += f64::from(w) * size / scale;
+                    }
+                }
+                None => return Err(FontError::MissingGlyph(ch, u32::from(ch))),
             }
         }
         Ok(total)
@@ -166,6 +193,27 @@ impl LoadedFont {
             Some(ttf_parser::Permissions::Restricted)
                 | Some(ttf_parser::Permissions::PreviewAndPrint)
         )
+    }
+
+    /// Glyph ID for a Unicode character, for CID (Type0) encoding.
+    pub fn glyph_index(&self, ch: char) -> Option<u16> {
+        let face = ttf_parser::Face::parse(&self.raw, 0).ok()?;
+        face.glyph_index(ch).map(|g| g.0)
+    }
+
+    /// Advance width of a glyph (by GID) in font units.
+    pub fn glyph_width_units(&self, gid: u16) -> Option<i64> {
+        let face = ttf_parser::Face::parse(&self.raw, 0).ok()?;
+        let g = ttf_parser::GlyphId(gid);
+        face.glyph_hor_advance(g).map(i64::from)
+    }
+
+    /// Width of a glyph (by GID) in points at the given size.
+    pub fn glyph_width_pt(&self, gid: u16, size: f64) -> Option<f64> {
+        let face = ttf_parser::Face::parse(&self.raw, 0).ok()?;
+        let g = ttf_parser::GlyphId(gid);
+        let w = face.glyph_hor_advance(g)?;
+        Some(f64::from(w) * size / f64::from(self.units_per_em))
     }
 
     /// Flag bits for `/Flags` in the font descriptor.

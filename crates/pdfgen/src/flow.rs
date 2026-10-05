@@ -106,6 +106,8 @@ impl<'a> Flow<'a> {
 
     /// Draw wrapped lines inside one marked-content sequence. Returns the
     /// MCID and the y after the last line. Does NOT advance self.y.
+    /// Text with any non-WinAnsi character automatically switches to CID
+    /// (Identity-H, two-byte codes); the font records the glyphs used.
     fn draw_lines(
         &mut self,
         tag: &str,
@@ -119,8 +121,29 @@ impl<'a> Flow<'a> {
         let mcid = pd.content.begin_tag(tag);
         let mut y = self.y;
         for line in lines {
-            let encoded = pdfgen_font::winansi::encode(line)?;
-            pd.content.text(&format!("F{font}"), size, x, y, &encoded);
+            match pdfgen_font::winansi::encode(line) {
+                Ok(encoded) => {
+                    pd.content.text(&format!("F{font}"), size, x, y, &encoded);
+                }
+                Err(_) => {
+                    // CID path: WinAnsi cannot encode this text. Map chars
+                    // to glyph IDs; record them so save() emits a Type0
+                    // font with CID widths and a matching ToUnicode. CID
+                    // text uses the separate F<idx>cid resource so the
+                    // simple (WinAnsi) font stays valid for other lines.
+                    let f = &self.doc.fonts[font];
+                    let (cids, chars) = pdfgen_font::cid::encode(line, f)?;
+                    let used = self.doc.cid_fonts.entry(font).or_default();
+                    for (c, g) in chars.iter().zip(&cids) {
+                        used.insert((*c, *g));
+                    }
+                    let mut bytes = Vec::with_capacity(cids.len() * 2);
+                    for cid in cids {
+                        bytes.extend_from_slice(&cid.to_be_bytes());
+                    }
+                    pd.content.text(&format!("F{font}cid"), size, x, y, &bytes);
+                }
+            }
             y -= lh;
         }
         pd.content.end_tag();

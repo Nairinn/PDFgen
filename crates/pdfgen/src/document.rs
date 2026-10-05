@@ -2,6 +2,7 @@
 
 use crate::image::{Image, ImageKind};
 use crate::page::PageData;
+use crate::stream::flate_compress;
 use crate::structure::Node;
 use crate::tounicode;
 use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
@@ -29,6 +30,9 @@ pub struct Document {
     pub page_size: (f64, f64),
     /// Bookmark entries collected from headings: (level, text, page).
     pub(crate) bookmarks: Vec<(u8, String, usize)>,
+    /// Fonts that needed CID (Type0) encoding: font index -> used
+    /// (char, glyph id) pairs.
+    pub(crate) cid_fonts: std::collections::BTreeMap<usize, std::collections::BTreeSet<(char, u16)>>,
     /// Generate the document outline (bookmarks) from headings.
     pub(crate) want_outline: bool,
     /// Form fields recorded by the flow API, emitted as AcroForm at save.
@@ -48,6 +52,7 @@ impl Document {
             images: Vec::new(),
             page_size: (612.0, 792.0),
             bookmarks: Vec::new(),
+            cid_fonts: Default::default(),
             want_outline: true,
             fields: Vec::new(),
         }
@@ -315,13 +320,26 @@ impl Document {
         let pages_obj = doc.alloc();
 
         // --- Fonts -----------------------------------------------------
+        // A font can be used both ways in one document: WinAnsi lines use
+        // F<idx>, CID lines use F<idx>cid. Emit both variants.
         let mut font_refs: Vec<Ref> = Vec::new();
-        for f in &self.fonts {
-            font_refs.push(Self::emit_font(&mut doc, f));
+        let mut cid_refs: Vec<Option<Ref>> = Vec::new();
+        for (i, f) in self.fonts.iter().enumerate() {
+            let r = Self::emit_font(&mut doc, f);
+            font_refs.push(r);
+            match self.cid_fonts.get(&i).filter(|s| !s.is_empty()) {
+                Some(used) => cid_refs.push(Some(Self::emit_font_type0(&mut doc, f, used))),
+                None => cid_refs.push(None),
+            }
         }
         let mut font_res = Dict::new();
         for (i, &r) in font_refs.iter().enumerate() {
             font_res.set(format!("F{i}"), r);
+        }
+        for (i, r) in cid_refs.iter().enumerate() {
+            if let Some(r) = r {
+                font_res.set(format!("F{i}cid"), *r);
+            }
         }
 
         // --- Images (XObjects) ------------------------------------------
@@ -715,6 +733,153 @@ impl Document {
             violations,
             human_review,
         })
+    }
+
+    /// Emit a Type0 (composite) font with a CIDFontType2 descendant for
+    /// text that WinAnsi cannot encode. `used` carries the (char, glyph)
+    /// pairs actually drawn; widths and ToUnicode cover exactly those.
+    fn emit_font_type0(
+        doc: &mut pdfgen_core::Document,
+        f: &LoadedFont,
+        used: &std::collections::BTreeSet<(char, u16)>,
+    ) -> Ref {
+        let fdict = doc.alloc(); // Type0
+        let desc = doc.alloc(); // CIDFontType2
+        let fdesc = doc.alloc(); // FontDescriptor
+        let ffile = doc.alloc(); // FontFile2
+        let cidtogid = doc.alloc();
+        let ftouni = doc.alloc();
+
+        // Font file (full embed; subsetting comes later).
+        doc.set_stream(
+            ffile,
+            Stream::new(
+                Dict::new().with("Length1", f.raw.len() as i64),
+                f.raw.clone(),
+            ),
+        );
+
+        // CIDToGIDMap stream: 2 bytes per CID from 0..=max_gid.
+        let max_gid = used.iter().map(|(_, g)| *g).max().unwrap_or(0);
+        let mut map = vec![0u8; (usize::from(max_gid) + 1) * 2];
+        for &(_, g) in used {
+            let off = usize::from(g) * 2;
+            map[off..off + 2].copy_from_slice(&g.to_be_bytes());
+        }
+        doc.set_stream(
+            cidtogid,
+            Stream::new(
+                Dict::new().with("Filter", "FlateDecode"),
+                flate_compress(&map),
+            ),
+        );
+
+        // ToUnicode CMap: 2-byte CID codes only (Identity-H); including
+        // 1-byte codes here corrupts the codespace.
+        let mut tu = String::new();
+        tu.push_str("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n");
+        tu.push_str("/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n");
+        tu.push_str("/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n");
+        tu.push_str("1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n");
+        let mut entries: Vec<(u32, char)> = used.iter().map(|&(ch, g)| (u32::from(g), ch)).collect();
+        entries.sort_unstable();
+        entries.dedup_by_key(|e| e.0);
+        for chunk in entries.chunks(100) {
+            tu.push_str(&format!("{} beginbfchar\n", chunk.len()));
+            for (code, ch) in chunk {
+                let unit = u32::from(*ch);
+                tu.push_str(&format!("<{code:04X}> <{unit:04X}>\n"));
+            }
+            tu.push_str("endbfchar\n");
+        }
+        tu.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+        doc.set_stream(ftouni, Stream::new(Dict::new(), tu.into_bytes()));
+
+        // Descriptor (same metrics as the simple font).
+        let scale = f64::from(f.units_per_em);
+        let to_thousandths = |v: f64| {
+            Object::Real(
+                pdfgen_core::fmt_real(v * 1000.0 / scale)
+                    .parse::<f64>()
+                    .unwrap_or(0.0)
+                    .into(),
+            )
+        };
+        let mut fd = Dict::new();
+        fd.set("Type", "FontDescriptor");
+        fd.set("FontName", Object::Name(Name::new(f.postscript_name.clone())));
+        fd.set("Flags", 4); // symbolic
+        fd.set(
+            "FontBBox",
+            Object::Array(vec![
+                to_thousandths(f64::from(f.bbox[0])),
+                to_thousandths(f64::from(f.bbox[1])),
+                to_thousandths(f64::from(f.bbox[2])),
+                to_thousandths(f64::from(f.bbox[3])),
+            ]),
+        );
+        fd.set("ItalicAngle", 0);
+        fd.set("Ascent", to_thousandths(f64::from(f.ascent)));
+        fd.set("Descent", to_thousandths(f64::from(f.descent)));
+        fd.set("CapHeight", to_thousandths(f64::from(f.cap_height)));
+        fd.set("StemV", 80);
+        fd.set("FontFile2", ffile);
+        doc.set(fdesc, Object::Dict(fd));
+
+        // Descendant CIDFontType2.
+        // W: run format [ c_first [w...] c_first [w...] ] — one entry per
+        // contiguous GID run, widths in glyph units scaled to 1000/em.
+        let mut warray: Vec<Object> = Vec::new();
+        {
+            let mut gids: Vec<u16> = used.iter().map(|&(_, g)| g).collect();
+            gids.sort_unstable();
+            gids.dedup();
+            let scale = f64::from(f.units_per_em);
+            let mut i = 0;
+            while i < gids.len() {
+                let start = gids[i];
+                let mut run: Vec<Object> = Vec::new();
+                while i < gids.len() && u32::from(gids[i]) == u32::from(start) + run.len() as u32 {
+                    let units = f.glyph_width_units(gids[i]).unwrap_or(0);
+                    let w1000 = units as f64 * 1000.0 / scale;
+                    run.push(Object::Real(
+                        pdfgen_core::fmt_real(w1000).parse::<f64>().unwrap_or(0.0).into(),
+                    ));
+                    i += 1;
+                }
+                warray.push(Object::Int(i64::from(start)));
+                warray.push(Object::Array(run));
+            }
+        }
+        let mut cid_font = Dict::new();
+        cid_font.set("Type", "Font");
+        cid_font.set("Subtype", "CIDFontType2");
+        cid_font.set("BaseFont", Object::Name(Name::new(f.postscript_name.clone())));
+        cid_font.set(
+            "CIDSystemInfo",
+            Object::Dict(
+                Dict::new()
+                    .with("Registry", Object::String(PdfString::text("Adobe")))
+                    .with("Ordering", Object::String(PdfString::text("Identity")))
+                    .with("Supplement", 0),
+            ),
+        );
+        cid_font.set("FontDescriptor", fdesc);
+        cid_font.set("CIDToGIDMap", cidtogid);
+        // W: [ gid w gid w ... ] pairs (per-glyph widths in glyph units).
+        cid_font.set("W", Object::Array(warray));
+        doc.set(desc, Object::Dict(cid_font));
+
+        // Type0 font.
+        let mut t0 = Dict::new();
+        t0.set("Type", "Font");
+        t0.set("Subtype", "Type0");
+        t0.set("BaseFont", Object::Name(Name::new(f.postscript_name.clone())));
+        t0.set("Encoding", "Identity-H");
+        t0.set("DescendantFonts", Object::Array(vec![Object::Ref(desc)]));
+        t0.set("ToUnicode", ftouni);
+        doc.set(fdict, Object::Dict(t0));
+        fdict
     }
 
     /// Emit the four objects for one embedded TrueType font; returns the
