@@ -14,6 +14,7 @@ members = [
     "crates/pdfgen-validate",
     "crates/pdfgen-cli",
     "crates/pdfgen-revision",
+    "crates/pdfgen-draw",
 ]
 
 [workspace.package]
@@ -34,6 +35,7 @@ pdfgen = { path = "crates/pdfgen", version = "0.1.0" }
 pdfgen-api = { path = "crates/pdfgen-api", version = "0.1.0" }
 pdfgen-validate = { path = "crates/pdfgen-validate", version = "0.1.0" }
 pdfgen-revision = { path = "crates/pdfgen-revision", version = "0.1.0" }
+pdfgen-draw = { path = "crates/pdfgen-draw", version = "0.1.0" }
 ttf-parser = "0.25"
 
 [workspace.lints.rust]

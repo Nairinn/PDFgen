@@ -430,6 +430,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdfgen-draw"
+version = "0.1.0"
+dependencies = [
+ "pdfgen",
+ "pdfgen-core",
+ "pdfgen-parse",
+ "pdfgen-revision",
+]
+
+[[package]]
 name = "pdfgen-font"
 version = "0.1.0"
 dependencies = [

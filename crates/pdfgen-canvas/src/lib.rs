@@ -112,6 +112,13 @@ impl Content {
         self.next_mcid
     }
 
+    /// Append raw content-stream operators verbatim. The caller is
+    /// responsible for being inside a tag or artifact (all drawing in
+    /// pdfgen-draw uses this within artifacts or tagged runs).
+    pub fn raw_ops(&mut self, ops: &str) {
+        self.ops.push_str(ops);
+    }
+
     /// Begin an artifact sequence (page furniture). `subtype` is `Header`,
     /// `Footer`, or empty for plain decoration (Matterhorn 18-001/18-002).
     pub fn begin_artifact(&mut self, subtype: &str) {

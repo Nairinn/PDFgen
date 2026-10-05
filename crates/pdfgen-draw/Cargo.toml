@@ -1,0 +1,17 @@
+[package]
+name = "pdfgen-draw"
+description = "Engineering drawing kit: ASME Y14 sheets, frames, title blocks, dimensions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfgen-core = { workspace = true }
+pdfgen = { workspace = true }
+pdfgen-parse = { workspace = true }
+pdfgen-revision = { workspace = true }
+
+[lints]
+workspace = true

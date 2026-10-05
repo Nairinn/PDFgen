@@ -26,7 +26,7 @@ pub struct Document {
     /// Loaded images, by index.
     pub(crate) images: Vec<Image>,
     /// Page size in points (all pages share it for now).
-    pub(crate) page_size: (f64, f64),
+    pub page_size: (f64, f64),
     /// Bookmark entries collected from headings: (level, text, page).
     pub(crate) bookmarks: Vec<(u8, String, usize)>,
     /// Generate the document outline (bookmarks) from headings.
@@ -70,6 +70,48 @@ impl Document {
         let f = LoadedFont::load(path)?;
         self.fonts.push(f);
         Ok(self.fonts.len() - 1)
+    }
+
+    // --- Drawing-kit surface (used by pdfgen-draw) ----------------------
+
+    /// Append an empty page sized `w` x `h` and return its index. Used by
+    /// the engineering drawing kit to start a custom-sized sheet.
+    pub fn add_draw_page(&mut self, w: f64, h: f64) -> usize {
+        self.page_size = (w, h);
+        self.pages.push(crate::page::PageData::default());
+        self.pages.len() - 1
+    }
+
+    /// Begin an artifact on the given page (decoration; skipped by screen
+    /// readers). Pair with [`Document::end_artifact`].
+    pub fn begin_artifact(&mut self, page: usize, subtype: &str) {
+        self.pages[page].content.begin_artifact(subtype);
+    }
+
+    /// End the innermost artifact on the page.
+    pub fn end_artifact(&mut self, page: usize) {
+        self.pages[page].content.end_artifact();
+    }
+
+    /// Begin a tagged run on the page; returns its MCID.
+    pub fn begin_tag(&mut self, page: usize, tag: &str) -> u32 {
+        self.pages[page].content.begin_tag(tag)
+    }
+
+    /// End the innermost tagged run on the page.
+    pub fn end_tag(&mut self, page: usize) {
+        self.pages[page].content.end_tag();
+    }
+
+    /// Append raw content-stream operators to the page (inside a tag or
+    /// artifact, per PDF/UA).
+    pub fn raw_ops(&mut self, page: usize, ops: &str) {
+        self.pages[page].content.raw_ops(ops);
+    }
+
+    /// Attach a completed structure node to the page.
+    pub fn push_node(&mut self, page: usize, node: Node) {
+        self.pages[page].nodes.push(node);
     }
 
     /// Load a font by family name ("Liberation Sans", "Helvetica", "Arial",
