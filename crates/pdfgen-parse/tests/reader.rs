@@ -10,7 +10,14 @@ fn out(name: &str) -> String {
 #[test]
 fn roundtrip_read_own_output() {
     for name in ["hello_ua1.pdf", "hello_ua2.pdf"] {
-        let mut r = PdfReader::open(out(name)).expect(name);
+        let path = out(name);
+        if !std::path::Path::new(&path).exists() {
+            // Built by the pdfgen crate's tests; they skip where the test
+            // font is absent, so there is nothing to round-trip here.
+            eprintln!("skipping {name}: fixture not present");
+            continue;
+        }
+        let mut r = PdfReader::open(&path).expect(name);
         assert!(!r.repair.scanned, "{name}: xref should load cleanly");
         let catalog = r.catalog().expect("catalog resolves");
         assert!(catalog.has("Pages"), "{name}: catalog has /Pages");
