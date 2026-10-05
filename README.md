@@ -70,6 +70,12 @@ reimplementation from the ISO specifications with different priorities:
 |---|---|
 | Writer (in-memory) | Tagged PDF/UA-1 + PDF/UA-2 output; structure tree; embedded TrueType; XMP |
 | Writer (streaming) | Event-oriented chunk API; pages flush to disk as they close; Flate-compressed content; O(n) incremental wrap; 500-section doc → **91,931/91,931 checks** |
+| Revisions | `commit`/`history`/`diff`/`revert` inside the file itself: appended incremental saves with message + author, byte-exact restore, object-level diff — a 3-revision file passes veraPDF 198/198 |
+| Validator + CLI | Matterhorn machine checks with checkpoint IDs (`pdfgen validate`), cross-checked against veraPDF verdicts on every fixture |
+| Forms | Interactive AcroForm text fields with `/TU` accessible names, widget annotations, and incremental-save `fill_text_field` |
+| Outline | Bookmarks generated from headings, nested by level |
+| Extraction | `extract_text` pulls text blocks from any PDF, tagged or not, Flate-compressed included |
+| HTML-to-PDF | Structural HTML subset → streamed tagged PDF/UA (headings, lists, tables, images with alt) |
 | Layout | Word wrap with real font metrics, page breaks, cross-page paragraphs (MCR), keep-with-next |
 | Content | Headings, paragraphs, bullet lists (`L/LI/Lbl/LBody`), tables (`Table/TR/TH` with `Scope`/`TD`), figures with alt text, PNG + JPEG, header/footer artifacts |
 | Fonts | By-name registry: built-in catalog (Liberation, OFL), system fonts (recursive scan), standard-14 aliases, user-registered files, substitution notes |
@@ -80,11 +86,8 @@ reimplementation from the ISO specifications with different priorities:
 
 ## What's coming next
 
-- **HTML-to-PDF** and richer complex layout (columns, footnotes, TOC, bookmarks)
-- **Text extraction** and interactive **form filling**
-- **Revision control**: incremental saves, history, diff, revert
-- **Validator CLI**: all 87 Matterhorn machine checks + human-review report
 - **Engineering drawing kit** (ASME Y14 first, then ISO)
+- **More Matterhorn checks** (page/object level: 15-x tables, 16-x headings, 28-x annotations)
 - **More catalog fonts** (Noto scripts, accessibility faces), CID subsetting
   for complex scripts
 - **Java 22+ FFM bindings**; Maven Central, PyPI and crates.io publishing
