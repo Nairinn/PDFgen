@@ -162,6 +162,11 @@ impl StreamWriter {
         title: &str,
         lang: &str,
     ) -> Result<Self, StreamError> {
+        // The output directory may not exist yet; create it rather than
+        // failing the stream.
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
         let mut out = std::fs::File::create(path)?;
         let mut header = format!("%PDF-{}\n", profile.pdf_version().header()).into_bytes();
         header.extend_from_slice(&[0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a]);

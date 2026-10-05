@@ -232,27 +232,22 @@ fn decode_name_record(data: &[u8], str_off: usize, rec_off: usize) -> Option<Str
     let off = u16::from_be_bytes([data[rec_off + 10], data[rec_off + 11]]) as usize;
     let raw = data.get(str_off + off..str_off + off + len)?;
     match (pid, eid) {
-        (0, _) | (3, 1) | (3, 10) => Some(String::from_utf16be(raw)),
+        (0, _) | (3, 1) | (3, 10) => Some(decode_utf16be(raw)),
         (1, 0) => Some(raw.iter().map(|&b| b as char).collect()),
         _ => None,
     }
 }
 
-trait FromUtf16Be {
-    fn from_utf16be(b: &[u8]) -> String;
-}
-
-impl FromUtf16Be for String {
-    fn from_utf16be(b: &[u8]) -> String {
-        (0..b.len() / 2)
-            .map(|i| {
-                u16::from_be_bytes([b[2 * i], b[2 * i + 1]])
-            })
-            .collect::<Vec<u16>>()
-            .iter()
-            .map(|&u| char::from_u32(u32::from(u)).unwrap_or('\u{fffd}'))
-            .collect()
-    }
+/// Decode UTF-16BE bytes to a String. Local helper (do not name it
+/// `from_utf16be` at the call site through String — newer rustc has a
+/// stable `String::from_utf16be` whose signature differs).
+fn decode_utf16be(b: &[u8]) -> String {
+    (0..b.len() / 2)
+        .map(|i| u16::from_be_bytes([b[2 * i], b[2 * i + 1]]))
+        .collect::<Vec<u16>>()
+        .iter()
+        .map(|&u| char::from_u32(u32::from(u)).unwrap_or('\u{fffd}'))
+        .collect()
 }
 
 /// Probe a font file for its family and style names without a full load.

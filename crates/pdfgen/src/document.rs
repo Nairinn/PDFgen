@@ -305,6 +305,11 @@ impl Document {
     /// accessibility report. The file is always written — compliance issues
     /// go into the report, and the file simply does not claim PDF/UA.
     pub fn save(&mut self, path: &str) -> Result<SaveReport, Box<dyn std::error::Error>> {
+        // The output directory may not exist yet (fresh clone, CI); a
+        // missing parent should never fail the write.
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
         // 1. Machine checks decide whether the file may claim PDF/UA.
         let violations = self.violations();
         let compliant = violations.is_empty();
