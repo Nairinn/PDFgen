@@ -4,6 +4,7 @@ members = [
     "crates/pdfgen-core",
     "crates/pdfgen-parse",
     "crates/pdfgen-font",
+    "crates/pdfgen-fonts",
     "crates/pdfgen-canvas",
     "crates/pdfgen-profile",
     "crates/pdfgen",
@@ -19,6 +20,7 @@ rust-version = "1.82"
 [workspace.dependencies]
 pdfgen-core = { path = "crates/pdfgen-core", version = "0.1.0" }
 pdfgen-font = { path = "crates/pdfgen-font", version = "0.1.0" }
+pdfgen-fonts = { path = "crates/pdfgen-fonts", version = "0.1.0" }
 pdfgen-canvas = { path = "crates/pdfgen-canvas", version = "0.1.0" }
 pdfgen-profile = { path = "crates/pdfgen-profile", version = "0.1.0" }
 pdfgen-parse = { path = "crates/pdfgen-parse", version = "0.1.0" }

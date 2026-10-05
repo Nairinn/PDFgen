@@ -6,6 +6,7 @@ use crate::structure::Node;
 use crate::tounicode;
 use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
 use pdfgen_font::LoadedFont;
+use pdfgen_fonts::FontRegistry;
 use pdfgen_profile::{xmp, Metadata, Profile, SaveReport, Status, Violation};
 
 /// A complete PDF/UA document under construction.
@@ -16,6 +17,10 @@ pub struct Document {
     pub meta: Metadata,
     /// Loaded fonts, by index.
     pub(crate) fonts: Vec<LoadedFont>,
+    /// Name-resolution registry (built-in catalog + system fonts).
+    pub(crate) registry: FontRegistry,
+    /// Font substitutions that happened (family asked -> family used).
+    pub(crate) substitutions: Vec<(String, String)>,
     /// Per-page content and structure nodes.
     pub(crate) pages: Vec<PageData>,
     /// Loaded images, by index.
@@ -31,6 +36,8 @@ impl Document {
             profile,
             meta: Metadata::default(),
             fonts: Vec::new(),
+            registry: FontRegistry::new(),
+            substitutions: Vec::new(),
             pages: Vec::new(),
             images: Vec::new(),
             page_size: (612.0, 792.0),
@@ -49,11 +56,31 @@ impl Document {
         self
     }
 
-    /// Load and register an embedded font (TTF/OTF).
+    /// Load and register an embedded font (TTF/OTF) by file path.
     pub fn load_font(&mut self, path: &str) -> Result<usize, pdfgen_font::FontError> {
         let f = LoadedFont::load(path)?;
         self.fonts.push(f);
         Ok(self.fonts.len() - 1)
+    }
+
+    /// Load a font by family name ("Liberation Sans", "Helvetica", "Arial",
+    /// a system font, …) and style ("Regular", "Bold", "Italic",
+    /// "Bold Italic"). Standard-14 names resolve to embedded look-alikes.
+    /// Unknown names fall back to Liberation Sans and record a
+    /// substitution in the save report.
+    pub fn font(&mut self, family: &str, style: &str) -> Result<usize, Box<dyn std::error::Error>> {
+        let (f, resolved) = self.registry.load(family, style)?;
+        if resolved.substituted && resolved.family.to_ascii_lowercase() != family.to_ascii_lowercase() {
+            self.substitutions
+                .push((family.to_string(), resolved.family.clone()));
+        }
+        self.fonts.push(f);
+        Ok(self.fonts.len() - 1)
+    }
+
+    /// Register a custom font file under a family name so `font()` finds it.
+    pub fn register_font(&mut self, family: &str, style: &str, path: &str) {
+        self.registry.register(family, style, path);
     }
 
     /// Register an image for later drawing; returns the resource name.
@@ -150,6 +177,8 @@ impl Document {
                 });
             }
         }
+        // Font substitutions do NOT affect compliance (an embedded
+        // look-alike satisfies PDF/UA); they are surfaced as review notes.
         v
     }
 
@@ -459,11 +488,16 @@ impl Document {
         std::fs::write(path, bytes)?;
 
         // 4. Report.
-        let human_review = vec![
+        let mut human_review = vec![
             "09-001: Confirm tags are in logical reading order".into(),
             "06-004: Confirm the dc:title clearly identifies the document".into(),
             "11-007: Confirm the natural language declared is appropriate".into(),
         ];
+        for (asked, used) in &self.substitutions {
+            human_review.push(format!(
+                "pdfgen: Font \"{asked}\" was not available; \"{used}\" was used instead"
+            ));
+        }
         Ok(SaveReport {
             profile: self.profile,
             status,

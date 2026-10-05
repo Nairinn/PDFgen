@@ -1,4 +1,3 @@
-//! Font loader needs to expose the WinAnsi helpers used by the facade.
 pub use winansi::encode as winansi_encode;
 pub use winansi::encode_char as winansi_encode_char;
 pub use winansi::unit_for_byte as winansi_unit_for_byte;
@@ -174,4 +173,101 @@ impl LoadedFont {
         // 32 = non-symbolic.
         32
     }
+}
+
+/// Decode a name-table string for the common platforms:
+/// pid 0/3 (Unicode/Windows) = UTF-16BE; pid 1 (Macintosh) = MacRoman.
+fn decode_name_record(data: &[u8], str_off: usize, rec_off: usize) -> Option<String> {
+    let pid = u16::from_be_bytes([data[rec_off], data[rec_off + 1]]);
+    let eid = u16::from_be_bytes([data[rec_off + 2], data[rec_off + 3]]);
+    let len = u16::from_be_bytes([data[rec_off + 8], data[rec_off + 9]]) as usize;
+    let off = u16::from_be_bytes([data[rec_off + 10], data[rec_off + 11]]) as usize;
+    let raw = data.get(str_off + off..str_off + off + len)?;
+    match (pid, eid) {
+        (0, _) | (3, 1) | (3, 10) => Some(String::from_utf16be(raw)),
+        (1, 0) => Some(raw.iter().map(|&b| b as char).collect()),
+        _ => None,
+    }
+}
+
+trait FromUtf16Be {
+    fn from_utf16be(b: &[u8]) -> String;
+}
+
+impl FromUtf16Be for String {
+    fn from_utf16be(b: &[u8]) -> String {
+        (0..b.len() / 2)
+            .map(|i| {
+                u16::from_be_bytes([b[2 * i], b[2 * i + 1]])
+            })
+            .collect::<Vec<u16>>()
+            .iter()
+            .map(|&u| char::from_u32(u32::from(u)).unwrap_or('\u{fffd}'))
+            .collect()
+    }
+}
+
+/// Probe a font file for its family and style names without a full load.
+/// Returns `(family, style)`; used by the registry to index system fonts.
+/// Decodes Unicode (pid 0/3) and Macintosh (pid 1) records manually because
+/// some system fonts (e.g. macOS Arial) only carry non-Windows-platform
+/// names that ttf-parser refuses to decode.
+pub fn probe(path: impl AsRef<Path>) -> Result<(String, String), FontError> {
+    let path = path.as_ref();
+    let data = std::fs::read(path).map_err(|source| FontError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+    // Locate the name table.
+    if data.len() < 12 {
+        return Err(FontError::Parse("truncated font".into()));
+    }
+    let num_tables = u16::from_be_bytes([data[4], data[5]]) as usize;
+    let mut name_off = None;
+    for i in 0..num_tables {
+        let rec = 12 + i * 16;
+        if &data[rec..rec + 4] == b"name" {
+            name_off = Some(u32::from_be_bytes([
+                data[rec + 8],
+                data[rec + 9],
+                data[rec + 10],
+                data[rec + 11],
+            ]) as usize);
+        }
+    }
+    let toff = name_off.ok_or_else(|| FontError::Parse("no name table".into()))?;
+    if toff + 6 > data.len() {
+        return Err(FontError::Parse("truncated name table".into()));
+    }
+    let count = u16::from_be_bytes([data[toff + 2], data[toff + 3]]) as usize;
+    let str_off = toff + u16::from_be_bytes([data[toff + 4], data[toff + 5]]) as usize;
+    let mut family = String::new();
+    let mut style = String::new();
+    for j in 0..count {
+        let rec = toff + 6 + j * 12;
+        if rec + 12 > data.len() {
+            break;
+        }
+        let nid = u16::from_be_bytes([data[rec + 6], data[rec + 7]]);
+        match nid {
+            1 if family.is_empty() => {
+                if let Some(s) = decode_name_record(&data, str_off, rec) {
+                    family = s;
+                }
+            }
+            2 if style.is_empty() => {
+                if let Some(s) = decode_name_record(&data, str_off, rec) {
+                    style = s;
+                }
+            }
+            _ => {}
+        }
+    }
+    if family.is_empty() {
+        return Err(FontError::Parse("no family name".into()));
+    }
+    if style.is_empty() {
+        style = "Regular".into();
+    }
+    Ok((family, style))
 }

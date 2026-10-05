@@ -1,0 +1,15 @@
+[package]
+name = "pdfgen-fonts"
+description = "Font registry: built-in catalog, system fonts, name resolution and fallback"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfgen-font = { workspace = true }
+thiserror = "2"
+
+[lints]
+workspace = true

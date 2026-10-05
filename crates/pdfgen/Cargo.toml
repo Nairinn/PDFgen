@@ -11,6 +11,7 @@ rustdoc-links = true
 [dependencies]
 pdfgen-core = { workspace = true }
 pdfgen-font = { workspace = true }
+pdfgen-fonts = { workspace = true }
 pdfgen-canvas = { workspace = true }
 pdfgen-parse = { workspace = true }
 pdfgen-profile = { workspace = true }

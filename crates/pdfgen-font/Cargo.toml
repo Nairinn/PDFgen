@@ -12,5 +12,10 @@ pdfgen-core = { workspace = true }
 ttf-parser = { workspace = true }
 thiserror = "2"
 
+[features]
+default = []
+## Enable `probe()` (used by pdfgen-fonts to name system fonts).
+registry = []
+
 [lints]
 workspace = true
