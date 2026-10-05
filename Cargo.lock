@@ -440,6 +440,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdfgen-ffi"
+version = "0.1.0"
+dependencies = [
+ "pdfgen-api",
+]
+
+[[package]]
 name = "pdfgen-font"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,14 @@
+[package]
+name = "pdfgen-ffi"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "C ABI for pdfgen, consumed by Java 22+ FFM and other FFIs"
+publish = false
+
+[lib]
+name = "pdfgen_ffi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+pdfgen-api = { path = "../pdfgen-api" }
