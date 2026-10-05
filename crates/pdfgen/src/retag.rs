@@ -39,7 +39,7 @@ pub struct TagSession {
 }
 
 /// Extract text from a content stream: BT..ET blocks, Tj/TJ strings.
-fn extract_text_runs(content: &[u8]) -> Vec<String> {
+pub(crate) fn extract_text_runs(content: &[u8]) -> Vec<String> {
     let text = String::from_utf8_lossy(content);
     let mut runs = Vec::new();
     let mut rest = &text[..];
@@ -242,7 +242,7 @@ fn looks_like_page_number(t: &str) -> bool {
 }
 
 /// Depth-first page reference collection from a /Pages node.
-fn collect_page_refs(
+pub(crate) fn collect_page_refs(
     reader: &mut PdfReader,
     node: u32,
 ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {

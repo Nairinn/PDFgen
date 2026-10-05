@@ -41,6 +41,16 @@ pub enum StreamEvent {
     End,
     /// Force a page break.
     PageBreak,
+    /// Place an image file (PNG/JPEG) inside the current element as a
+    /// figure. Alt text comes from the enclosing Begin.
+    Image {
+        /// Path of the image file.
+        path: String,
+        /// Draw width in points.
+        width: f64,
+        /// Draw height in points.
+        height: f64,
+    },
 }
 
 /// Errors from the streaming writer.
@@ -114,6 +124,12 @@ pub struct StreamWriter {
     lang: String,
     /// Reusable operator scratch buffer (avoids per-op allocations).
     scratch: String,
+    /// Loaded images (registered on first use).
+    images: Vec<crate::image::Image>,
+    /// Image XObject object ids; 0 = not yet written.
+    image_ids: Vec<u32>,
+    /// Images placed but not yet drawn: (image index, w, h, page, y, mcid).
+    pending_images: Vec<(usize, f64, f64, usize, f64, u32)>,
 }
 
 /// A structure element being built.
@@ -121,6 +137,10 @@ struct OpenElem {
     tag: String,
     alt: Option<String>,
     pieces: Vec<(usize, u32)>,
+    /// Completed child element indexes (into the elems tree).
+    children: Vec<u32>,
+    /// Table cell scope ("Column" for TH), if any.
+    scope: Option<String>,
 }
 
 /// A completed structure element (its serialization fields only).
@@ -128,6 +148,9 @@ struct ElemRecord {
     tag: String,
     alt: Option<String>,
     pieces: Vec<(usize, u32)>,
+    children: Vec<u32>,
+    /// Table cell scope ("Column" for TH), if any.
+    scope: Option<String>,
 }
 
 impl StreamWriter {
@@ -172,6 +195,9 @@ impl StreamWriter {
             title: title.to_string(),
             lang: lang.to_string(),
             scratch: String::with_capacity(4096),
+            images: Vec::new(),
+            image_ids: Vec::new(),
+            pending_images: Vec::new(),
         })
     }
 
@@ -186,10 +212,18 @@ impl StreamWriter {
     fn one(&mut self, ev: StreamEvent) -> Result<(), StreamError> {
         match ev {
             StreamEvent::Begin { tag, alt } => {
+                // TH cells get Scope=Column automatically (PDF/UA 15-003).
+                let scope = if tag == "TH" {
+                    Some("Column".to_string())
+                } else {
+                    None
+                };
                 self.open.push(OpenElem {
                     tag,
                     alt,
                     pieces: Vec::new(),
+                    children: Vec::new(),
+                    scope,
                 });
             }
             StreamEvent::Text { text, font, size } => {
@@ -199,6 +233,8 @@ impl StreamWriter {
                         tag: "P".into(),
                         alt: None,
                         pieces: Vec::new(),
+                        children: Vec::new(),
+                        scope: None,
                     });
                 }
                 // Take the open element out, place, put back (borrow dance).
@@ -224,9 +260,41 @@ impl StreamWriter {
                     tag: elem.tag,
                     alt: elem.alt,
                     pieces: elem.pieces,
+                    children: elem.children,
+                    scope: elem.scope,
                 });
+                // Nest under the parent: a completed element becomes a
+                // CHILD of the innermost still-open element (lists hold
+                // LIs, LIs hold Lbl/LBody, tables hold TRs...).
+                if let Some(parent) = self.open.last_mut() {
+                    parent.children.push(idx);
+                }
             }
             StreamEvent::PageBreak => self.flush_page()?,
+            StreamEvent::Image {
+                path,
+                width,
+                height,
+            } => {
+                // Load and register the image; ids are assigned at finish
+                // in registration order, so record the index only.
+                let img = crate::image::Image::load(&path)
+                    .map_err(|e| StreamError::Font(e.to_string()))?;
+                let idx = self.images.len();
+                self.images.push(img);
+                self.image_ids.push(0);
+                // Reserve space on the current page and grab an MCID now.
+                let page = self.page_ids.len();
+                let y = self.y - height;
+                let mcid = self.next_mcid;
+                self.next_mcid += 1;
+                self.page_content
+                    .push_str(&format!("/Figure <</MCID {mcid}>> BDC\n"));
+                // Placeholder draw op appended at flush; record placement.
+                self.pending_images
+                    .push((idx, width, height, page, y, mcid));
+                self.y = y;
+            }
         }
         Ok(())
     }
@@ -346,6 +414,29 @@ impl StreamWriter {
         if self.page_content.is_empty() {
             return Ok(());
         }
+        // Pending image draw ops on THIS page: (idx, w, h, page, y, mcid).
+        let page_idx_now = self.page_ids.len();
+        let draws: Vec<(usize, f64, f64, usize, f64, u32)> = self
+            .pending_images
+            .iter()
+            .filter(|(_, _, _, pg, _, _)| *pg == page_idx_now)
+            .copied()
+            .collect();
+        for (idx, w, h, _pg, y, _mcid) in draws {
+            use std::fmt::Write as _;
+            let mut scratch = std::mem::take(&mut self.scratch);
+            let _ = write!(
+                scratch,
+                "q {} 0 0 {} {} {} cm /Im{idx} Do Q\nEMC\n",
+                pdfgen_core::fmt_real(w),
+                pdfgen_core::fmt_real(h),
+                pdfgen_core::fmt_real(MARGIN),
+                pdfgen_core::fmt_real(y)
+            );
+            self.page_content.push_str(&scratch);
+            self.scratch = scratch;
+        }
+
         let content_id = self.alloc();
         let raw = std::mem::take(&mut self.page_content).into_bytes();
         let compressed = flate_compress(&raw);
@@ -360,6 +451,27 @@ impl StreamWriter {
         for (i, &fid) in self.font_ids.iter().enumerate() {
             font_res.set(format!("F{i}"), Object::Ref(Ref::new(fid)));
         }
+        let mut res = Dict::new();
+        res.set("Font", Object::Dict(font_res));
+
+        // Emit image XObjects once, before this page's object serializes,
+        // so the Resources dictionary carries real ids.
+        if !self.images.is_empty() {
+            let images = std::mem::take(&mut self.images);
+            let ids_now: Vec<u32> = (0..images.len()).map(|_| self.alloc()).collect();
+            for (img, &xid) in images.iter().zip(&ids_now) {
+                emit_image_xobject(self, xid, img)?;
+            }
+            for (i, xid) in ids_now.iter().enumerate() {
+                self.image_ids[i] = *xid;
+            }
+            let mut xobj = Dict::new();
+            for (i, &xid) in self.image_ids.iter().enumerate() {
+                xobj.set(format!("Im{i}"), Object::Ref(Ref::new(xid)));
+            }
+            res.set("XObject", Object::Dict(xobj));
+            self.images = images;
+        }
         let mut pg = Dict::new();
         pg.set("Type", "Page");
         pg.set("Parent", Object::Ref(Ref::new(ids::PAGES)));
@@ -372,7 +484,7 @@ impl StreamWriter {
                 Object::Real(PAGE.1.into()),
             ]),
         );
-        pg.set("Resources", Object::Dict(Dict::new().with("Font", Object::Dict(font_res))));
+        pg.set("Resources", Object::Dict(res));
         pg.set("Contents", Object::Ref(Ref::new(content_id)));
         pg.set("StructParents", page_idx as i64);
         pg.set("Tabs", "S");
@@ -466,31 +578,55 @@ impl StreamWriter {
         }
         self.fonts = fonts;
 
-        // Structure elements.
+        // Structure elements (nested: each element's P is its real parent,
+        // K holds child refs when children exist, else marked content).
         let elem_first = self.next_obj;
         let elem_ids: Vec<u32> = (0..self.elems.len())
             .map(|i| elem_first + i as u32)
             .collect();
         self.next_obj += self.elems.len() as u32;
+        let doc_elem_id = elem_first + self.elems.len() as u32;
+        let ns_id = doc_elem_id + 1;
+        let root_id = doc_elem_id + 2;
+        self.next_obj = root_id + 1;
+
+        // Parent of each element: doc element, or the containing element
+        // (children store indexes into elems).
+        let mut child_parent: Vec<Option<u32>> = vec![None; self.elems.len()];
+        for (ei, rec) in self.elems.iter().enumerate() {
+            for &child in &rec.children {
+                child_parent[child as usize] = Some(elem_ids[ei]);
+            }
+        }
+
         // Build each element's dict outside the iteration borrow.
         let elem_dicts: Vec<Object> = self
             .elems
             .iter()
-            .zip(&elem_ids)
-            .map(|(rec, _eid)| {
-                let doc_elem_id = elem_first + self.elems.len() as u32;
-                let ns_id = doc_elem_id + 1;
+            .enumerate()
+            .map(|(ei, rec)| {
                 let mut e = Dict::new();
                 e.set("Type", "StructElem");
                 e.set("S", Object::Name(Name::new(rec.tag.clone())));
                 if self.profile == pdfgen_profile::Profile::PdfUa2 {
                     e.set("NS", Object::Ref(Ref::new(ns_id)));
                 }
-                e.set("P", Object::Ref(Ref::new(doc_elem_id)));
-                if rec.pieces.len() == 1 {
+                e.set(
+                    "P",
+                    Object::Ref(Ref::new(child_parent[ei].unwrap_or(doc_elem_id))),
+                );
+                // K: children when nested, else marked content.
+                if !rec.children.is_empty() {
+                    let kids: Vec<Object> = rec
+                        .children
+                        .iter()
+                        .map(|&c| Object::Ref(Ref::new(elem_ids[c as usize])))
+                        .collect();
+                    e.set("K", Object::Array(kids));
+                } else if rec.pieces.len() == 1 {
                     e.set("Pg", Object::Ref(Ref::new(self.page_ids[rec.pieces[0].0])));
                     e.set("K", i64::from(rec.pieces[0].1));
-                } else {
+                } else if !rec.pieces.is_empty() {
                     e.set(
                         "Pg",
                         Object::Ref(
@@ -518,18 +654,22 @@ impl StreamWriter {
                 if let Some(alt) = &rec.alt {
                     e.set("Alt", PdfString::text(alt));
                 }
+                // Table-cell Scope attribute (PDF/UA 15-003): an /A
+                // attribute array owned by this element.
+                if let Some(scope) = &rec.scope {
+                    let mut a = Dict::new();
+                    a.set("O", "Table");
+                    a.set("Scope", scope.as_str());
+                    e.set("A", Object::Array(vec![Object::Dict(a)]));
+                }
                 Object::Dict(e)
             })
             .collect();
         for (obj, &eid) in elem_dicts.iter().zip(&elem_ids) {
             self.write_object(eid, obj)?;
         }
-        let doc_elem_id = elem_first + self.elems.len() as u32;
-        let ns_id = doc_elem_id + 1;
-        let root_id = doc_elem_id + 2;
-        self.next_obj = root_id + 1;
 
-        // Document root element.
+        // Document root element: only TOP-LEVEL (parentless) elements.
         let mut dr = Dict::new();
         dr.set("Type", "StructElem");
         dr.set("S", "Document");
@@ -537,10 +677,13 @@ impl StreamWriter {
             dr.set("NS", Object::Ref(Ref::new(ns_id)));
         }
         dr.set("P", Object::Ref(Ref::new(root_id)));
-        dr.set(
-            "K",
-            Object::Array(elem_ids.iter().map(|&r| Object::Ref(Ref::new(r))).collect()),
-        );
+        let top_level: Vec<Object> = elem_ids
+            .iter()
+            .enumerate()
+            .filter(|(ei, _)| child_parent[*ei].is_none())
+            .map(|(_, &eid)| Object::Ref(Ref::new(eid)))
+            .collect();
+        dr.set("K", Object::Array(top_level));
         self.write_object(doc_elem_id, &Object::Dict(dr))?;
 
         // Namespace (UA-2 only).
@@ -816,6 +959,35 @@ fn flate_compress(data: &[u8]) -> Vec<u8> {
     let mut enc = ZlibEncoder::new(Vec::with_capacity(data.len() / 2), Compression::fast());
     let _ = enc.write_all(data);
     enc.finish().unwrap_or_else(|_| data.to_vec())
+}
+
+/// Emit one image XObject (RGB raw or JPEG DCTDecode pass-through).
+fn emit_image_xobject(
+    w: &mut StreamWriter,
+    id: u32,
+    img: &crate::image::Image,
+) -> Result<(), StreamError> {
+    let mut d = Dict::new();
+    d.set("Type", "XObject");
+    d.set("Subtype", "Image");
+    d.set("Width", img.w as i64);
+    d.set("Height", img.h as i64);
+    d.set("ColorSpace", "DeviceRGB");
+    d.set("BitsPerComponent", 8);
+    let stream = match &img.kind {
+        crate::image::ImageKind::Rgb(rgb) => Stream {
+            dict: d,
+            data: rgb.clone(),
+        },
+        crate::image::ImageKind::Jpeg(bytes) => {
+            d.set("Filter", "DCTDecode");
+            Stream {
+                dict: d,
+                data: bytes.clone(),
+            }
+        }
+    };
+    w.write_object(id, &Object::Stream(stream))
 }
 
 /// Locate the default font file for streaming documents.
