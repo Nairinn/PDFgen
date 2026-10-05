@@ -105,6 +105,69 @@ impl Document {
         crate::flow::Flow::new(self)
     }
 
+    // --- One-shot flow helpers (bindings-friendly: no borrow escapes) ---
+
+    /// Flow a heading; see [`Flow::heading`].
+    pub fn flow_heading(&mut self, level: u8, text: &str) -> Result<(), pdfgen_font::FontError> {
+        self.flow().heading(level, text)
+    }
+
+    /// Flow a paragraph; see [`Flow::paragraph`].
+    pub fn flow_paragraph(&mut self, text: &str) -> Result<(), pdfgen_font::FontError> {
+        self.flow().paragraph(text)
+    }
+
+    /// Flow a paragraph in a specific font; see [`Flow::paragraph_in`].
+    pub fn flow_paragraph_in(
+        &mut self,
+        font: usize,
+        size: f64,
+        text: &str,
+    ) -> Result<(), pdfgen_font::FontError> {
+        self.flow().paragraph_in(font, size, text)
+    }
+
+    /// Flow a bullet list; see [`Flow::bullet_list`].
+    pub fn flow_bullet_list(
+        &mut self,
+        items: &[&str],
+    ) -> Result<(), pdfgen_font::FontError> {
+        self.flow().bullet_list(items)
+    }
+
+    /// Flow a table; see [`Flow::table`].
+    pub fn flow_table(
+        &mut self,
+        header: &[&str],
+        rows: &[Vec<&str>],
+        widths: &[f64],
+    ) -> Result<(), pdfgen_font::FontError> {
+        self.flow().table(header, rows, widths)
+    }
+
+    /// Load an image file and flow it as a figure; see [`Flow::figure`].
+    pub fn flow_figure(
+        &mut self,
+        path: &str,
+        alt: &str,
+        width: f64,
+        height: f64,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let img = crate::image::Image::load(path)?;
+        self.flow().figure(&img, alt, width, height)?;
+        Ok(())
+    }
+
+    /// Flow a page header artifact; see [`Flow::header`].
+    pub fn flow_header(&mut self, text: &str) -> Result<(), pdfgen_font::FontError> {
+        self.flow().header(text)
+    }
+
+    /// Flow a page footer artifact; see [`Flow::footer`].
+    pub fn flow_footer(&mut self, text: &str) -> Result<(), pdfgen_font::FontError> {
+        self.flow().footer(text)
+    }
+
     /// Compute machine-check violations for the current state.
     fn violations(&self) -> Vec<Violation> {
         let mut v = Vec::new();

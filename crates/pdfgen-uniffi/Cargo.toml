@@ -1,0 +1,23 @@
+[package]
+name = "pdfgen-uniffi"
+description = "Kotlin/Java bindings for pdfgen via UniFFI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "pdfgen_uniffi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+pdfgen-api = { workspace = true }
+uniffi = { version = "0.32.2", features = ["cli"] }
+thiserror = "2"
+
+[lints]
+workspace = true
+
+[build-dependencies]
+uniffi_build = { version = "0.32.2" }

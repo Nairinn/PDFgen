@@ -1,0 +1,21 @@
+[package]
+name = "pdfgen-py"
+description = "Python bindings for pdfgen via PyO3"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+# Same name as the pdfgen rlib crate but a different artifact type
+# (cdylib), so the Python import name is `pdfgen`.
+name = "pdfgen"
+crate-type = ["cdylib"]
+
+[dependencies]
+pdfgen-api = { workspace = true }
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py39"] }
+
+[lints]
+workspace = true

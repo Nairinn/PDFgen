@@ -28,6 +28,11 @@ impl<'a> Flow<'a> {
         if doc.pages.is_empty() {
             doc.pages.push(Default::default());
         }
+        // Defaults are accessible: if no font was ever loaded, resolve
+        // "Liberation Sans Regular" now so bare documents just work.
+        if doc.fonts.is_empty() {
+            let _ = doc.font("Liberation Sans", "Regular");
+        }
         let page_idx = doc.pages.len() - 1;
         let y = if doc.pages[page_idx].nodes.is_empty() {
             h - margin
@@ -65,7 +70,12 @@ impl<'a> Flow<'a> {
         size: f64,
         max_w: f64,
     ) -> Result<Vec<String>, FontError> {
-        let f = &self.doc.fonts[font];
+        let Some(f) = self.doc.fonts.get(font) else {
+            // No font loaded (or bad handle): the caller relied on a
+            // default that does not exist. Fail with a clear message
+            // rather than panic.
+            return Err(FontError::MissingGlyph('?', 0));
+        };
         let mut lines = Vec::new();
         let mut cur = String::new();
         for word in text.split(' ') {

@@ -8,6 +8,9 @@ members = [
     "crates/pdfgen-canvas",
     "crates/pdfgen-profile",
     "crates/pdfgen",
+    "crates/pdfgen-api",
+    "crates/pdfgen-py",
+    "crates/pdfgen-uniffi",
 ]
 
 [workspace.package]
@@ -24,6 +27,8 @@ pdfgen-fonts = { path = "crates/pdfgen-fonts", version = "0.1.0" }
 pdfgen-canvas = { path = "crates/pdfgen-canvas", version = "0.1.0" }
 pdfgen-profile = { path = "crates/pdfgen-profile", version = "0.1.0" }
 pdfgen-parse = { path = "crates/pdfgen-parse", version = "0.1.0" }
+pdfgen = { path = "crates/pdfgen", version = "0.1.0" }
+pdfgen-api = { path = "crates/pdfgen-api", version = "0.1.0" }
 ttf-parser = "0.25"
 
 [workspace.lints.rust]
