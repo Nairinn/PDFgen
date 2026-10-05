@@ -27,7 +27,7 @@ pub struct CatalogEntry {
     pub file: &'static str,
 }
 
-/// The built-in catalog (Liberation family: Sans/Serif/Mono).
+/// The built-in catalog (Liberation + Noto families, all OFL-1.1).
 pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry { family: "Liberation Sans", style: "Regular", file: "vendor/liberation/LiberationSans-Regular.ttf" },
     CatalogEntry { family: "Liberation Sans", style: "Bold", file: "vendor/liberation/LiberationSans-Bold.ttf" },
@@ -41,6 +41,14 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry { family: "Liberation Mono", style: "Bold", file: "vendor/liberation/LiberationMono-Bold.ttf" },
     CatalogEntry { family: "Liberation Mono", style: "Italic", file: "vendor/liberation/LiberationMono-Italic.ttf" },
     CatalogEntry { family: "Liberation Mono", style: "Bold Italic", file: "vendor/liberation/LiberationMono-BoldItalic.ttf" },
+    CatalogEntry { family: "Noto Sans", style: "Regular", file: "vendor/noto/NotoSans-Regular.ttf" },
+    CatalogEntry { family: "Noto Sans", style: "Bold", file: "vendor/noto/NotoSans-Bold.ttf" },
+    CatalogEntry { family: "Noto Sans", style: "Italic", file: "vendor/noto/NotoSans-Italic.ttf" },
+    CatalogEntry { family: "Noto Sans", style: "Bold Italic", file: "vendor/noto/NotoSans-BoldItalic.ttf" },
+    CatalogEntry { family: "Noto Serif", style: "Regular", file: "vendor/noto/NotoSerif-Regular.ttf" },
+    CatalogEntry { family: "Noto Serif", style: "Bold", file: "vendor/noto/NotoSerif-Bold.ttf" },
+    CatalogEntry { family: "Noto Sans Mono", style: "Regular", file: "vendor/noto/NotoSansMono-Regular.ttf" },
+    CatalogEntry { family: "Noto Sans Mono", style: "Bold", file: "vendor/noto/NotoSansMono-Bold.ttf" },
 ];
 
 /// Standard-14 name → look-alike family (PDF/UA needs embedded fonts).
