@@ -1,0 +1,16 @@
+[package]
+name = "pdfgen-font"
+description = "Font loading, metrics, encoding tables and embedding"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfgen-core = { workspace = true }
+ttf-parser = { workspace = true }
+thiserror = "2"
+
+[lints]
+workspace = true

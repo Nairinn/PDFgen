@@ -1,0 +1,40 @@
+# cargo-deny configuration: keep the dependency tree permissively licensed.
+# Run: cargo deny check
+
+[graph]
+# check all targets including tests
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-apple-darwin" },
+    { triple = "x86_64-pc-windows-msvc" },
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+]
+# OFL-1.1 / Apache-2.0 are for font *files* shipped by pdfgen-fonts-* crates,
+# not compiled dependencies; they appear in font manifests, not Cargo metadata.
+confidence-threshold = 0.93
+
+[bans]
+multiple-versions = "warn"
+deny = [
+    # Copyleft: the whole point of this project is a clean MIT library.
+    { name = "pdf", deny = true },
+    { name = "lopdf", deny = true },
+    { name = "pdfium-render", deny = true },
+]
+
+[advisories]
+version = 2
+yanked = "warn"

@@ -1,0 +1,18 @@
+[package]
+name = "pdfgen"
+description = "Free, MIT-licensed, from-scratch PDF library with PDF/UA end to end"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+rustdoc-links = true
+
+[dependencies]
+pdfgen-core = { workspace = true }
+pdfgen-font = { workspace = true }
+pdfgen-canvas = { workspace = true }
+pdfgen-profile = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,14 @@
+[package]
+name = "pdfgen-profile"
+description = "Conformance profiles (PDF/UA-1 and PDF/UA-2) and the save report"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfgen-core = { workspace = true }
+
+[lints]
+workspace = true

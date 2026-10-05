@@ -1,0 +1,27 @@
+# Rust
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+# Generated test output
+/tests/output/
+/tests/golden/*.actual.pdf
+*.actual.pdf
+
+# Local tooling
+tools/
+.verapdf/
+
+# OS
+.DS_Store
+
+# Python bindings build
+bindings/python/build/
+bindings/python/dist/
+*.so
+*.dylib
+*.egg-info/
+
+# JVM bindings build
+bindings/*/build/
+*.jar

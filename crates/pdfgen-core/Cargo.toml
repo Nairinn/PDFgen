@@ -1,0 +1,16 @@
+[package]
+name = "pdfgen-core"
+description = "PDF object model, serializer and low-level document writer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = "2"
+
+[dev-dependencies]
+
+[lints]
+workspace = true
