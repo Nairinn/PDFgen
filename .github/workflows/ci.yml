@@ -50,5 +50,5 @@ jobs:
         run: cd crates/pdfgen-py && maturin build --out dist
       - name: Install and import
         run: |
-          pip install dist/*.whl --no-deps || pip install crates/pdfgen-py/dist/*.whl --no-deps
+          pip install crates/pdfgen-py/dist/*.whl --no-deps
           python -c "import pdfgen; print('pdfgen', pdfgen.__version__)"
