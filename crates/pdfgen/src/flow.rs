@@ -355,6 +355,50 @@ impl<'a> Flow<'a> {
         Ok(())
     }
 
+    // ------------------------------------------------------------ forms
+
+    /// Add an interactive text field with an accessible label. The label
+    /// is tagged text (`Form > Caption`-style: label drawn, widget linked);
+    /// the field dictionary carries `/TU` (tooltip = the label) so screen
+    /// readers announce it. Filling happens in any PDF viewer.
+    pub fn text_field(&mut self, label: &str, name: &str) -> Result<(), FontError> {
+        let field_w = 220.0;
+        let field_h = 18.0;
+        self.ensure_space(field_h + 11.0);
+
+        // Label text, tagged.
+        let encoded = pdfgen_font::winansi::encode(label)?;
+        let pd = &mut self.doc.pages[self.page_idx];
+        let mcid = pd.content.begin_tag("Caption");
+        pd.content
+            .text("F0", 11.0, self.margin, self.y - 11.0, &encoded);
+        pd.content.end_tag();
+
+        // Field box drawn as the widget's border (annotation appearance).
+        // Pure decoration on the page: mark it as an artifact.
+        let y_box = self.y - field_h - 11.0;
+        pd.content.begin_artifact("");
+        pd.content.rect(self.margin + 160.0, y_box, field_w, field_h);
+        pd.content.end_artifact();
+
+        // Record for AcroForm emission at save.
+        self.doc.fields.push(crate::form::FieldSpec {
+            name: name.to_string(),
+            tu: label.to_string(),
+            page: self.page_idx,
+            x: self.margin + 160.0,
+            y: y_box,
+            w: field_w,
+            h: field_h,
+        });
+
+        self.y = y_box - 8.0;
+        self.doc.pages[self.page_idx]
+            .nodes
+            .push(Node::leaf("Caption", label.to_string(), 0, 11.0).with_pieces(vec![(self.page_idx, mcid)]));
+        Ok(())
+    }
+
     /// Page footer furniture, drawn as a pagination artifact.
     pub fn footer(&mut self, text: &str) -> Result<(), FontError> {
         let encoded = pdfgen_font::winansi::encode(text)?;

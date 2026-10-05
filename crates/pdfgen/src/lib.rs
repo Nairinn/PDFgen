@@ -25,6 +25,7 @@
 mod document;
 mod extract;
 mod flow;
+mod form;
 mod html;
 mod image;
 mod page;
@@ -36,6 +37,7 @@ mod tounicode;
 pub use document::Document;
 pub use extract::{extract_text, PageText};
 pub use flow::Flow;
+pub use form::fill_text_field;
 pub use html::{html_file_to_pdf, html_to_pdf, HtmlError};
 pub use image::{Image, ImageError, ImageKind};
 pub use page::Page;

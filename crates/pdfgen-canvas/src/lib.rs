@@ -116,7 +116,9 @@ impl Content {
     /// `Footer`, or empty for plain decoration (Matterhorn 18-001/18-002).
     pub fn begin_artifact(&mut self, subtype: &str) {
         if subtype.is_empty() {
-            self.ops.push_str("/Artifact BDC\n");
+            // A property dict is required: some validators (veraPDF) treat
+            // a bare /Artifact name without one as unmarked content.
+            self.ops.push_str("/Artifact <</Type /Pagination>> BDC\n");
         } else {
             self.ops.push_str(&format!(
                 "/Artifact <</Type /Pagination /Subtype /{subtype}>> BDC\n"

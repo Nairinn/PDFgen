@@ -31,6 +31,8 @@ pub struct Document {
     pub(crate) bookmarks: Vec<(u8, String, usize)>,
     /// Generate the document outline (bookmarks) from headings.
     pub(crate) want_outline: bool,
+    /// Form fields recorded by the flow API, emitted as AcroForm at save.
+    pub(crate) fields: Vec<crate::form::FieldSpec>,
 }
 
 impl Document {
@@ -47,6 +49,7 @@ impl Document {
             page_size: (612.0, 792.0),
             bookmarks: Vec::new(),
             want_outline: true,
+            fields: Vec::new(),
         }
     }
 
@@ -624,6 +627,18 @@ impl Document {
         if let Some(outlines) = outlines_ref {
             cat.set("Outlines", outlines);
             cat.set("PageMode", "UseOutlines");
+        }
+        // AcroForm with accessible (/TU) fields.
+        if !self.fields.is_empty() {
+            let field_refs: Vec<Ref> = self
+                .fields
+                .iter()
+                .map(|spec| {
+                    crate::form::emit_field(&mut doc, spec, page_refs[spec.page.min(n_pages - 1)])
+                })
+                .collect();
+            let af = crate::form::emit_acroform(&mut doc, &field_refs);
+            cat.set("AcroForm", af);
         }
         if let Some(lang) = &self.meta.lang {
             cat.set("Lang", PdfString::text(lang));
