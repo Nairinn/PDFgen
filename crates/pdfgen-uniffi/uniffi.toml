@@ -1,2 +1,2 @@
-[bindings]
-kotlin = true
+[defaults]
+# Kotlin bindings enabled by default for this crate.

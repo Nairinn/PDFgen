@@ -185,25 +185,26 @@ fn report_from_api(r: pdfgen_api::Report) -> Report {
 /// Errors surface as exceptions in Kotlin/Java.
 #[derive(uniffi::Error, Debug, thiserror::Error)]
 pub enum PdfgenError {
-    /// Something failed; the message says what.
-    #[error("{message}")]
+    /// Something failed; `msg` says what.
+    #[error("{msg}")]
     General {
         /// Human-readable error message.
-        message: String,
+        msg: String,
     },
 }
 
 impl From<String> for PdfgenError {
-    fn from(message: String) -> Self {
-        PdfgenError::General { message }
+    fn from(msg: String) -> Self {
+        PdfgenError::General { msg }
     }
 }
 
-#[derive(uniffi::Record)]
-pub struct VersionInfo {
-    /// Crate version.
-    pub version: String,
-}
+    /// Library version metadata.
+    #[derive(uniffi::Record)]
+    pub struct VersionInfo {
+        /// Crate version string.
+        pub version: String,
+    }
 
 /// Library version metadata.
 #[uniffi::export]
