@@ -353,6 +353,21 @@ impl PdfReader {
         &self.known
     }
 
+    /// Known object offsets: (id, byte offset) for every in-use entry.
+    /// Used by the revision crate to re-emit xref tables.
+    pub fn object_offsets(&self) -> Vec<(u32, u64)> {
+        let mut out: Vec<(u32, u64)> = self
+            .xref
+            .iter()
+            .filter_map(|(id, e)| match e {
+                Entry::InUse(off) => Some((*id, *off)),
+                Entry::Free => None,
+            })
+            .collect();
+        out.sort_unstable();
+        out
+    }
+
     /// Resolve an object by number (lazily; cached).
     pub fn get(&mut self, id: u32) -> Result<Object, ParseError> {
         if let Some(cached) = self.cache.get(&id) {

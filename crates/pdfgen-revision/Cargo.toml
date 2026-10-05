@@ -1,0 +1,19 @@
+[package]
+name = "pdfgen-revision"
+description = "PDF version control: commit, history, diff, revert inside the file itself"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfgen-core = { workspace = true }
+pdfgen-parse = { workspace = true }
+
+[dev-dependencies]
+pdfgen = { workspace = true }
+pdfgen-validate = { workspace = true }
+
+[lints]
+workspace = true

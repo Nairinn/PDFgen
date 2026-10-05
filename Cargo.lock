@@ -471,6 +471,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdfgen-revision"
+version = "0.1.0"
+dependencies = [
+ "pdfgen",
+ "pdfgen-core",
+ "pdfgen-parse",
+ "pdfgen-validate",
+]
+
+[[package]]
 name = "pdfgen-uniffi"
 version = "0.1.0"
 dependencies = [
