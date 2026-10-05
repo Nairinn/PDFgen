@@ -45,6 +45,46 @@ impl Sheet {
     }
 }
 
+/// ISO 5457 A-series sheet sizes (landscape, mm -> points; 1 mm = 72/25.4 pt).
+#[derive(Debug, Clone, Copy)]
+pub enum IsoSheet {
+    /// 210 x 297 mm (landscape).
+    A4,
+    /// 297 x 420 mm.
+    A3,
+    /// 420 x 594 mm.
+    A2,
+    /// 594 x 841 mm.
+    A1,
+    /// 841 x 1189 mm.
+    A0,
+}
+
+impl IsoSheet {
+    /// Landscape size in points.
+    pub fn points(self) -> (f64, f64) {
+        let mm = |w: f64, h: f64| (w * 72.0 / 25.4, h * 72.0 / 25.4);
+        match self {
+            IsoSheet::A4 => mm(297.0, 210.0),
+            IsoSheet::A3 => mm(420.0, 297.0),
+            IsoSheet::A2 => mm(594.0, 420.0),
+            IsoSheet::A1 => mm(841.0, 594.0),
+            IsoSheet::A0 => mm(1189.0, 841.0),
+        }
+    }
+
+    /// Size designation as text ("A4").
+    pub fn letter(self) -> &'static str {
+        match self {
+            IsoSheet::A4 => "A4",
+            IsoSheet::A3 => "A3",
+            IsoSheet::A2 => "A2",
+            IsoSheet::A1 => "A1",
+            IsoSheet::A0 => "A0",
+        }
+    }
+}
+
 /// Title block field rows (drawn as a tagged TH/TD table).
 #[derive(Debug, Clone)]
 pub struct TitleField {
@@ -68,8 +108,7 @@ pub struct Drawing<'a> {
 }
 
 impl<'a> Drawing<'a> {
-    /// Begin a drawing sheet of the given size. Appends a custom-sized
-    /// page and draws the Y14.1 border frame.
+    /// Begin an ASME drawing sheet (Y14.1 border frame).
     pub fn new(doc: &'a mut Document, sheet: Sheet) -> Self {
         let (w, h) = sheet.points();
         let page = doc.add_draw_page(w, h);
@@ -84,7 +123,63 @@ impl<'a> Drawing<'a> {
         d
     }
 
-    /// Draw the border frame (two concentric rects, artifact content).
+    /// Begin an ISO 5457 sheet: A-series size with the ISO frame
+    /// (10 mm trimming margin + inner content frame) and, on sheets larger
+    /// than A4, the centring-marks cross pattern.
+    pub fn new_iso(doc: &'a mut Document, sheet: IsoSheet) -> Self {
+        let (w, h) = sheet.points();
+        let page = doc.add_draw_page(w, h);
+        // ISO 5457: 10 mm trimming margin, 5 mm inner frame gap for A4,
+        // 10 mm for larger sheets.
+        let trim = 10.0 * 72.0 / 25.4;
+        let inner_gap = if matches!(sheet, IsoSheet::A4) { 5.0 } else { 10.0 } * 72.0 / 25.4;
+        let mut d = Drawing {
+            doc,
+            w,
+            h,
+            border: trim,
+            page,
+        };
+
+        let (w_, h_, b) = (d.w, d.h, d.border);
+        let f = b + inner_gap;
+        let mut ops = format!(
+            "0.7 w {} {} {} {} re S\n0.5 w {} {} {} {} re S\n",
+            b,
+            b,
+            w_ - 2.0 * b,
+            h_ - 2.0 * b,
+            f,
+            f,
+            w_ - 2.0 * f,
+            h_ - 2.0 * f
+        );
+        // ISO 5457 centring marks (A3 and up): short crosshairs at the
+        // middle of each edge, drawn edge-to-frame.
+        if !matches!(sheet, IsoSheet::A4) {
+            let half_w = w_ / 2.0;
+            let half_h = h_ / 2.0;
+            let mark = 8.0;
+            // Left and right mid-edge horizontal marks.
+            ops.push_str(&format!(
+                "0.35 w 0 {} {} {} m l S\n{} {} {} {} m l S\n",
+                half_h, mark, half_h,
+                w_ - mark, half_h, w_, half_h
+            ));
+            // Top and bottom mid-edge vertical marks.
+            ops.push_str(&format!(
+                "0.35 w {} 0 {} {} m l S\n{} {} {} {} m l S\n",
+                half_w, half_w, mark,
+                half_w, h_ - mark, half_w, h_
+            ));
+        }
+        d.doc.begin_artifact(d.page, "");
+        d.doc.raw_ops(d.page, &ops);
+        d.doc.end_artifact(d.page);
+        d
+    }
+
+    /// Draw the ASME border frame (two concentric rects, artifact content).
     fn frame(&mut self) {
         let (w, h, b) = (self.w, self.h, self.border);
         let ops = format!(

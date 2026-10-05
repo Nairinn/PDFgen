@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build (excluding Python extension)
+        run: cargo build --workspace --exclude pdfgen-py
+
+      - name: Test
+        run: cargo test --workspace --exclude pdfgen-py
+
+      - name: Clippy
+        run: cargo clippy --workspace --exclude pdfgen-py -- -D warnings
+        continue-on-error: true
+
+      - name: Lint commit messages (Conventional Commits)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          git log --format='%s' origin/main~50..HEAD 2>/dev/null |
+          head -50 |
+          grep -vE '^(feat|fix|docs|chore|refactor|test|style|perf|build|ci|revert)(\(.+\))?: .+$' |
+          grep -q . && { echo "Non-conventional commit subjects found:"; git log --format='%s' origin/main~50..HEAD | grep -vE '^(feat|fix|docs|chore|refactor|test|style|perf|build|ci|revert)(\(.+\))?: .+$' | head; exit 1; } || echo "commit style OK"
+
+  binding-smoke:
+    name: Python binding build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install maturin
+      - name: Build wheel
+        run: cd crates/pdfgen-py && maturin build --out dist
+      - name: Install and import
+        run: |
+          pip install dist/*.whl --no-deps || pip install crates/pdfgen-py/dist/*.whl --no-deps
+          python -c "import pdfgen; print('pdfgen', pdfgen.__version__)"
