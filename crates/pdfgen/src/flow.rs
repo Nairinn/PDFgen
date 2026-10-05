@@ -148,6 +148,10 @@ impl<'a> Flow<'a> {
         self.ensure_space(needed);
         let (mcid, y) = self.draw_lines(&format!("H{level}"), 0, size, &lines, self.margin)?;
         self.y = y;
+        // Bookmark entry for the outline (built at save).
+        self.doc
+            .bookmarks
+            .push((level, text.to_string(), self.page_idx));
         self.doc.pages[self.page_idx].nodes.push(
             Node::leaf(format!("H{level}"), text.to_string(), 0, size)
                 .with_pieces(vec![(self.page_idx, mcid)]),

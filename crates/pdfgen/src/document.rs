@@ -27,6 +27,10 @@ pub struct Document {
     pub(crate) images: Vec<Image>,
     /// Page size in points (all pages share it for now).
     pub(crate) page_size: (f64, f64),
+    /// Bookmark entries collected from headings: (level, text, page).
+    pub(crate) bookmarks: Vec<(u8, String, usize)>,
+    /// Generate the document outline (bookmarks) from headings.
+    pub(crate) want_outline: bool,
 }
 
 impl Document {
@@ -41,6 +45,8 @@ impl Document {
             pages: Vec::new(),
             images: Vec::new(),
             page_size: (612.0, 792.0),
+            bookmarks: Vec::new(),
+            want_outline: true,
         }
     }
 
@@ -519,6 +525,87 @@ impl Document {
             ),
         );
 
+        // --- Outline (bookmarks) ----------------------------------------
+        let outlines_ref = if self.want_outline && !self.bookmarks.is_empty() {
+            let outlines_root = doc.alloc();
+            let item_refs: Vec<Ref> = self.bookmarks.iter().map(|_| doc.alloc()).collect();
+
+            // Nesting: each item's parent is the nearest previous entry
+            // with a smaller level (classic outline construction).
+            let mut parent_of: Vec<Option<usize>> = vec![None; self.bookmarks.len()];
+            let mut last_at_level: [Option<usize>; 7] = [None; 7];
+            for (i, &(level, _, _)) in self.bookmarks.iter().enumerate() {
+                let lvl = level.min(6) as usize;
+                let mut parent = None;
+                for l in (0..lvl).rev() {
+                    if last_at_level[l].is_some() {
+                        parent = last_at_level[l];
+                        break;
+                    }
+                }
+                parent_of[i] = parent;
+                last_at_level[lvl] = Some(i);
+                for l in (lvl + 1)..7 {
+                    last_at_level[l] = None;
+                }
+            }
+
+            for (i, &(level, ref title, page)) in self.bookmarks.iter().enumerate() {
+                let mut item = Dict::new();
+                item.set("Title", PdfString::text(title));
+                item.set(
+                    "Parent",
+                    match parent_of[i] {
+                        Some(p) => Object::Ref(item_refs[p]),
+                        None => Object::Ref(outlines_root),
+                    },
+                );
+                item.set(
+                    "Dest",
+                    Object::Array(vec![
+                        Object::Ref(page_refs[page.min(n_pages - 1)]),
+                        Object::Name(Name::new("XYZ")),
+                        Object::Null,
+                        Object::Null,
+                        Object::Null,
+                    ]),
+                );
+                // Prev/Next among siblings at any level (flat reading order
+                // is acceptable: Next/Prev chain across all items).
+                if i > 0 {
+                    item.set("Prev", Object::Ref(item_refs[i - 1]));
+                }
+                if i + 1 < self.bookmarks.len() {
+                    item.set("Next", Object::Ref(item_refs[i + 1]));
+                }
+                // First/Last child if this item has children.
+                let kids: Vec<usize> = parent_of
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, p)| **p == Some(i))
+                    .map(|(c, _)| c)
+                    .collect();
+                if let (Some(&f), Some(&l)) = (kids.first(), kids.last()) {
+                    item.set("First", Object::Ref(item_refs[f]));
+                    item.set("Last", Object::Ref(item_refs[l]));
+                }
+                let _ = level;
+                doc.set(item_refs[i], Object::Dict(item));
+            }
+
+            let mut outl = Dict::new();
+            outl.set("Type", "Outlines");
+            if let (Some(&f), Some(&l)) = (item_refs.first(), item_refs.last()) {
+                outl.set("First", Object::Ref(f));
+                outl.set("Last", Object::Ref(l));
+            }
+            outl.set("Count", self.bookmarks.len() as i64);
+            doc.set(outlines_root, Object::Dict(outl));
+            Some(outlines_root)
+        } else {
+            None
+        };
+
         // --- Metadata stream --------------------------------------------
         let xmp_bytes = xmp::build(&self.meta, self.profile.ua_part(), compliant);
         let metadata = doc.alloc();
@@ -534,6 +621,10 @@ impl Document {
         let mut cat = Dict::new();
         cat.set("Type", "Catalog");
         cat.set("Pages", pages_obj);
+        if let Some(outlines) = outlines_ref {
+            cat.set("Outlines", outlines);
+            cat.set("PageMode", "UseOutlines");
+        }
         if let Some(lang) = &self.meta.lang {
             cat.set("Lang", PdfString::text(lang));
         }
