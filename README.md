@@ -104,10 +104,15 @@ crates/
   pdfgen-fonts     registry: built-in catalog, system fonts, name resolution
   pdfgen-canvas    content streams, marked content (BDC/EMC), artifacts
   pdfgen-profile   PDF/UA-1 + UA-2 profiles, XMP, the save report
-  pdfgen           the public API: Document, Flow, StreamWriter, TagSession
+  pdfgen           the public API: Document, Flow, StreamWriter, TagSession,
+                   extract_text, HTML-to-PDF, forms, bookmarks
   pdfgen-api       bindings-friendly facade (owned types, no lifetimes)
   pdfgen-py        Python bindings (PyO3)
   pdfgen-uniffi    Kotlin/Java bindings (UniFFI)
+  pdfgen-validate  Matterhorn machine checks (the `pdfgen validate` engine)
+  pdfgen-revision  commit / history / diff / revert inside the PDF
+  pdfgen-draw      ASME Y14 drawing kit (sheets, title block, dimensions)
+  pdfgen-cli       the `pdfgen` command-line tool
 fonts/vendor/      bundled OFL fonts (Liberation family)
 tests/output/      generated PDFs (gitignored) — all veraPDF-validated
 tools/verapdf/     local veraPDF install used as the external checker
@@ -117,8 +122,9 @@ tools/verapdf/     local veraPDF install used as the external checker
 
 ```bash
 cargo test                     # generates tests/output/*.pdf and checks them
+cargo run -p pdfgen-cli -- validate tests/output/hello_ua1.pdf   # our checker
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-tools/verapdf/verapdf -f ua1 tests/output/hello_ua1.pdf
+tools/verapdf/verapdf -f ua1 tests/output/hello_ua1.pdf           # external gate
 tools/verapdf/verapdf -f ua2 tests/output/hello_ua2.pdf
 ```
 
