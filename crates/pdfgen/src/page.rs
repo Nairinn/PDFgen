@@ -1,32 +1,38 @@
-//! One page under construction: tagged text blocks flowing top to bottom.
+//! Per-page data and the absolute-placement page builder.
 
-use crate::document::Document;
 use pdfgen_font::FontError;
 
-/// A single tagged text block on a page.
+/// A single tagged text block. A block that flows across page breaks has
+/// one piece (page index, MCID within that page) per page it lands on.
 #[derive(Debug, Clone)]
 pub struct Block {
     /// PDF structure type: `H1`..`H6`, `P`, …
     pub tag: String,
-    /// Marked-content ID assigned within the page's content stream.
-    pub mcid: u32,
     /// Index of the font in the document's font list.
     pub font: usize,
     /// Font size in points.
     pub size: f64,
-    /// Position of the baseline.
-    pub x: f64,
-    pub y: f64,
+    /// Marked-content pieces: (page index, MCID within that page).
+    pub pieces: Vec<(usize, u32)>,
     /// Original text (pre-encoding) for diagnostics.
     pub text: String,
-    /// WinAnsi-encoded bytes drawn in the content stream.
-    pub encoded: Vec<u8>,
 }
 
-/// Builder for one page. Blocks flow down the page in call order, which is
-/// also the logical reading order.
+/// Per-page accumulated content and blocks.
+#[derive(Debug, Default)]
+pub(crate) struct PageData {
+    /// The page's content stream under construction.
+    pub content: pdfgen_canvas::Content,
+    /// Tagged blocks placed on this page.
+    pub blocks: Vec<Block>,
+}
+
+/// Builder for one explicitly placed page. Each call places exactly one
+/// line (the flow API wraps); blocks go down the page in call order,
+/// which is also the logical reading order.
 pub struct Page<'a> {
-    doc: &'a mut Document,
+    doc: &'a mut crate::document::Document,
+    idx: usize,
     /// Page width in points.
     pub width: f64,
     /// Page height in points.
@@ -38,10 +44,11 @@ pub struct Page<'a> {
 }
 
 impl<'a> Page<'a> {
-    /// Create the page builder over a document.
-    pub(crate) fn new(doc: &'a mut Document, w: f64, h: f64) -> Self {
+    /// Create the page builder over a document (page `idx` must exist).
+    pub(crate) fn new(doc: &'a mut crate::document::Document, idx: usize, w: f64, h: f64) -> Self {
         Page {
             doc,
+            idx,
             width: w,
             height: h,
             margin: 72.0,
@@ -57,10 +64,7 @@ impl<'a> Page<'a> {
 
     /// Add a tagged heading (levels 1-6).
     pub fn heading(&mut self, level: u8, text: &str) -> Result<(), FontError> {
-        debug_assert!(
-            (1..=6).contains(&level),
-            "heading levels are 1-6"
-        );
+        debug_assert!((1..=6).contains(&level), "heading levels are 1-6");
         let size = match level {
             1 => 18.0,
             2 => 15.0,
@@ -91,19 +95,16 @@ impl<'a> Page<'a> {
         let encoded = pdfgen_font::winansi::encode(text)?;
         let x = self.margin;
         let y = self.next_baseline(size);
-        let mcid = self
-            .doc
+        let pd = &mut self.doc.pages[self.idx];
+        let mcid = pd
             .content
             .tagged_text(tag, &format!("F{font}"), size, x, y, &encoded);
-        self.doc.blocks.push(Block {
+        pd.blocks.push(Block {
             tag: tag.to_string(),
-            mcid,
             font,
             size,
-            x,
-            y,
+            pieces: vec![(self.idx, mcid)],
             text: text.to_string(),
-            encoded,
         });
         Ok(())
     }

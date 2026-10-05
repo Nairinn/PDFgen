@@ -1,6 +1,6 @@
 //! The end-to-end document: fonts, pages, structure tree, XMP and save.
 
-use crate::page::Block;
+use crate::page::{Block, PageData};
 use crate::tounicode;
 use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
 use pdfgen_font::LoadedFont;
@@ -14,12 +14,12 @@ pub struct Document {
     pub meta: Metadata,
     /// Loaded fonts, by index.
     pub(crate) fonts: Vec<LoadedFont>,
-    /// The single content stream (M1: one page).
-    pub(crate) content: pdfgen_canvas::Content,
-    /// Tagged blocks recorded for the structure tree.
-    pub(crate) blocks: Vec<Block>,
-    /// Page size in points.
+    /// Per-page content and blocks.
+    pub(crate) pages: Vec<PageData>,
+    /// Page size in points (all pages share it for now).
     pub(crate) page_size: (f64, f64),
+    /// Next StructParents key to hand out.
+    pub(crate) next_struct_parents: i64,
 }
 
 impl Document {
@@ -29,9 +29,9 @@ impl Document {
             profile,
             meta: Metadata::default(),
             fonts: Vec::new(),
-            content: pdfgen_canvas::Content::new(),
-            blocks: Vec::new(),
+            pages: Vec::new(),
             page_size: (612.0, 792.0),
+            next_struct_parents: 0,
         }
     }
 
@@ -54,10 +54,20 @@ impl Document {
         Ok(self.fonts.len() - 1)
     }
 
-    /// Begin a page (M1: single page).
+    /// Begin an explicitly placed page; content is placed via the returned
+    /// builder. For flowing text use [`Document::flow`] instead.
     pub fn add_page(&mut self, w: f64, h: f64) -> crate::page::Page<'_> {
         self.page_size = (w, h);
-        crate::page::Page::new(self, w, h)
+        self.pages.push(PageData::default());
+        crate::page::Page::new(self, self.pages.len() - 1, w, h)
+    }
+
+    /// Start flowing content. The flow wraps text to the page width and
+    /// starts new pages automatically as needed.
+    pub fn flow(&mut self) -> crate::flow::Flow<'_> {
+        self.pages.push(PageData::default());
+        self.page_size = (612.0, 792.0);
+        crate::flow::Flow::new(self)
     }
 
     /// Compute machine-check violations for the current state.
@@ -84,20 +94,22 @@ impl Document {
                 fix: "Call doc.lang(\"en-US\") (or the document's language).".into(),
             });
         }
-        if self.blocks.is_empty() {
+        if self.pages.iter().all(|p| p.blocks.is_empty()) {
             v.push(Violation {
                 id: "01-006".into(),
                 message: "No content has been tagged: the structure tree would be empty".into(),
                 fix: "Add at least one heading or paragraph before saving.".into(),
             });
         }
-        for b in &self.blocks {
-            if b.tag.starts_with('H') && b.text.trim().is_empty() {
-                v.push(Violation {
-                    id: "09-003".into(),
-                    message: format!("Heading {} is empty", b.tag),
-                    fix: "Headings must contain text.".into(),
-                });
+        for pd in &self.pages {
+            for b in &pd.blocks {
+                if b.tag.starts_with('H') && b.text.trim().is_empty() {
+                    v.push(Violation {
+                        id: "09-003".into(),
+                        message: format!("Heading {} is empty", b.tag),
+                        fix: "Headings must contain text.".into(),
+                    });
+                }
             }
         }
         v
@@ -106,10 +118,7 @@ impl Document {
     /// Serialize the document, write it to `path`, and return the
     /// accessibility report. The file is always written — compliance issues
     /// go into the report, and the file simply does not claim PDF/UA.
-    pub fn save(
-        &mut self,
-        path: &str,
-    ) -> Result<SaveReport, Box<dyn std::error::Error>> {
+    pub fn save(&mut self, path: &str) -> Result<SaveReport, Box<dyn std::error::Error>> {
         // 1. Machine checks decide whether the file may claim PDF/UA.
         let violations = self.violations();
         let compliant = violations.is_empty();
@@ -121,24 +130,32 @@ impl Document {
 
         // 2. Build the object graph.
         let mut doc = pdfgen_core::Document::new();
-        let content_bytes = std::mem::take(&mut self.content).finish();
-
         let catalog = doc.alloc();
-        let pages = doc.alloc();
-        let page = doc.alloc();
-        let contents = doc.alloc();
+        let pages_obj = doc.alloc();
 
         // --- Fonts -----------------------------------------------------
         let mut font_refs: Vec<Ref> = Vec::new();
         for f in &self.fonts {
             font_refs.push(Self::emit_font(&mut doc, f));
         }
+        let mut font_res = Dict::new();
+        for (i, &r) in font_refs.iter().enumerate() {
+            font_res.set(format!("F{i}"), r);
+        }
+
+        // --- Pages -----------------------------------------------------
+        let n_pages = self.pages.len();
+        let mut page_refs: Vec<Ref> = Vec::with_capacity(n_pages);
+        let mut contents_refs: Vec<Ref> = Vec::with_capacity(n_pages);
+        for _ in 0..n_pages {
+            page_refs.push(doc.alloc());
+            contents_refs.push(doc.alloc());
+        }
 
         // --- Structure tree --------------------------------------------
         let struct_root = doc.alloc();
         let doc_elem = doc.alloc();
-        // PDF 2.0 (UA-2): elements live in the standard structure namespace,
-        // declared on the tree root and referenced by each element.
+        // PDF 2.0 (UA-2): elements live in the standard structure namespace.
         let namespace = if self.profile == Profile::PdfUa2 {
             let ns = doc.alloc();
             doc.set(
@@ -153,26 +170,55 @@ impl Document {
         } else {
             None
         };
-        let elem_refs: Vec<Ref> = self
-            .blocks
+
+        // One StructElem per block, on every page that has blocks; the
+        // element's K lists its marked-content pieces, each as an MCR
+        // dictionary pointing at the right page and MCID.
+        //
+        // element_refs: (page_idx, block_idx) -> object ref. A block split
+        // across pages gets ONE element whose K references every page.
+        let mut elem_refs: Vec<Vec<Ref>> = self
+            .pages
             .iter()
-            .map(|_| doc.alloc())
+            .map(|pd| pd.blocks.iter().map(|_| doc.alloc()).collect())
             .collect();
 
-        for (b, &r) in self.blocks.iter().zip(elem_refs.iter()) {
-            let mut e = Dict::new();
-            e.set("Type", "StructElem");
-            e.set("S", Object::Name(Name::new(b.tag.clone())));
-            if let Some(ns) = namespace {
-                e.set("NS", ns);
+        for (pi, pd) in self.pages.iter().enumerate() {
+            for (bi, b) in pd.blocks.iter().enumerate() {
+                let r = elem_refs[pi][bi];
+                let mut e = Dict::new();
+                e.set("Type", "StructElem");
+                e.set("S", Object::Name(Name::new(b.tag.clone())));
+                if let Some(ns) = namespace {
+                    e.set("NS", ns);
+                }
+                e.set("P", doc_elem);
+                e.set("Pg", page_refs[b.pieces[0].0]);
+                // K: one entry per marked-content piece. Single piece on the
+                // page the element lives on: plain MCID integer. Otherwise
+                // MCR dicts referencing the right page.
+                if b.pieces.len() == 1 && b.pieces[0].0 == pi {
+                    e.set("K", i64::from(b.pieces[0].1));
+                } else {
+                    let kids: Vec<Object> = b
+                        .pieces
+                        .iter()
+                        .map(|&(pgi, mcid)| {
+                            Object::Dict(
+                                Dict::new()
+                                    .with("Type", "MCR")
+                                    .with("Pg", page_refs[pgi])
+                                    .with("MCID", i64::from(mcid)),
+                            )
+                        })
+                        .collect();
+                    e.set("K", Object::Array(kids));
+                }
+                doc.set(r, Object::Dict(e));
             }
-            e.set("P", doc_elem);
-            e.set("Pg", page);
-            e.set("K", i64::from(b.mcid));
-            doc.set(r, Object::Dict(e));
         }
 
-        // Root element: /Document, parent = StructTreeRoot itself.
+        // Root element: /Document.
         let mut dr = Dict::new();
         dr.set("Type", "StructElem");
         dr.set("S", "Document");
@@ -180,15 +226,55 @@ impl Document {
             dr.set("NS", ns);
         }
         dr.set("P", struct_root);
-        dr.set(
-            "K",
-            Object::Array(elem_refs.iter().map(|&r| Object::Ref(r)).collect()),
-        );
+        let mut kids: Vec<Object> = Vec::new();
+        for pd_refs in &elem_refs {
+            for &r in pd_refs {
+                kids.push(Object::Ref(r));
+            }
+        }
+        dr.set("K", Object::Array(kids));
         doc.set(doc_elem, Object::Dict(dr));
 
-        // Parent tree: page's StructParents (0) -> array of element refs
-        // indexed by MCID.
-        let kids: Vec<Object> = elem_refs.iter().map(|&r| Object::Ref(r)).collect();
+        // Parent tree: page i's StructParents key -> array of element refs
+        // for blocks that START on page i (MCID-indexed via the page's own
+        // marked content). Elements continued from a previous page appear
+        // in the array of the page where their MCID lives.
+        let mut nums: Vec<Object> = Vec::new();
+        for pi in 0..n_pages {
+            // MCID-indexed array: position = MCID.
+            let n_mcids = self.pages[pi].content.mcid_count();
+            let mut by_mcid: Vec<Option<Ref>> = vec![None; n_mcids as usize];
+            for (bi, b) in self.pages[pi].blocks.iter().enumerate() {
+                for &(pgi, mcid) in &b.pieces {
+                    if pgi == pi {
+                        by_mcid[mcid as usize] = Some(elem_refs[pi][bi]);
+                    }
+                }
+            }
+            // Also cover pieces of blocks that started elsewhere.
+            for (other_pi, other_pd) in self.pages.iter().enumerate() {
+                if other_pi == pi {
+                    continue;
+                }
+                for (bi, b) in other_pd.blocks.iter().enumerate() {
+                    for &(pgi, mcid) in &b.pieces {
+                        if pgi == pi {
+                            by_mcid[mcid as usize] =
+                                Some(elem_refs[other_pi][bi]);
+                        }
+                    }
+                }
+            }
+            let arr: Vec<Object> = by_mcid
+                .into_iter()
+                .map(|r| match r {
+                    Some(r) => Object::Ref(r),
+                    None => Object::Null,
+                })
+                .collect();
+            nums.push(Object::Int(pi as i64));
+            nums.push(Object::Array(arr));
+        }
         let mut str_root = Dict::new();
         str_root.set("Type", "StructTreeRoot");
         str_root.set("K", doc_elem);
@@ -197,50 +283,49 @@ impl Document {
         }
         str_root.set(
             "ParentTree",
-            Object::Dict(Dict::new().with(
-                "Nums",
-                Object::Array(vec![Object::Int(0), Object::Array(kids)]),
-            )),
+            Object::Dict(Dict::new().with("Nums", Object::Array(nums))),
         );
-        str_root.set("ParentTreeNextKey", 1);
+        str_root.set("ParentTreeNextKey", n_pages as i64);
         doc.set(struct_root, Object::Dict(str_root));
 
-        // --- Page and pages --------------------------------------------
-        let mut font_res = Dict::new();
-        for (i, &r) in font_refs.iter().enumerate() {
-            font_res.set(format!("F{i}"), r);
-        }
+        // --- Page objects -----------------------------------------------
         let (pw, ph) = self.page_size;
-        let mut pg = Dict::new();
-        pg.set("Type", "Page");
-        pg.set("Parent", pages);
-        pg.set(
-            "MediaBox",
-            Object::Array(vec![
-                Object::Int(0),
-                Object::Int(0),
-                Object::Real(pw.into()),
-                Object::Real(ph.into()),
-            ]),
-        );
-        pg.set("Resources", Object::Dict(Dict::new().with("Font", font_res)));
-        pg.set("Contents", contents);
-        pg.set("StructParents", 0);
-        pg.set("Tabs", "S");
-        doc.set(page, Object::Dict(pg));
+        for pi in 0..n_pages {
+            let mut pg = Dict::new();
+            pg.set("Type", "Page");
+            pg.set("Parent", pages_obj);
+            pg.set(
+                "MediaBox",
+                Object::Array(vec![
+                    Object::Int(0),
+                    Object::Int(0),
+                    Object::Real(pw.into()),
+                    Object::Real(ph.into()),
+                ]),
+            );
+            pg.set("Resources", Object::Dict(Dict::new().with("Font", font_res.clone())));
+            pg.set("Contents", contents_refs[pi]);
+            pg.set("StructParents", pi as i64);
+            pg.set("Tabs", "S");
+            doc.set(page_refs[pi], Object::Dict(pg));
+            let content_bytes = std::mem::take(&mut self.pages[pi].content).finish();
+            doc.set_stream(
+                contents_refs[pi],
+                Stream::new(Dict::new(), content_bytes),
+            );
+        }
 
         doc.set(
-            pages,
+            pages_obj,
             Object::Dict(
                 Dict::new()
                     .with("Type", "Pages")
-                    .with("Kids", Object::Array(vec![Object::Ref(page)]))
-                    .with("Count", 1),
+                    .with(
+                        "Kids",
+                        Object::Array(page_refs.iter().map(|&r| Object::Ref(r)).collect()),
+                    )
+                    .with("Count", n_pages as i64),
             ),
-        );
-        doc.set_stream(
-            contents,
-            Stream::new(Dict::new(), content_bytes),
         );
 
         // --- Metadata stream --------------------------------------------
@@ -249,9 +334,7 @@ impl Document {
         doc.set_stream(
             metadata,
             Stream::new(
-                Dict::new()
-                    .with("Type", "Metadata")
-                    .with("Subtype", "XML"),
+                Dict::new().with("Type", "Metadata").with("Subtype", "XML"),
                 xmp_bytes,
             ),
         );
@@ -259,7 +342,7 @@ impl Document {
         // --- Catalog ------------------------------------------------------
         let mut cat = Dict::new();
         cat.set("Type", "Catalog");
-        cat.set("Pages", pages);
+        cat.set("Pages", pages_obj);
         if let Some(lang) = &self.meta.lang {
             cat.set("Lang", PdfString::text(lang));
         }
@@ -307,31 +390,44 @@ impl Document {
                 None => Object::Int(0),
             })
             .collect();
-        let to_thousandths = |v: f64| Object::Real(pdfgen_core::fmt_real(v * 1000.0 / scale).parse::<f64>().unwrap_or(0.0).into());
+        let to_thousandths = |v: f64| {
+            Object::Real(
+                pdfgen_core::fmt_real(v * 1000.0 / scale)
+                    .parse::<f64>()
+                    .unwrap_or(0.0)
+                    .into(),
+            )
+        };
 
         // Font file (uncompressed for M1).
         doc.set_stream(
             ffile,
-            Stream::new(Dict::new().with("Length1", f.raw.len() as i64), f.raw.clone()),
+            Stream::new(
+                Dict::new().with("Length1", f.raw.len() as i64),
+                f.raw.clone(),
+            ),
         );
 
         // ToUnicode CMap.
-        doc.set_stream(
-            ftouni,
-            Stream::new(Dict::new(), tounicode::build_winansi()),
-        );
+        doc.set_stream(ftouni, Stream::new(Dict::new(), tounicode::build_winansi()));
 
         // Descriptor.
         let mut fd = Dict::new();
         fd.set("Type", "FontDescriptor");
-        fd.set("FontName", Object::Name(Name::new(f.postscript_name.clone())));
+        fd.set(
+            "FontName",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        );
         fd.set("Flags", f.descriptor_flags());
-        fd.set("FontBBox", Object::Array(vec![
-            to_thousandths(f64::from(f.bbox[0])),
-            to_thousandths(f64::from(f.bbox[1])),
-            to_thousandths(f64::from(f.bbox[2])),
-            to_thousandths(f64::from(f.bbox[3])),
-        ]));
+        fd.set(
+            "FontBBox",
+            Object::Array(vec![
+                to_thousandths(f64::from(f.bbox[0])),
+                to_thousandths(f64::from(f.bbox[1])),
+                to_thousandths(f64::from(f.bbox[2])),
+                to_thousandths(f64::from(f.bbox[3])),
+            ]),
+        );
         fd.set("ItalicAngle", 0);
         fd.set("Ascent", to_thousandths(f64::from(f.ascent)));
         fd.set("Descent", to_thousandths(f64::from(f.descent)));
@@ -344,7 +440,10 @@ impl Document {
         let mut ff = Dict::new();
         ff.set("Type", "Font");
         ff.set("Subtype", "TrueType");
-        ff.set("BaseFont", Object::Name(Name::new(f.postscript_name.clone())));
+        ff.set(
+            "BaseFont",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        );
         ff.set("FirstChar", 0);
         ff.set("LastChar", 255);
         ff.set("Widths", Object::Array(widths));

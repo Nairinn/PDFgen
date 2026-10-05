@@ -23,11 +23,13 @@
 //! ```
 
 mod document;
+mod flow;
 mod page;
 mod retag;
 mod tounicode;
 
 pub use document::Document;
+pub use flow::Flow;
 pub use page::{Block, Page};
 pub use retag::{TagSession, TextRun};
 pub use pdfgen_font::{FontError, LoadedFont};

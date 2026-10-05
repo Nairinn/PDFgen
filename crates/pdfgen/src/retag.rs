@@ -179,18 +179,17 @@ impl TagSession {
     pub fn auto_tag(&mut self) -> &mut Self {
         let mut last_page = usize::MAX;
         for i in 0..self.runs.len() {
-            let (page, text) = (self.runs[i].page, self.runs[i].page_title_dummy());
-            let _ = text;
             let t = self.runs[i].text.trim();
             if self.runs[i].page != last_page {
                 self.runs[i].tag = "H1".into();
                 last_page = self.runs[i].page;
             } else if t.len() < 60
-                && t.chars().all(|c| c.is_uppercase() || c.is_whitespace() || c == ':')
+                && t.chars()
+                    .all(|c| c.is_uppercase() || c.is_whitespace() || c == ':')
                 && !t.is_empty()
             {
                 self.runs[i].tag = "H2".into();
-            } else if t == "Page {page} page_number_marker" || looks_like_page_number(t) {
+            } else if looks_like_page_number(t) {
                 self.runs[i].artifact = true;
             }
         }
@@ -217,34 +216,24 @@ impl TagSession {
             doc.load_font(arial)?;
         }
 
-        let (w, h) = (612.0, 792.0);
-        {
-            let mut page = doc.add_page(w, h);
-            for run in &self.runs {
-                if run.artifact {
-                    continue;
-                }
-                let level = run
-                    .tag
-                    .strip_prefix('H')
-                    .and_then(|n| n.parse::<u8>().ok());
-                match level {
-                    Some(1) => page.heading(1, &run.text)?,
-                    Some(2) => page.heading(2, &run.text)?,
-                    Some(3) => page.heading(3, &run.text)?,
-                    _ => page.paragraph(&run.text)?,
-                }
+        // Re-emit extracted text as fresh tagged, flowing content.
+        let mut flow = doc.flow();
+        for run in &self.runs {
+            if run.artifact {
+                continue;
+            }
+            let level = run.tag.strip_prefix('H').and_then(|n| n.parse::<u8>().ok());
+            match level {
+                Some(1) => flow.heading(1, &run.text)?,
+                Some(2) => flow.heading(2, &run.text)?,
+                Some(3) => flow.heading(3, &run.text)?,
+                _ => flow.paragraph(&run.text)?,
             }
         }
+        drop(flow);
 
         let report = doc.save(path)?;
         Ok(report)
-    }
-}
-
-impl TextRun {
-    fn page_title_dummy(&self) -> &str {
-        ""
     }
 }
 
