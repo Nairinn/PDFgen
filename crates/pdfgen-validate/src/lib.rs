@@ -145,5 +145,135 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
 
     let _ = Profile::PdfUa1; // UA-2 rule set arrives with the reader's NS walk.
 
+    // -- Structure-tree walk: tables (15-x), headings (14-x), figures (13-x) --
+    if let Some(Object::Ref(root_ref)) = catalog.get("StructTreeRoot").cloned() {
+        let root = reader.get(root_ref.id).map_err(|e| e.to_string())?;
+        if let Object::Dict(root_d) = root {
+            if let Some(Object::Ref(k)) = root_d.get("K").cloned() {
+                let doc_elem = reader.get(k.id).map_err(|e| e.to_string())?;
+                if let Object::Dict(doc_d) = doc_elem {
+                    if let Some(Object::Array(kids)) = doc_d.get("K").cloned() {
+                        for kid in kids {
+                            if let Object::Ref(r) = kid {
+                                walk_element(
+                                    &mut reader,
+                                    r.id,
+                                    &mut findings,
+                                    &mut review,
+                                )?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Ok(Report { findings, review })
+}
+
+/// Recursively check one structure element (and its children).
+fn walk_element(
+    reader: &mut PdfReader,
+    id: u32,
+    findings: &mut Vec<Finding>,
+    review: &mut Vec<&'static str>,
+) -> Result<(), String> {
+    let obj = reader.get(id).map_err(|e| e.to_string())?;
+    let Object::Dict(d) = obj else {
+        return Ok(());
+    };
+    let tag = match d.get("S") {
+        Some(Object::Name(n)) => n.0.clone(),
+        _ => String::new(),
+    };
+    let ctx = format!("element {id} ({tag})");
+
+    match tag.as_str() {
+        // Checkpoint 15: tables.
+        "Table" => {
+            let has_th = has_header_row(reader, &d);
+            if !has_th {
+                findings.push(Finding {
+                    id: "15-001".into(),
+                    message: "Table has no header row (TH)".into(),
+                    context: ctx,
+                });
+            }
+        }
+        // Checkpoint 15-003: header cells need Scope.
+        "TH" => {
+            let has_scope = d
+                .get("A")
+                .and_then(|a| match a {
+                    Object::Array(items) => Some(
+                        items
+                            .iter()
+                            .any(|i| matches!(i, Object::Dict(dd) if dd.get("Scope").is_some())),
+                    ),
+                    Object::Dict(dd) => Some(dd.get("Scope").is_some()),
+                    _ => None,
+                })
+                .unwrap_or(false);
+            if !has_scope {
+                findings.push(Finding {
+                    id: "15-003".into(),
+                    message: "Header cell (TH) has no Scope attribute".into(),
+                    context: ctx,
+                });
+            }
+        }
+        // Checkpoint 13-004: figures need alt text.
+        "Figure" => {
+            if d.get("Alt").is_none() {
+                findings.push(Finding {
+                    id: "13-004".into(),
+                    message: "Figure has no alternative text (/Alt)".into(),
+                    context: ctx,
+                });
+            } else {
+                review.push("13-002: Confirm the alt text conveys the figure's meaning");
+            }
+        }
+        _ => {}
+    }
+
+    // Recurse into child element refs in /K.
+    if let Some(Object::Array(kids)) = d.get("K").cloned() {
+        for kid in kids {
+            if let Object::Ref(r) = kid {
+                walk_element(reader, r.id, findings, review)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// True when any child TR contains a TH.
+fn has_header_row(reader: &mut PdfReader, table: &pdfgen_core::Dict) -> bool {
+    let Some(Object::Array(kids)) = table.get("K").cloned() else {
+        return false;
+    };
+    for kid in kids {
+        if let Object::Ref(r) = kid {
+            let Ok(obj) = reader.get(r.id) else { continue };
+            let Object::Dict(tr) = obj else { continue };
+            if !matches!(tr.get("S"), Some(Object::Name(n)) if n.0 == "TR") {
+                continue;
+            }
+            if let Some(Object::Array(cells)) = tr.get("K").cloned() {
+                for c in cells {
+                    if let Object::Ref(cr) = c {
+                        let Ok(co) = reader.get(cr.id) else { continue };
+                        if let Object::Dict(cd) = co {
+                            if matches!(cd.get("S"), Some(Object::Name(n)) if n.0 == "TH") {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
 }
