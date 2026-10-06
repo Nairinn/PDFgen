@@ -650,7 +650,18 @@ impl Document {
                 }
             }
 
-            for (i, &(level, ref title, page)) in self.bookmarks.iter().enumerate() {
+            // Sibling chains: Prev/Next link only items that share a
+            // parent (per-item O(1) via a per-parent child list).
+            let mut children_of: Vec<Vec<usize>> = vec![Vec::new(); self.bookmarks.len()];
+            let mut root_children: Vec<usize> = Vec::new();
+            for (i, p) in parent_of.iter().enumerate() {
+                match p {
+                    Some(p) => children_of[*p].push(i),
+                    None => root_children.push(i),
+                }
+            }
+
+            for (i, &(_level, ref title, page)) in self.bookmarks.iter().enumerate() {
                 let mut item = Dict::new();
                 item.set("Title", PdfString::text(title));
                 item.set(
@@ -670,36 +681,41 @@ impl Document {
                         Object::Null,
                     ]),
                 );
-                // Prev/Next among siblings at any level (flat reading order
-                // is acceptable: Next/Prev chain across all items).
-                if i > 0 {
-                    item.set("Prev", Object::Ref(item_refs[i - 1]));
+                // Siblings only: link to the neighbors that share OUR parent.
+                let sibs = match parent_of[i] {
+                    Some(p) => &children_of[p],
+                    None => &root_children,
+                };
+                if let Some(pos) = sibs.iter().position(|&s| s == i) {
+                    if pos > 0 {
+                        item.set("Prev", Object::Ref(item_refs[sibs[pos - 1]]));
+                    }
+                    if pos + 1 < sibs.len() {
+                        item.set("Next", Object::Ref(item_refs[sibs[pos + 1]]));
+                    }
                 }
-                if i + 1 < self.bookmarks.len() {
-                    item.set("Next", Object::Ref(item_refs[i + 1]));
-                }
-                // First/Last child if this item has children.
-                let kids: Vec<usize> = parent_of
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, p)| **p == Some(i))
-                    .map(|(c, _)| c)
-                    .collect();
+                // First/Last child + descendant Count (visible items).
+                let kids = &children_of[i];
                 if let (Some(&f), Some(&l)) = (kids.first(), kids.last()) {
                     item.set("First", Object::Ref(item_refs[f]));
                     item.set("Last", Object::Ref(item_refs[l]));
+                    item.set("Count", count_descendants(i, &children_of) as i64);
                 }
-                let _ = level;
                 doc.set(item_refs[i], Object::Dict(item));
             }
 
             let mut outl = Dict::new();
             outl.set("Type", "Outlines");
-            if let (Some(&f), Some(&l)) = (item_refs.first(), item_refs.last()) {
-                outl.set("First", Object::Ref(f));
-                outl.set("Last", Object::Ref(l));
+            if let (Some(&f), Some(&l)) = (root_children.first(), root_children.last()) {
+                outl.set("First", Object::Ref(item_refs[f]));
+                outl.set("Last", Object::Ref(item_refs[l]));
+                // Count: total open items across the tree.
+                let total: usize = root_children
+                    .iter()
+                    .map(|&r| 1 + count_descendants(r, &children_of))
+                    .sum();
+                outl.set("Count", total as i64);
             }
-            outl.set("Count", self.bookmarks.len() as i64);
             doc.set(outlines_root, Object::Dict(outl));
             Some(outlines_root)
         } else {
@@ -1054,4 +1070,12 @@ impl Document {
         doc.set(fdict, Object::Dict(ff));
         fdict
     }
+}
+/// Number of descendants (children, grandchildren, ...) of `root` in the
+/// outline child lists.
+fn count_descendants(root: usize, children_of: &[Vec<usize>]) -> usize {
+    children_of[root]
+        .iter()
+        .map(|&c| 1 + count_descendants(c, children_of))
+        .sum()
 }
