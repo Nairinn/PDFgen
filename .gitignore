@@ -25,3 +25,7 @@ bindings/python/dist/
 # JVM bindings build
 bindings/*/build/
 *.jar
+
+# Compiled Java classes
+*.class
+bindings/java/classes/
