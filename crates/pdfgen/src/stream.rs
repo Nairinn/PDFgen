@@ -14,7 +14,6 @@
 //! [`crate::Document`] stays for small documents and full editing.
 
 use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
-use std::collections::HashMap;
 use std::io::{Seek, Write};
 
 /// One layout event, in document order.
@@ -96,11 +95,14 @@ mod ids {
 ///
 /// [`finish`]: StreamWriter::finish
 pub struct StreamWriter {
-    out: std::fs::File,
-    /// PDF byte offset of the next write.
+    /// Buffered output (the file is flushed at finish; every write goes
+    /// through the 8 KiB buffer, no per-object syscall).
+    out: std::io::BufWriter<std::fs::File>,
+    /// PDF byte offset of the next write, tracked by adding bytes written
+    /// (no stream_position syscall per object).
     cursor: u64,
-    /// Flushed objects: id -> byte offset.
-    xref: HashMap<u32, u64>,
+    /// Flushed objects: byte offset indexed by object id (0 = absent).
+    xref: Vec<u64>,
     /// Ids handed out for pages/contents/elements so far.
     next_obj: u32,
     /// Open structure elements awaiting their End.
@@ -167,7 +169,7 @@ impl StreamWriter {
         if let Some(parent) = std::path::Path::new(path).parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let mut out = std::fs::File::create(path)?;
+        let mut out = std::io::BufWriter::new(std::fs::File::create(path)?);
         let mut header = format!("%PDF-{}\n", profile.pdf_version().header()).into_bytes();
         header.extend_from_slice(&[0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a]);
         out.write_all(&header)?;
@@ -183,7 +185,7 @@ impl StreamWriter {
         Ok(StreamWriter {
             out,
             cursor,
-            xref: HashMap::new(),
+            xref: Vec::new(),
             next_obj,
             open: Vec::new(),
             page_content: String::new(),
@@ -531,7 +533,8 @@ impl StreamWriter {
 
     /// Serialize one object to disk at the cursor and record its offset.
     fn write_object(&mut self, id: u32, obj: &Object) -> Result<(), StreamError> {
-        self.xref.insert(id, self.cursor);
+        let off = self.cursor;
+        self.record_offset(id, off);
         let mut head = format!("{id} 0 obj\n");
         match obj {
             Object::Stream(s) => {
@@ -548,18 +551,29 @@ impl StreamWriter {
                 }
                 head.push_str(">>");
                 head.push_str("\nstream\n");
+                let n = head.len() + s.data.len() + b"\nendstream\nendobj\n".len();
                 self.out.write_all(head.as_bytes())?;
                 self.out.write_all(&s.data)?;
                 self.out.write_all(b"\nendstream\nendobj\n")?;
+                self.cursor += n as u64;
             }
             obj => {
                 pdfgen_core::write_object(&mut head, obj);
                 head.push_str("\nendobj\n");
                 self.out.write_all(head.as_bytes())?;
+                self.cursor += head.len() as u64;
             }
         }
-        self.cursor = self.out.stream_position()?;
         Ok(())
+    }
+
+    /// Record an object's byte offset (xref grows on demand).
+    fn record_offset(&mut self, id: u32, off: u64) {
+        let idx = id as usize;
+        if self.xref.len() <= idx {
+            self.xref.resize(idx + 1, 0);
+        }
+        self.xref[idx] = off;
     }
 
     /// Finish the document: fonts, structure tree, parent tree, pages,
@@ -801,9 +815,11 @@ impl StreamWriter {
         let mut x = format!("xref\n0 {size}\n");
         x.push_str("0000000000 65535 f \n");
         for id in 1..size {
-            match self.xref.get(&id) {
-                Some(off) => x.push_str(&format!("{off:010} 00000 n \n")),
-                None => x.push_str("0000000000 65535 f \n"),
+            let off = self.xref.get(id as usize).copied().unwrap_or(0);
+            if off != 0 {
+                x.push_str(&format!("{off:010} 00000 n \n"));
+            } else {
+                x.push_str("0000000000 65535 f \n");
             }
         }
         x.push_str(&format!(
