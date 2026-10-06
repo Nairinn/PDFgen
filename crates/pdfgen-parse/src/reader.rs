@@ -105,7 +105,48 @@ impl PdfReader {
             Some(b'x') => self.load_classic_xref(offset as usize),
             Some(b'0'..=b'9') => self.load_xref_stream(offset as usize),
             _ => Err(ParseError::BadXrefOffset(offset)),
+        }?;
+
+        // --- Follow the /Prev chain ---------------------------------
+        // Incremental updates append newer xref sections linked by /Prev;
+        // older entries fill the gaps the newest section doesn't cover.
+        // The newest entry for an object wins (it was inserted first; we
+        // only insert when absent).
+        let mut visited: std::collections::HashSet<u64> = std::collections::HashSet::new();
+        loop {
+            let prev = match self.trailer.get("Prev") {
+                Some(Object::Int(p)) => *p as u64,
+                _ => break,
+            };
+            if prev as usize >= self.data.len() || !visited.insert(prev) {
+                break; // out of range or a loop: stop, keep what we have
+            }
+            // Remember which keys the newest trailer lacks; older
+            // sections may provide them (e.g. the first /ID, /Info).
+            let saved_trailer = std::mem::take(&mut self.trailer);
+            self.trailer = pdfgen_core::Dict::new();
+            let mut probe = Lexer::new(&self.data);
+            probe.seek(prev as usize);
+            match probe.peek() {
+                Some(b'x') => self.load_classic_xref(prev as usize)?,
+                Some(b'0'..=b'9') => self.load_xref_stream(prev as usize)?,
+                _ => {
+                    self.trailer = saved_trailer;
+                    break;
+                }
+            }
+            // Merge: keep the newest section's keys, add any older keys
+            // the newest lacked (except Prev itself, which is chain state).
+            let older = std::mem::take(&mut self.trailer);
+            self.trailer = saved_trailer;
+            for (k, v) in older.0 {
+                if k.0 != "Prev" && self.trailer.get(&k.0).is_none() {
+                    self.trailer.set(k.0.clone(), v);
+                }
+            }
         }
+        self.rebuild_known();
+        Ok(())
     }
 
     fn load_classic_xref(&mut self, offset: usize) -> Result<(), ParseError> {
@@ -145,9 +186,9 @@ impl PdfReader {
                     };
                     let id = u32::try_from(first + i).unwrap_or(0);
                     if nums[2].starts_with('n') {
-                        self.xref.insert(id, Entry::InUse(off));
+                        self.xref.entry(id).or_insert(Entry::InUse(off));
                     } else {
-                        self.xref.insert(id, Entry::Free);
+                        self.xref.entry(id).or_insert(Entry::Free);
                     }
                     lx.seek(start + 20);
                 }
@@ -270,10 +311,10 @@ impl PdfReader {
                 let id = first + i;
                 match fields[0] {
                     0 => {
-                        self.xref.insert(id, Entry::Free);
+                        self.xref.entry(id).or_insert(Entry::Free);
                     }
                     1 => {
-                        self.xref.insert(id, Entry::InUse(fields[1]));
+                        self.xref.entry(id).or_insert(Entry::InUse(fields[1]));
                     }
                     2 => {
                         // Compressed object in an object stream; record the

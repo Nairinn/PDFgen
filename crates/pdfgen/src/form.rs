@@ -70,16 +70,70 @@ pub(crate) fn emit_acroform(doc: &mut pdfgen_core::Document, field_refs: &[Ref])
     af
 }
 
-/// Fill a text field in an existing PDF: sets `/V` on the named field and
-/// regenerates appearance streams via `/NeedAppearances` (viewers render
-/// the value). The file is rewritten in place (full rewrite; incremental
-/// saves come with revision control).
+/// Decode a PDF text string: UTF-16BE with a BOM when it starts FE FF,
+/// PDFDocEncoding (treat as Latin-1) otherwise.
+fn decode_pdf_text_string(bytes: &[u8]) -> String {
+    if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
+        // UTF-16BE after the BOM.
+        let units: Vec<u16> = bytes[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .collect();
+        char::decode_utf16(units)
+            .map(|r| r.unwrap_or('\u{fffd}'))
+            .collect()
+    } else {
+        bytes.iter().map(|&b| b as char).collect()
+    }
+}
+
+/// Find the field object whose /T matches `name`, walking Kids
+/// hierarchies. Returns its object id.
+fn find_field(
+    reader: &mut PdfReader,
+    entries: &[Object],
+    name: &str,
+    depth: usize,
+) -> Result<Option<u32>, Box<dyn std::error::Error>> {
+    if depth > 32 {
+        return Ok(None);
+    }
+    for f in entries {
+        if let Object::Ref(r) = f {
+            if let Ok(Object::Dict(fd)) = reader.get(r.id) {
+                let matches = fd
+                    .get("T")
+                    .and_then(|t| match t {
+                        Object::String(s) => Some(decode_pdf_text_string(&s.0) == name),
+                        _ => None,
+                    })
+                    .unwrap_or(false);
+                if matches {
+                    return Ok(Some(r.id));
+                }
+                // Descend into Kids.
+                if let Some(Object::Array(kids)) = fd.get("Kids").cloned() {
+                    if let Some(found) = find_field(reader, &kids, name, depth + 1)? {
+                        return Ok(Some(found));
+                    }
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Fill a text field in an existing PDF by APPENDING an incremental update:
+/// the patched field object plus a new xref section chained with /Prev.
+/// The original bytes are never renumbered, so tags, IDs and metadata stay
+/// intact, and pdfgen-revision keeps working on the updated file.
 pub fn fill_text_field(
     path: &str,
     name: &str,
     value: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut reader = PdfReader::open(path)?;
+    let data = std::fs::read(path)?;
+    let mut reader = PdfReader::from_bytes(data.clone())?;
     let catalog = reader.catalog()?;
 
     // Find AcroForm -> Fields.
@@ -93,65 +147,84 @@ pub fn fill_text_field(
         return Err("AcroForm has no Fields".into());
     };
 
-    // Locate the field by /T.
-    let mut field_ref: Option<Ref> = None;
-    for f in fields {
-        if let Object::Ref(r) = f {
-            if let Object::Dict(fd) = reader.get(r.id)? {
-                if let Some(Object::String(t)) = fd.get("T") {
-                    // Decode PDFString (bytes) and compare.
-                    let decoded = String::from_utf8_lossy(&t.0).into_owned();
-                    if decoded == name {
-                        field_ref = Some(r);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    let Some(r) = field_ref else {
+    let Some(field_id) = find_field(&mut reader, &fields, name, 0)? else {
         return Err(format!("field {name:?} not found").into());
     };
 
-    // Set /V on the field object. Rebuild the whole file: read every
-    // object we can, then rewrite with the field updated.
-    let mut out = pdfgen_core::Document::new();
-    let mut remap: std::collections::HashMap<u32, Ref> = std::collections::HashMap::new();
+    // Patch /V onto the field dict.
+    let Object::Dict(mut fd) = reader.get(field_id)? else {
+        return Err("field object is not a dictionary".into());
+    };
+    fd.set("V", PdfString::text(value));
 
-    let ids: Vec<u32> = reader
-        .object_ids()
-        .iter()
-        .copied()
-        .filter(|&id| id != 0)
-        .collect();
-    for id in ids {
-        if let Ok(obj) = reader.get(id) {
-            let new_ref = out.alloc();
-            remap.insert(id, new_ref);
-            let obj = if id == r.id {
-                // Patch /V into this field dict.
-                if let Object::Dict(mut fd) = obj {
-                    fd.set("V", PdfString::text(value));
-                    Object::Dict(fd)
-                } else {
-                    obj
-                }
-            } else {
-                obj
-            };
-            out.set(new_ref, obj);
-        }
-    }
+    // --- Append the incremental section ---------------------------------
+    let prev_xref = last_startxref(&data).unwrap_or(0);
+    let base = data.len() as u64;
+    let mut section: Vec<u8> = Vec::with_capacity(1024);
+    let mut cursor = base;
 
-    // Root: same id as before (remap the trailer Root id).
+    // The patched field object, at its original id.
+    let mut serialized_field = format!("{field_id} 0 obj\n");
+    pdfgen_core::write_object(&mut serialized_field, &Object::Dict(fd));
+    serialized_field.push_str("\nendobj\n");
+    section.extend_from_slice(serialized_field.as_bytes());
+    let field_off = cursor;
+    cursor += serialized_field.len() as u64;
+
+    // xref + trailer with /Prev. /Root (and /ID when present) carry over
+    // so a reader that reads only the newest trailer still resolves the
+    // catalog; the /Prev chain preserves the rest.
+    let size = match reader.trailer().get("Size") {
+        Some(Object::Int(s)) => *s as u32,
+        _ => field_id + 1,
+    };
     let Some(Object::Ref(root)) = reader.trailer().get("Root").cloned() else {
         return Err("trailer has no /Root".into());
     };
-    let Some(&new_root) = remap.get(&root.id) else {
-        return Err("catalog could not be remapped".into());
-    };
+    let mut trailer = format!("<< /Size {size} /Prev {prev_xref} /Root {} {} R", root.id, root.gen);
+    if let Some(Object::Array(ids)) = reader.trailer().get("ID").cloned() {
+        let parts: Vec<String> = ids
+            .iter()
+            .filter_map(|i| match i {
+                Object::String(s) => Some(format!("<{}>", hex(&s.0))),
+                _ => None,
+            })
+            .collect();
+        if parts.len() == ids.len() && !parts.is_empty() {
+            trailer.push_str(&format!(" /ID [{}]", parts.join(" ")));
+        }
+    }
+    trailer.push_str(" >>\n");
+    let xref_at = cursor;
+    let mut xref = format!("xref\n{field_id} 1\n{field_off:010} 00000 n \n");
+    xref.push_str("trailer\n");
+    xref.push_str(&trailer);
+    xref.push_str(&format!("startxref\n{xref_at}\n%%EOF\n"));
+    section.extend_from_slice(xref.as_bytes());
 
-    let bytes = out.serialize(pdfgen_core::PdfVersion::V1_7, new_root)?;
-    std::fs::write(path, bytes)?;
+    // Append to the file in place.
+    use std::io::Write as _;
+    let mut f = std::fs::OpenOptions::new().append(true).open(path)?;
+    f.write_all(&section)?;
     Ok(())
+}
+
+/// Hex-encode bytes for a PDF hex string.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02X}")).collect()
+}
+
+/// Byte offset of the last `startxref` value in the file.
+fn last_startxref(data: &[u8]) -> Option<u64> {
+    let idx = data
+        .windows(9)
+        .rposition(|w| w == b"startxref")?;
+    let rest = &data[idx + 9..];
+    let s = std::str::from_utf8(rest).ok()?;
+    let num: String = s
+        .trim_start()
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    num.parse::<u64>().ok()
 }
