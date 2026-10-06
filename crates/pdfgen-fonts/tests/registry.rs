@@ -25,9 +25,12 @@ fn registry_resolves_catalog_and_aliases() {
     // The alias table itself.
     assert_eq!(
         standard14_family("Times New Roman"),
-        Some("Liberation Serif")
+        Some(("Liberation Serif", "regular"))
     );
-    assert_eq!(standard14_family("Courier"), Some("Liberation Mono"));
+    assert_eq!(
+        standard14_family("Courier"),
+        Some(("Liberation Mono", "regular"))
+    );
     assert_eq!(standard14_family("Bogus Font"), None);
 }
 
@@ -56,4 +59,36 @@ fn user_registered_font_wins() {
     let r = reg.resolve("My Brand Font", "Regular").unwrap();
     assert!(!r.substituted);
     assert_eq!(r.family, "My Brand Font");
+}
+
+/// P0-11: standard-14 aliases must honor the style encoded in the name.
+#[test]
+fn standard14_alias_style_is_honored() {
+    let mut r = FontRegistry::new();
+    // Helvetica-Bold must resolve to the BOLD look-alike, not Regular.
+    let bold = r.resolve("Helvetica-Bold", "").expect("helvetica bold");
+    let path = bold.path.to_string_lossy().into_owned();
+    assert!(
+        path.contains("LiberationSans-Bold.ttf"),
+        "Helvetica-Bold must resolve to the bold face, got {path}"
+    );
+    assert!(bold.substituted, "look-alike is a substitution");
+
+    // Times-Italic -> italic face.
+    let it = r.resolve("Times-Italic", "").expect("times italic");
+    let it_path = it.path.to_string_lossy().into_owned();
+    assert!(
+        it_path.contains("LiberationSerif-Italic.ttf"),
+        "Times-Italic must resolve to the italic face, got {it_path}"
+    );
+
+    // Helvetica-BoldItalic -> bold italic face.
+    let bi = r
+        .resolve("Helvetica-BoldOblique", "")
+        .expect("helvetica bold oblique");
+    let bi_path = bi.path.to_string_lossy().into_owned();
+    assert!(
+        bi_path.contains("LiberationSans-BoldItalic.ttf"),
+        "Helvetica-BoldOblique must resolve to the bold-italic face, got {bi_path}"
+    );
 }

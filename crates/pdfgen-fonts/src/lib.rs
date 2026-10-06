@@ -192,30 +192,31 @@ pub const CATALOG: &[CatalogEntry] = &[
 ];
 
 /// Standard-14 name → look-alike family (PDF/UA needs embedded fonts).
-const STANDARD_14: &[(&str, &str)] = &[
-    ("Helvetica", "Liberation Sans"),
-    ("Helvetica-Bold", "Liberation Sans"),
-    ("Helvetica-Oblique", "Liberation Sans"),
-    ("Helvetica-BoldOblique", "Liberation Sans"),
-    ("Arial", "Liberation Sans"),
-    ("Times-Roman", "Liberation Serif"),
-    ("Times-Bold", "Liberation Serif"),
-    ("Times-Italic", "Liberation Serif"),
-    ("Times-BoldItalic", "Liberation Serif"),
-    ("Times New Roman", "Liberation Serif"),
-    ("Courier", "Liberation Mono"),
-    ("Courier-Bold", "Liberation Mono"),
-    ("Courier-Oblique", "Liberation Mono"),
-    ("Courier-BoldOblique", "Liberation Mono"),
-    ("Courier New", "Liberation Mono"),
+/// (alias, look-alike family, style the alias implies).
+const STANDARD_14: &[(&str, &str, &str)] = &[
+    ("Helvetica", "Liberation Sans", "regular"),
+    ("Helvetica-Bold", "Liberation Sans", "bold"),
+    ("Helvetica-Oblique", "Liberation Sans", "italic"),
+    ("Helvetica-BoldOblique", "Liberation Sans", "bold italic"),
+    ("Arial", "Liberation Sans", "regular"),
+    ("Times-Roman", "Liberation Serif", "regular"),
+    ("Times-Bold", "Liberation Serif", "bold"),
+    ("Times-Italic", "Liberation Serif", "italic"),
+    ("Times-BoldItalic", "Liberation Serif", "bold italic"),
+    ("Times New Roman", "Liberation Serif", "regular"),
+    ("Courier", "Liberation Mono", "regular"),
+    ("Courier-Bold", "Liberation Mono", "bold"),
+    ("Courier-Oblique", "Liberation Mono", "italic"),
+    ("Courier-BoldOblique", "Liberation Mono", "bold italic"),
+    ("Courier New", "Liberation Mono", "regular"),
 ];
 
 /// Resolve a standard-14 / common name to its look-alike family.
-pub fn standard14_family(name: &str) -> Option<&'static str> {
+pub fn standard14_family(name: &str) -> Option<(&'static str, &'static str)> {
     STANDARD_14
         .iter()
-        .find(|(alias, _)| eq_ignore_case(*alias, name))
-        .map(|(_, family)| *family)
+        .find(|(alias, _, _)| eq_ignore_case(*alias, name))
+        .map(|(_, family, style)| (*family, *style))
 }
 
 fn eq_ignore_case(a: &str, b: &str) -> bool {
@@ -315,7 +316,7 @@ impl FontRegistry {
 
         // 2. Standard-14 alias table (used only if 3 and 4 both miss, so a
         // real system font is preferred over a look-alike).
-        let cat_family = standard14_family(family).map(str::to_ascii_lowercase);
+        let cat_family = standard14_family(family).map(|(f, _)| f.to_ascii_lowercase());
 
         // 3. Built-in catalog (exact family names like "Liberation Sans").
         if let Some(dir) = Self::fonts_dir() {
@@ -323,10 +324,7 @@ impl FontRegistry {
                 if e.family.to_ascii_lowercase() == key {
                     let want = style_key.is_empty()
                         || e.style.to_ascii_lowercase().contains(&style_key)
-                        || (style_key == "regular" && e.style == "Regular")
-                        || (style_key == "bold" && e.style == "Bold")
-                        || (style_key == "italic" && e.style == "Italic")
-                        || (style_key == "bold italic" && e.style == "Bold Italic");
+                        || style_matches(&style_key, &e.style);
                     if want {
                         let p = dir.join(e.file);
                         if p.exists() {
@@ -362,28 +360,31 @@ impl FontRegistry {
             }
         }
 
-        // 5. Standard-14 alias → catalog look-alike (substituted).
+        // 5. Standard-14 alias → catalog look-alike (substituted). The
+        // alias itself implies a style ("Helvetica-Bold" is bold) which
+        // wins over a generic request; the requested style only refines
+        // a plain alias.
         if let Some(aliased) = cat_family.as_deref() {
+            let alias_style = standard14_family(family)
+                .map(|(_, st)| st.to_string())
+                .unwrap_or_default();
+            let want_style = if !alias_style.is_empty() && alias_style != "regular" {
+                alias_style
+            } else {
+                style_key.clone()
+            };
             if let Some(dir) = Self::fonts_dir() {
                 for e in CATALOG {
-                    if e.family.to_ascii_lowercase() == aliased {
-                        let want = style_key.is_empty()
-                            || (style_key == "regular" && e.style == "Regular")
-                            || (style_key == "bold"
-                                && (e.style == "Bold" || e.style == "Bold Italic"))
-                            || (style_key == "italic"
-                                && (e.style == "Italic" || e.style == "Bold Italic"))
-                            || (style_key == "bold italic" && e.style == "Bold Italic")
-                            || e.style == "Regular";
-                        if want {
-                            let p = dir.join(e.file);
-                            if p.exists() {
-                                return Ok(Resolved {
-                                    path: p,
-                                    family: e.family.to_string(),
-                                    substituted: true,
-                                });
-                            }
+                    if e.family.to_ascii_lowercase() == aliased
+                        && style_matches(&want_style, &e.style)
+                    {
+                        let p = dir.join(e.file);
+                        if p.exists() {
+                            return Ok(Resolved {
+                                path: p,
+                                family: e.family.to_string(),
+                                substituted: true,
+                            });
                         }
                     }
                 }
@@ -410,12 +411,15 @@ impl FontRegistry {
         //    bundled fonts; degrade to the platform's default sans with a
         //    substitution note rather than failing).
         if let Some(sys) = self.system.as_ref() {
-            for probe in ["helvetica", "arial", "liberation sans", "dejavu sans", "noto sans"] {
+            for probe in [
+                "helvetica",
+                "arial",
+                "liberation sans",
+                "dejavu sans",
+                "noto sans",
+            ] {
                 if let Some(styles) = sys.get(probe) {
-                    if let Some(p) = styles
-                        .get("regular")
-                        .or_else(|| styles.values().next())
-                    {
+                    if let Some(p) = styles.get("regular").or_else(|| styles.values().next()) {
                         return Ok(Resolved {
                             path: p.clone(),
                             family: probe.to_string(),
@@ -511,5 +515,17 @@ impl ExpandHome for PathBuf {
             }
         }
         self
+    }
+}
+
+/// True when a catalog entry's style satisfies the requested style key
+/// ("bold", "italic", "bold italic", "regular", or empty = any).
+fn style_matches(want: &str, have: &str) -> bool {
+    match want {
+        "" | "regular" => have.eq_ignore_ascii_case("regular"),
+        "bold" => have.eq_ignore_ascii_case("bold") || have.eq_ignore_ascii_case("bold italic"),
+        "italic" => have.eq_ignore_ascii_case("italic") || have.eq_ignore_ascii_case("bold italic"),
+        "bold italic" => have.eq_ignore_ascii_case("bold italic"),
+        other => have.to_ascii_lowercase().contains(other),
     }
 }
