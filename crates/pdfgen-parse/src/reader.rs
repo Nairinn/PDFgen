@@ -11,6 +11,8 @@ use std::path::Path;
 enum Entry {
     /// In use at this byte offset.
     InUse(u64),
+    /// Compressed inside an object stream: (stream object id, index).
+    Compressed { stream: u32, index: u32 },
     /// Free.
     Free,
 }
@@ -33,6 +35,8 @@ pub struct PdfReader {
     pub repair: RepairInfo,
     /// Cache of already-resolved top-level objects.
     cache: HashMap<u32, Object>,
+    /// Object-stream contents cache: stream id -> its /N decoded objects.
+    objstm_cache: HashMap<u32, Vec<Object>>,
     /// Objects currently being resolved (cycle protection).
     resolving: Vec<u32>,
     /// Object numbers known to exist (sorted).
@@ -53,6 +57,7 @@ impl PdfReader {
             trailer: Dict::new(),
             repair: RepairInfo::default(),
             cache: HashMap::new(),
+            objstm_cache: HashMap::new(),
             resolving: Vec::new(),
             known: Vec::new(),
         };
@@ -317,9 +322,12 @@ impl PdfReader {
                         self.xref.entry(id).or_insert(Entry::InUse(fields[1]));
                     }
                     2 => {
-                        // Compressed object in an object stream; record the
-                        // object-stream number for later resolution.
-                        self.xref.insert(id, Entry::InUse(u64::MAX - fields[1]));
+                        // Compressed object in an object stream; field1 is
+                        // the object-stream number, field2 the index in it.
+                        self.xref.entry(id).or_insert(Entry::Compressed {
+                            stream: fields[1] as u32,
+                            index: fields[2] as u32,
+                        });
                     }
                     _ => {}
                 }
@@ -410,7 +418,7 @@ impl PdfReader {
             .iter()
             .filter_map(|(id, e)| match e {
                 Entry::InUse(off) => Some((*id, *off)),
-                Entry::Free => None,
+                Entry::Compressed { .. } | Entry::Free => None,
             })
             .collect();
         out.sort_unstable();
@@ -425,20 +433,130 @@ impl PdfReader {
         if self.resolving.contains(&id) {
             return Ok(Object::Null); // cycle guard
         }
-        let Some(Entry::InUse(offset)) = self.xref.get(&id).copied() else {
-            return Err(ParseError::ObjectNotFound(id));
-        };
-        if offset >= u64::MAX - 1_000_000 {
-            // Object compressed inside an object stream: not yet supported;
-            // treat as missing rather than corrupt the read.
-            return Err(ParseError::ObjectNotFound(id));
+        match self.xref.get(&id).copied() {
+            Some(Entry::InUse(offset)) => {}
+            Some(Entry::Compressed { stream, index }) => {
+                return self.get_from_object_stream(stream, index);
+            }
+            _ => return Err(ParseError::ObjectNotFound(id)),
         }
+        let offset = match self.xref.get(&id).copied() {
+            Some(Entry::InUse(off)) => off,
+            _ => unreachable!("checked above"),
+        };
         self.resolving.push(id);
         let result = self.parse_object_at(id, offset);
         self.resolving.pop();
         let obj = result?;
         self.cache.insert(id, obj.clone());
         Ok(obj)
+    }
+
+    /// Resolve an object compressed inside an object stream (PDF 1.5+).
+    /// `stream` is the object-stream's object id; `index` selects which
+    /// of its /N objects to return. Stream objects are cached whole.
+    fn get_from_object_stream(&mut self, stream: u32, index: u32) -> Result<Object, ParseError> {
+        if let Some(cached) = self.objstm_cache.get(&stream) {
+            if let Some(obj) = cached.get(index as usize) {
+                return Ok(obj.clone());
+            }
+            return Err(ParseError::ObjectNotFound(stream));
+        }
+        // Parse the object stream itself (by normal xref entry).
+        let raw = match self.xref.get(&stream).copied() {
+            Some(Entry::InUse(off)) => self.parse_object_at(stream, off)?,
+            _ => return Err(ParseError::ObjectNotFound(stream)),
+        };
+        let Object::Stream(stm) = raw else {
+            return Err(ParseError::Malformed(
+                0,
+                "object stream is not a stream".into(),
+            ));
+        };
+        let n = match stm.dict.get("N") {
+            Some(Object::Int(n)) => *n as u32,
+            _ => return Err(ParseError::Malformed(0, "object stream missing /N".into())),
+        };
+        let first = match stm.dict.get("First") {
+            Some(Object::Int(f)) => *f as usize,
+            _ => {
+                return Err(ParseError::Malformed(
+                    0,
+                    "object stream missing /First".into(),
+                ))
+            }
+        };
+        // Decode the stream data (FlateDecode and filter arrays).
+        let data = self.decode_stream_data(&stm)?;
+        if first >= data.len() {
+            return Err(ParseError::Malformed(
+                0,
+                "object stream /First out of range".into(),
+            ));
+        }
+        // Header: N pairs of (obj id, relative offset) in the decoded data.
+        let header = String::from_utf8_lossy(&data[..first]);
+        let mut nums: Vec<u32> = header
+            .split_whitespace()
+            .filter_map(|t| t.parse::<u32>().ok())
+            .collect();
+        if nums.len() < (n as usize) * 2 {
+            return Err(ParseError::Malformed(
+                0,
+                "object stream header truncated".into(),
+            ));
+        }
+        let mut objects: Vec<Object> = Vec::with_capacity(n as usize);
+        for i in 0..n as usize {
+            // Header layout: N pairs of (obj id, relative offset), so
+            // offset i lives at nums[2*i + 1].
+            let rel = nums.get(2 * i + 1).copied().unwrap_or(0) as usize;
+            let abs = first + rel;
+            if abs >= data.len() {
+                objects.push(Object::Null);
+                continue;
+            }
+            let mut lx = Lexer::new(&data);
+            lx.seek(abs);
+            let obj = match parse_value(&data, &mut lx) {
+                Ok(Some(o)) => o,
+                Ok(None) | Err(_) => Object::Null,
+            };
+            objects.push(obj);
+        }
+        self.objstm_cache.insert(stream, objects);
+        let obj = self
+            .objstm_cache
+            .get(&stream)
+            .and_then(|c| c.get(index as usize).cloned());
+        obj.ok_or_else(|| ParseError::ObjectNotFound(stream))
+    }
+
+    /// Decode a stream's bytes through its /Filter (single name or array),
+    /// with FlateDecode support. Predictors are applied for xref streams
+    /// by the caller that needs them.
+    fn decode_stream_data(&self, stm: &Stream) -> Result<Vec<u8>, ParseError> {
+        match stm.dict.get("Filter") {
+            Some(Object::Name(n)) if n.0 == "FlateDecode" => inflate(&stm.data)
+                .ok_or_else(|| ParseError::Malformed(0, "zlib decode failed".into())),
+            Some(Object::Array(filters)) => {
+                // Filter arrays: apply the filters in order. Only
+                // FlateDecode is implemented; unknown filters pass the
+                // data through (best effort, like most readers).
+                let mut data = stm.data.clone();
+                for f in filters {
+                    if let Object::Name(n) = f {
+                        if n.0 == "FlateDecode" {
+                            data = inflate(&data).ok_or_else(|| {
+                                ParseError::Malformed(0, "zlib decode failed".into())
+                            })?;
+                        }
+                    }
+                }
+                Ok(data)
+            }
+            _ => Ok(stm.data.clone()),
+        }
     }
 
     fn parse_object_at(&mut self, id: u32, offset: u64) -> Result<Object, ParseError> {
