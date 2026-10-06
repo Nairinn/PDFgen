@@ -13,8 +13,7 @@ fn html_document_to_compliant_pdf() {
 
     let html = std::fs::read_to_string(fixture).expect("fixture html");
     let path = format!("{out_dir}/html_ua1.pdf");
-    let report = html_to_pdf(&html, &path, "HTML Source Document", "en-US")
-        .expect("convert");
+    let report = html_to_pdf(&html, &path, "HTML Source Document", "en-US").expect("convert");
 
     assert_eq!(
         report.status,

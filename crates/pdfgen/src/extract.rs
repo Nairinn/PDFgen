@@ -38,8 +38,9 @@ pub fn extract_text(path: &str) -> Result<Vec<PageText>, Box<dyn std::error::Err
             continue;
         };
         let data: Vec<u8> = match stream.dict.get("Filter") {
-            Some(Object::Name(n)) if n.0 == "FlateDecode" => retag::inflate(&stream.data)
-                .unwrap_or_else(|| stream.data.clone()),
+            Some(Object::Name(n)) if n.0 == "FlateDecode" => {
+                retag::inflate(&stream.data).unwrap_or_else(|| stream.data.clone())
+            }
             _ => stream.data.clone(),
         };
         out.push(PageText {

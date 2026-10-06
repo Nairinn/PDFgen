@@ -70,11 +70,7 @@ impl Document {
 
     /// New document with title and language set.
     #[uniffi::constructor]
-    pub fn new_with(
-        profile: Profile,
-        title: String,
-        lang: String,
-    ) -> Arc<Self> {
+    pub fn new_with(profile: Profile, title: String, lang: String) -> Arc<Self> {
         let inner = PdfDocument::new(profile.into());
         inner.set_title(&title);
         inner.set_lang(&lang);
@@ -135,7 +131,9 @@ impl Document {
         rows: Vec<Vec<String>>,
         widths: Vec<f64>,
     ) -> Result<(), PdfgenError> {
-        self.inner.table(header, rows, widths).map_err(PdfgenError::from)
+        self.inner
+            .table(header, rows, widths)
+            .map_err(PdfgenError::from)
     }
 
     /// Place an image file (PNG/JPEG) as a figure with alt text. Empty alt
@@ -164,7 +162,10 @@ impl Document {
 
     /// Save the file (ALWAYS writes it) and return the report.
     pub fn save(&self, path: String) -> Result<Report, PdfgenError> {
-        self.inner.save(&path).map(report_from_api).map_err(PdfgenError::from)
+        self.inner
+            .save(&path)
+            .map(report_from_api)
+            .map_err(PdfgenError::from)
     }
 }
 
@@ -199,12 +200,12 @@ impl From<String> for PdfgenError {
     }
 }
 
-    /// Library version metadata.
-    #[derive(uniffi::Record)]
-    pub struct VersionInfo {
-        /// Crate version string.
-        pub version: String,
-    }
+/// Library version metadata.
+#[derive(uniffi::Record)]
+pub struct VersionInfo {
+    /// Crate version string.
+    pub version: String,
+}
 
 /// Library version metadata.
 #[uniffi::export]

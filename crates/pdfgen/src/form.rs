@@ -7,7 +7,7 @@
 //! on the owning page. Filling is done by writing `/V` on the field —
 //! see [`fill_text_field`].
 
-use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
+use pdfgen_core::{Dict, Object, PdfString, Ref};
 use pdfgen_parse::PdfReader;
 
 /// A text field to create, recorded by the flow API.
@@ -30,11 +30,7 @@ pub struct FieldSpec {
 }
 
 /// Emit one field object + its widget annotation. Returns the field ref.
-pub(crate) fn emit_field(
-    doc: &mut pdfgen_core::Document,
-    spec: &FieldSpec,
-    page_ref: Ref,
-) -> Ref {
+pub(crate) fn emit_field(doc: &mut pdfgen_core::Document, spec: &FieldSpec, page_ref: Ref) -> Ref {
     let field = doc.alloc();
     let mut f = Dict::new();
     f.set("FT", "Tx");
@@ -55,20 +51,14 @@ pub(crate) fn emit_field(
     );
     widget.set("P", page_ref);
     widget.set("F", 4); // print flag
-    f.set(
-        "Kids",
-        Object::Array(vec![Object::Dict(widget)]),
-    );
+    f.set("Kids", Object::Array(vec![Object::Dict(widget)]));
     doc.set(field, Object::Dict(f));
     field
 }
 
 /// Emit the AcroForm dictionary with the given field refs. Returns the
 /// AcroForm ref.
-pub(crate) fn emit_acroform(
-    doc: &mut pdfgen_core::Document,
-    field_refs: &[Ref],
-) -> Ref {
+pub(crate) fn emit_acroform(doc: &mut pdfgen_core::Document, field_refs: &[Ref]) -> Ref {
     let af = doc.alloc();
     let mut d = Dict::new();
     d.set(
@@ -84,7 +74,11 @@ pub(crate) fn emit_acroform(
 /// regenerates appearance streams via `/NeedAppearances` (viewers render
 /// the value). The file is rewritten in place (full rewrite; incremental
 /// saves come with revision control).
-pub fn fill_text_field(path: &str, name: &str, value: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn fill_text_field(
+    path: &str,
+    name: &str,
+    value: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = PdfReader::open(path)?;
     let catalog = reader.catalog()?;
 

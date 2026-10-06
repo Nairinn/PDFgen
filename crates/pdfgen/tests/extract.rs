@@ -155,7 +155,10 @@ fn extracts_from_untagged_pdf() {
             pdfgen_core::Object::Dict(
                 pdfgen_core::Dict::new()
                     .with("Type", "Pages")
-                    .with("Kids", pdfgen_core::Object::Array(vec![pdfgen_core::Object::Ref(page)]))
+                    .with(
+                        "Kids",
+                        pdfgen_core::Object::Array(vec![pdfgen_core::Object::Ref(page)]),
+                    )
                     .with("Count", 1),
             ),
         );

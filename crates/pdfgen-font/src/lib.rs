@@ -1,11 +1,14 @@
+//! Font loading, metrics, WinAnsi/CID encoding, TTC extraction,
+//! subsetting and embedding permissions.
+
 pub use winansi::encode as winansi_encode;
 pub use winansi::encode_char as winansi_encode_char;
 pub use winansi::unit_for_byte as winansi_unit_for_byte;
 
-pub mod winansi;
 pub mod cid;
 pub mod subset;
 pub mod ttc;
+pub mod winansi;
 
 use std::path::Path;
 use thiserror::Error;
@@ -99,10 +102,7 @@ impl LoadedFont {
             .and_then(|n| n.to_string())
             .unwrap_or_else(|| postscript_name.clone());
 
-        let permissions = face
-            .tables()
-            .os2
-            .and_then(|o| o.permissions());
+        let permissions = face.tables().os2.and_then(|o| o.permissions());
         let ascent = face.ascender();
         let descent = face.descender();
         let cap_height = face
@@ -113,7 +113,12 @@ impl LoadedFont {
             .unwrap_or(((ascent as f32) * 0.7) as i16);
         let bbox = {
             let b = face.global_bounding_box();
-            [b.x_min as f32, b.y_min as f32, b.x_max as f32, b.y_max as f32]
+            [
+                b.x_min as f32,
+                b.y_min as f32,
+                b.x_max as f32,
+                b.y_max as f32,
+            ]
         };
 
         // WinAnsi byte -> Unicode -> glyph -> advance.

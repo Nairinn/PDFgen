@@ -42,6 +42,7 @@ pub struct Image {
     /// Payload.
     pub kind: ImageKind,
     /// Alt text (PDF/UA 13-004); set at registration time.
+    #[allow(dead_code)]
     pub(crate) alt: String,
 }
 
@@ -122,9 +123,21 @@ impl Image {
             }
             let marker = bytes[i + 1];
             // SOF0-15 except DHT (C4), DAC (CC), JPG (C8), RSTn.
-            let is_sof = matches!(marker,
-                0xc0 | 0xc1 | 0xc2 | 0xc3 | 0xc5 | 0xc6 | 0xc7
-                | 0xc9 | 0xca | 0xcb | 0xcd | 0xce | 0xcf);
+            let is_sof = matches!(
+                marker,
+                0xc0 | 0xc1
+                    | 0xc2
+                    | 0xc3
+                    | 0xc5
+                    | 0xc6
+                    | 0xc7
+                    | 0xc9
+                    | 0xca
+                    | 0xcb
+                    | 0xcd
+                    | 0xce
+                    | 0xcf
+            );
             if is_sof {
                 let h = u16::from_be_bytes([bytes[i + 5], bytes[i + 6]]);
                 let w = u16::from_be_bytes([bytes[i + 7], bytes[i + 8]]);

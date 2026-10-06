@@ -1,7 +1,8 @@
 fn main() {
     let mut doc = pdfgen::Document::new(pdfgen::Profile::PdfUa1);
     doc.title("Service Request Form").lang("en-US");
-    doc.load_font("/System/Library/Fonts/Supplemental/Arial.ttf").unwrap();
+    doc.load_font("/System/Library/Fonts/Supplemental/Arial.ttf")
+        .unwrap();
     let mut flow = doc.flow();
     flow.heading(1, "Form").unwrap();
     flow.text_field("Full name", "fullname").unwrap();

@@ -21,14 +21,22 @@ fn renders_text_and_geometry() {
     {
         let mut flow = doc.flow();
         flow.heading(1, "Ink on the page").unwrap();
-        flow.paragraph("This paragraph becomes pixels when rendered.").unwrap();
+        flow.paragraph("This paragraph becomes pixels when rendered.")
+            .unwrap();
     }
     let path = out("render_source.pdf");
     let report = doc.save(&path).unwrap();
     assert_eq!(report.status, Status::Compliant);
 
-    let bmp = render_page(&path, 0, RenderOptions { dpi: 150.0, white_background: true })
-        .expect("renders");
+    let bmp = render_page(
+        &path,
+        0,
+        RenderOptions {
+            dpi: 150.0,
+            white_background: true,
+        },
+    )
+    .expect("renders");
     assert_eq!(bmp.width, 1275, "8.5in at 150dpi");
     assert_eq!(bmp.height, 1650, "11in at 150dpi");
 
@@ -51,7 +59,10 @@ fn renders_text_and_geometry() {
             y < bmp.height as usize / 4 && p[0] < 128
         })
         .count();
-    assert!(top_dark > 100, "heading ink expected near top, got {top_dark}");
+    assert!(
+        top_dark > 100,
+        "heading ink expected near top, got {top_dark}"
+    );
 
     // PNG encodes with a sane signature and size.
     let png = bmp.to_png().expect("png encodes");
@@ -77,8 +88,12 @@ fn renders_cid_text() {
         {
             let mut flow = doc.flow();
             flow.heading(1, "CID Render Test").unwrap();
-            flow.paragraph_in(myanmar, 12.0, "\u{1000}\u{1001}\u{1002}\u{1019}\u{103C}\u{102D}\u{1004}\u{103A}")
-                .unwrap();
+            flow.paragraph_in(
+                myanmar,
+                12.0,
+                "\u{1000}\u{1001}\u{1002}\u{1019}\u{103C}\u{102D}\u{1004}\u{103A}",
+            )
+            .unwrap();
         }
         doc.save(&path).unwrap();
     }

@@ -140,7 +140,9 @@ impl PdfReader {
                     if nums.len() < 3 {
                         break;
                     }
-                    let Ok(off) = nums[0].parse::<u64>() else { break };
+                    let Ok(off) = nums[0].parse::<u64>() else {
+                        break;
+                    };
                     let id = u32::try_from(first + i).unwrap_or(0);
                     if nums[2].starts_with('n') {
                         self.xref.insert(id, Entry::InUse(off));
@@ -211,7 +213,8 @@ impl PdfReader {
             Some(Object::Name(n)) if n.0 == "FlateDecode"
         );
         let bytes: Vec<u8> = if filtered {
-            inflate(raw).ok_or_else(|| ParseError::Malformed(offset, "zlib decode failed".into()))?
+            inflate(raw)
+                .ok_or_else(|| ParseError::Malformed(offset, "zlib decode failed".into()))?
         } else {
             raw.to_vec()
         };
@@ -224,7 +227,12 @@ impl PdfReader {
                     _ => None,
                 })
                 .collect(),
-            _ => return Err(ParseError::Malformed(offset, "xref stream without /W".into())),
+            _ => {
+                return Err(ParseError::Malformed(
+                    offset,
+                    "xref stream without /W".into(),
+                ))
+            }
         };
         let size = match dict.get("Size") {
             Some(Object::Int(s)) => *s as u32,
@@ -408,11 +416,21 @@ impl PdfReader {
         }
         match lx.next_token()? {
             Some(Token::Int(_)) => {}
-            _ => return Err(ParseError::Malformed(offset as usize, "missing generation".into())),
+            _ => {
+                return Err(ParseError::Malformed(
+                    offset as usize,
+                    "missing generation".into(),
+                ))
+            }
         }
         match lx.next_token()? {
             Some(Token::ObjKeyword) => {}
-            _ => return Err(ParseError::Malformed(offset as usize, "missing obj keyword".into())),
+            _ => {
+                return Err(ParseError::Malformed(
+                    offset as usize,
+                    "missing obj keyword".into(),
+                ))
+            }
         }
         // Body: dict (+stream), array, or scalar.
         match lx.peek() {
@@ -462,7 +480,10 @@ impl PdfReader {
             }
             _ => {
                 let Some(v) = parse_value(data, &mut lx)? else {
-                    return Err(ParseError::Malformed(offset as usize, "object body missing".into()));
+                    return Err(ParseError::Malformed(
+                        offset as usize,
+                        "object body missing".into(),
+                    ));
                 };
                 Ok(v)
             }
@@ -481,7 +502,10 @@ impl PdfReader {
         };
         match self.get(root.id)? {
             Object::Dict(d) => Ok(d),
-            _ => Err(ParseError::Malformed(0, "catalog is not a dictionary".into())),
+            _ => Err(ParseError::Malformed(
+                0,
+                "catalog is not a dictionary".into(),
+            )),
         }
     }
 }
@@ -546,7 +570,9 @@ fn parse_value(data: &[u8], lx: &mut Lexer<'_>) -> Result<Option<Object>, ParseE
                         lx.next_token()?;
                         break;
                     }
-                    None => return Err(ParseError::Malformed(lx.pos(), "unterminated array".into())),
+                    None => {
+                        return Err(ParseError::Malformed(lx.pos(), "unterminated array".into()))
+                    }
                     _ => {}
                 }
                 if let Some(v) = parse_value(data, lx)? {
@@ -585,7 +611,10 @@ fn find_stream_body(data: &[u8], lx: &mut Lexer<'_>) -> Result<usize, ParseError
         }
         probe += 1;
     }
-    Err(ParseError::Malformed(lx.pos(), "stream keyword not found".into()))
+    Err(ParseError::Malformed(
+        lx.pos(),
+        "stream keyword not found".into(),
+    ))
 }
 
 fn find_endstream(data: &[u8], from: usize) -> Result<usize, ParseError> {

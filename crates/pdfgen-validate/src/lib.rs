@@ -92,8 +92,7 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
                 if !text.contains("pdfuaid") {
                     findings.push(Finding {
                         id: "06-002".into(),
-                        message: "XMP metadata does not include the PDF/UA identifier"
-                            .into(),
+                        message: "XMP metadata does not include the PDF/UA identifier".into(),
                         context: "document".into(),
                     });
                 }
@@ -125,20 +124,17 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
     let doc_title_shown = catalog
         .get("ViewerPreferences")
         .and_then(|o| match o {
-            Object::Dict(d) => d
-                .get("DisplayDocTitle")
-                .and_then(|v| match v {
-                    Object::Bool(b) => Some(*b),
-                    _ => None,
-                }),
+            Object::Dict(d) => d.get("DisplayDocTitle").and_then(|v| match v {
+                Object::Bool(b) => Some(*b),
+                _ => None,
+            }),
             _ => None,
         })
         .unwrap_or(false);
     if !doc_title_shown {
         findings.push(Finding {
             id: "02-007".into(),
-            message: "DisplayDocTitle is not set; the document title is not shown"
-                .into(),
+            message: "DisplayDocTitle is not set; the document title is not shown".into(),
             context: "document".into(),
         });
     }
@@ -163,7 +159,9 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
         if let Some(Object::Array(fields)) = acro.get("Fields").cloned() {
             for f in fields {
                 let Object::Ref(fr) = f else { continue };
-                let Ok(Object::Dict(fd)) = reader.get(fr.id) else { continue };
+                let Ok(Object::Dict(fd)) = reader.get(fr.id) else {
+                    continue;
+                };
                 let ctx = format!("field {}", fr.id);
                 // 28-001: interactive form fields need a TU (accessible
                 // name). /T alone is a raw field name, not an accessible
@@ -182,10 +180,9 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
                 }
                 // 28-002: no JavaScript actions on the field.
                 if let Some(Object::Dict(aa)) = fd.get("AA").cloned() {
-                    let has_action = aa
-                        .0
-                        .iter()
-                        .any(|(k, _)| matches!(k.0.as_str(), "K" | "V" | "F" | "C"));
+                    let has_action =
+                        aa.0.iter()
+                            .any(|(k, _)| matches!(k.0.as_str(), "K" | "V" | "F" | "C"));
                     if has_action {
                         findings.push(Finding {
                             id: "28-002".into(),
@@ -208,12 +205,7 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
                     if let Some(Object::Array(kids)) = doc_d.get("K").cloned() {
                         for kid in kids {
                             if let Object::Ref(r) = kid {
-                                walk_element(
-                                    &mut reader,
-                                    r.id,
-                                    &mut findings,
-                                    &mut review,
-                                )?;
+                                walk_element(&mut reader, r.id, &mut findings, &mut review)?;
                             }
                         }
                     }

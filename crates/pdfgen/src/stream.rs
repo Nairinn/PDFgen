@@ -86,7 +86,9 @@ mod ids {
     pub const METADATA: u32 = 3;
     /// 4+: 4 objects per font (dict, descriptor, file, tounicode).
     pub const FONT_BASE: u32 = 4;
-    /// After the fonts, dynamic objects start here.
+    /// After the fonts, dynamic objects start here. (Layout constant
+    /// kept for readers of the ID scheme.)
+    #[allow(dead_code)]
     pub const DYNAMIC_BASE: u32 = 4;
 }
 
@@ -173,10 +175,8 @@ impl StreamWriter {
         out.write_all(&header)?;
         let cursor = header.len() as u64;
 
-        let fonts = vec![
-            pdfgen_font::LoadedFont::load(default_font_path()?)
-                .map_err(|e| StreamError::Font(e.to_string()))?,
-        ];
+        let fonts = vec![pdfgen_font::LoadedFont::load(default_font_path()?)
+            .map_err(|e| StreamError::Font(e.to_string()))?];
         let font_ids = (0..fonts.len())
             .map(|i| ids::FONT_BASE + (i as u32) * 4)
             .collect();
@@ -321,8 +321,7 @@ impl StreamWriter {
         let f = self
             .fonts
             .get(font)
-            .ok_or_else(|| StreamError::Font(format!("bad font handle {font}")))?
-            .clone();
+            .ok_or_else(|| StreamError::Font(format!("bad font handle {font}")))?;
         let lh = size * LH;
         let max_w = PAGE.0 - 2.0 * MARGIN;
 
@@ -332,9 +331,7 @@ impl StreamWriter {
         {
             let mut cur = String::with_capacity(128);
             let mut cur_w = 0.0f64;
-            let space_w = f
-                .byte_width_pt(b' ', size)
-                .unwrap_or(size * 0.25);
+            let space_w = f.byte_width_pt(b' ', size).unwrap_or(size * 0.25);
             let mut pending_space = false;
             let mut word_start: Option<usize> = None;
             for (i, _ch) in text.char_indices() {
@@ -343,8 +340,14 @@ impl StreamWriter {
                     if let Some(ws) = word_start.take() {
                         let w = word_width_pt(&f, &text[ws..i], size, scale);
                         pack_word(
-                            &mut lines, &mut cur, &mut cur_w, &mut pending_space,
-                            space_w, w, max_w, &text[ws..i],
+                            &mut lines,
+                            &mut cur,
+                            &mut cur_w,
+                            &mut pending_space,
+                            space_w,
+                            w,
+                            max_w,
+                            &text[ws..i],
                         );
                     } else {
                         pending_space = !cur.is_empty();
@@ -356,8 +359,14 @@ impl StreamWriter {
             if let Some(ws) = word_start.take() {
                 let w = word_width_pt(&f, &text[ws..], size, scale);
                 pack_word(
-                    &mut lines, &mut cur, &mut cur_w, &mut pending_space,
-                    space_w, w, max_w, &text[ws..],
+                    &mut lines,
+                    &mut cur,
+                    &mut cur_w,
+                    &mut pending_space,
+                    space_w,
+                    w,
+                    max_w,
+                    &text[ws..],
                 );
             }
             if !cur.is_empty() {
@@ -448,7 +457,13 @@ impl StreamWriter {
         let mut d = Dict::new();
         d.set("Filter", "FlateDecode");
         d.set("Length", compressed.len() as i64);
-        self.write_object(content_id, &Object::Stream(Stream { dict: d, data: compressed }))?;
+        self.write_object(
+            content_id,
+            &Object::Stream(Stream {
+                dict: d,
+                data: compressed,
+            }),
+        )?;
 
         let page_id = self.alloc();
         let page_idx = self.page_ids.len();
@@ -545,8 +560,8 @@ impl StreamWriter {
     pub fn finish(mut self) -> Result<pdfgen_profile::SaveReport, StreamError> {
         self.flush_page()?;
 
-        let compliant = !self.title.trim().is_empty() && !self.lang.is_empty()
-            && !self.elems.is_empty();
+        let compliant =
+            !self.title.trim().is_empty() && !self.lang.is_empty() && !self.elems.is_empty();
         let mut violations: Vec<pdfgen_profile::Violation> = Vec::new();
         if self.title.trim().is_empty() {
             violations.push(pdfgen_profile::Violation {
@@ -848,7 +863,10 @@ fn emit_stream_font(
     };
     let fd = Dict::new()
         .with("Type", "FontDescriptor")
-        .with("FontName", Object::Name(Name::new(f.postscript_name.clone())))
+        .with(
+            "FontName",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        )
         .with("Flags", f.descriptor_flags())
         .with(
             "FontBBox",
@@ -871,7 +889,10 @@ fn emit_stream_font(
     let fobj = Dict::new()
         .with("Type", "Font")
         .with("Subtype", "TrueType")
-        .with("BaseFont", Object::Name(Name::new(f.postscript_name.clone())))
+        .with(
+            "BaseFont",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        )
         .with("FirstChar", 0)
         .with("LastChar", 255)
         .with("Widths", Object::Array(widths))
@@ -916,7 +937,11 @@ fn pack_word(
     max_w: f64,
     word: &str,
 ) {
-    let need = if *pending_space { *cur_w + space_w + w } else { w };
+    let need = if *pending_space {
+        *cur_w + space_w + w
+    } else {
+        w
+    };
     if !cur.is_empty() && need > max_w {
         lines.push(std::mem::take(cur));
         *cur_w = 0.0;
@@ -1006,7 +1031,5 @@ fn default_font_path() -> Result<String, StreamError> {
     if std::path::Path::new(alt).exists() {
         return Ok(alt.into());
     }
-    Err(StreamError::Font(
-        "no default font available".into(),
-    ))
+    Err(StreamError::Font("no default font available".into()))
 }

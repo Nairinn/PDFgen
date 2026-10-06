@@ -25,7 +25,10 @@ fn headerless_table_is_flagged() {
     // Content: one TD text run with an MCID.
     w.set_stream(
         contents,
-        Stream::new(Dict::new(), b"/TD <</MCID 0>> BDC\nBT /F0 12 Tf 72 700 Td (cell) Tj ET\nEMC\n".to_vec()),
+        Stream::new(
+            Dict::new(),
+            b"/TD <</MCID 0>> BDC\nBT /F0 12 Tf 72 700 Td (cell) Tj ET\nEMC\n".to_vec(),
+        ),
     );
 
     // TD element.
@@ -70,10 +73,7 @@ fn headerless_table_is_flagged() {
         "ParentTree",
         Object::Dict(Dict::new().with(
             "Nums",
-            Object::Array(vec![
-                Object::Int(0),
-                Object::Array(vec![Object::Ref(td)]),
-            ]),
+            Object::Array(vec![Object::Int(0), Object::Array(vec![Object::Ref(td)])]),
         )),
     );
     w.set(struct_root, Object::Dict(sr));
@@ -81,7 +81,15 @@ fn headerless_table_is_flagged() {
     let mut pg = Dict::new();
     pg.set("Type", "Page");
     pg.set("Parent", pages);
-    pg.set("MediaBox", Object::Array(vec![Object::Int(0), Object::Int(0), Object::Int(612), Object::Int(792)]));
+    pg.set(
+        "MediaBox",
+        Object::Array(vec![
+            Object::Int(0),
+            Object::Int(0),
+            Object::Int(612),
+            Object::Int(792),
+        ]),
+    );
     pg.set("Resources", Object::Dict(Dict::new()));
     pg.set("Contents", contents);
     pg.set("StructParents", 0);
@@ -89,7 +97,12 @@ fn headerless_table_is_flagged() {
 
     w.set(
         pages,
-        Object::Dict(Dict::new().with("Type", "Pages").with("Kids", Object::Array(vec![Object::Ref(page)])).with("Count", 1)),
+        Object::Dict(
+            Dict::new()
+                .with("Type", "Pages")
+                .with("Kids", Object::Array(vec![Object::Ref(page)]))
+                .with("Count", 1),
+        ),
     );
 
     let mut cat = Dict::new();

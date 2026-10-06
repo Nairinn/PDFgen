@@ -68,8 +68,7 @@ impl Content {
     pub fn begin_tag(&mut self, tag: &str) -> u32 {
         let mcid = self.next_mcid;
         self.next_mcid += 1;
-        self.ops
-            .push_str(&format!("/{tag} <</MCID {mcid}>> BDC\n"));
+        self.ops.push_str(&format!("/{tag} <</MCID {mcid}>> BDC\n"));
         mcid
     }
 

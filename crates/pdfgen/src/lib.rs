@@ -41,12 +41,12 @@ pub use form::fill_text_field;
 pub use html::{html_file_to_pdf, html_to_pdf, HtmlError};
 pub use image::{Image, ImageError, ImageKind};
 pub use page::Page;
+pub use pdfgen_font::{FontError, LoadedFont};
+pub use pdfgen_parse::{ParseError, PdfReader};
+pub use pdfgen_profile::{Metadata, Profile, SaveReport, Status, Violation};
+pub use retag::{TagSession, TextRun};
 pub use stream::{StreamError, StreamEvent, StreamWriter};
 pub use structure::Node;
-pub use retag::{TagSession, TextRun};
-pub use pdfgen_font::{FontError, LoadedFont};
-pub use pdfgen_profile::{Metadata, Profile, SaveReport, Status, Violation};
-pub use pdfgen_parse::{ParseError, PdfReader};
 
 /// WinAnsi helpers re-exported for callers that encode text themselves.
 pub use pdfgen_font::winansi;

@@ -209,9 +209,9 @@ impl<'a> Flow<'a> {
                 self.new_page();
             }
         }
-        self.doc.pages[self.page_idx].nodes.push(
-            Node::leaf("P", text.to_string(), font, size).with_pieces(pieces),
-        );
+        self.doc.pages[self.page_idx]
+            .nodes
+            .push(Node::leaf("P", text.to_string(), font, size).with_pieces(pieces));
         Ok(())
     }
 
@@ -227,14 +227,12 @@ impl<'a> Flow<'a> {
             let lines = self.wrap_to(item, 0, 11.0, self.width - 2.0 * self.margin - 14.0)?;
             let (body_mcid, y2) = self.draw_lines("LBody", 0, 11.0, &lines, self.margin + 14.0)?;
             self.y = y1.min(y2);
-            list.children.push(
-                Node::group("LI").with_children(vec![
+            list.children.push(Node::group("LI").with_children(vec![
                     Node::leaf("Lbl", "\u{2022}".into(), 0, 11.0)
                         .with_pieces(vec![(self.page_idx, lbl_mcid)]),
                     Node::leaf("LBody", item.to_string(), 0, 11.0)
                         .with_pieces(vec![(self.page_idx, body_mcid)]),
-                ]),
-            );
+                ]));
         }
         self.doc.pages[self.page_idx].nodes.push(list);
         Ok(())
@@ -310,8 +308,7 @@ impl<'a> Flow<'a> {
                     self.wrap_to(c, 0, 11.0, w - 2.0 * PAD)
                 })
                 .collect::<Result<_, _>>()?;
-            let row_h =
-                11.0 * LH * wrapped.iter().map(Vec::len).max().unwrap_or(1) as f64;
+            let row_h = 11.0 * LH * wrapped.iter().map(Vec::len).max().unwrap_or(1) as f64;
             self.ensure_space(row_h);
             let mut tr = Node::group("TR");
             let mut x = self.margin;
@@ -328,8 +325,7 @@ impl<'a> Flow<'a> {
                 }
                 pd.content.end_tag();
                 tr.children.push(
-                    Node::leaf("TD", cell_text, 0, 11.0)
-                        .with_pieces(vec![(self.page_idx, mcid)]),
+                    Node::leaf("TD", cell_text, 0, 11.0).with_pieces(vec![(self.page_idx, mcid)]),
                 );
                 x += col_w[ci.min(col_w.len() - 1)];
                 y_top = y_top.min(y);
@@ -345,13 +341,7 @@ impl<'a> Flow<'a> {
     // --------------------------------------------------------- figures
 
     /// Tagged figure: image with alt text (empty alt = decorative).
-    pub fn figure(
-        &mut self,
-        image: &Image,
-        alt: &str,
-        w: f64,
-        h: f64,
-    ) -> Result<(), FontError> {
+    pub fn figure(&mut self, image: &Image, alt: &str, w: f64, h: f64) -> Result<(), FontError> {
         self.ensure_space(h);
         let res = self.doc.register_image(image);
         let pd = &mut self.doc.pages[self.page_idx];
@@ -373,7 +363,8 @@ impl<'a> Flow<'a> {
         let encoded = pdfgen_font::winansi::encode(text)?;
         let pd = &mut self.doc.pages[self.page_idx];
         pd.content.begin_artifact("Header");
-        pd.content.text("F0", 9.0, self.margin, self.height - 40.0, &encoded);
+        pd.content
+            .text("F0", 9.0, self.margin, self.height - 40.0, &encoded);
         pd.content.end_artifact();
         Ok(())
     }
@@ -401,7 +392,8 @@ impl<'a> Flow<'a> {
         // Pure decoration on the page: mark it as an artifact.
         let y_box = self.y - field_h - 11.0;
         pd.content.begin_artifact("");
-        pd.content.rect(self.margin + 160.0, y_box, field_w, field_h);
+        pd.content
+            .rect(self.margin + 160.0, y_box, field_w, field_h);
         pd.content.end_artifact();
 
         // Record for AcroForm emission at save.
@@ -416,9 +408,10 @@ impl<'a> Flow<'a> {
         });
 
         self.y = y_box - 8.0;
-        self.doc.pages[self.page_idx]
-            .nodes
-            .push(Node::leaf("Caption", label.to_string(), 0, 11.0).with_pieces(vec![(self.page_idx, mcid)]));
+        self.doc.pages[self.page_idx].nodes.push(
+            Node::leaf("Caption", label.to_string(), 0, 11.0)
+                .with_pieces(vec![(self.page_idx, mcid)]),
+        );
         Ok(())
     }
 
@@ -433,12 +426,6 @@ impl<'a> Flow<'a> {
     }
 }
 
-/// Helper for the header-cell text draw (draws each wrapped line).
-fn encoded_if(_lines: &[String], _line: &String, encoded: Vec<u8>) -> Vec<u8> {
-    encoded
-}
 
-/// Re-export for callers constructing images.
-pub use crate::image::Image as FlowImage;
 #[allow(unused_imports)]
 use ImageKind as _FlowImageKind;

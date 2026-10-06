@@ -28,12 +28,15 @@ fn unnamed_form_field_is_flagged() {
             Dict::new()
                 .with("Type", "Annot")
                 .with("Subtype", "Widget")
-                .with("Rect", Object::Array(vec![
-                    Object::Int(72),
-                    Object::Int(600),
-                    Object::Int(300),
-                    Object::Int(630),
-                ])),
+                .with(
+                    "Rect",
+                    Object::Array(vec![
+                        Object::Int(72),
+                        Object::Int(600),
+                        Object::Int(300),
+                        Object::Int(630),
+                    ]),
+                ),
         )]),
     );
     w.set(field, Object::Dict(f));
@@ -47,7 +50,12 @@ fn unnamed_form_field_is_flagged() {
     pg.set("Parent", pages);
     pg.set(
         "MediaBox",
-        Object::Array(vec![Object::Int(0), Object::Int(0), Object::Int(612), Object::Int(792)]),
+        Object::Array(vec![
+            Object::Int(0),
+            Object::Int(0),
+            Object::Int(612),
+            Object::Int(792),
+        ]),
     );
     pg.set("Resources", Object::Dict(Dict::new()));
     w.set(page, Object::Dict(pg));

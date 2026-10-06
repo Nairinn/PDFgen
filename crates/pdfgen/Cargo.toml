@@ -6,7 +6,6 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-rustdoc-links = true
 
 [dependencies]
 pdfgen-core = { workspace = true }

@@ -44,7 +44,10 @@ fn untagged_fixture() {
         Object::Dict(
             Dict::new()
                 .with("Type", "FontDescriptor")
-                .with("FontName", Object::Name(pdfgen::Name::new(loaded.postscript_name.clone())))
+                .with(
+                    "FontName",
+                    Object::Name(pdfgen::Name::new(loaded.postscript_name.clone())),
+                )
                 .with("Flags", 32)
                 .with("FontFile2", ffile),
         ),
@@ -55,7 +58,10 @@ fn untagged_fixture() {
             Dict::new()
                 .with("Type", "Font")
                 .with("Subtype", "TrueType")
-                .with("BaseFont", Object::Name(pdfgen::Name::new(loaded.postscript_name.clone())))
+                .with(
+                    "BaseFont",
+                    Object::Name(pdfgen::Name::new(loaded.postscript_name.clone())),
+                )
                 .with("FirstChar", 0)
                 .with("LastChar", 255)
                 .with("Widths", Object::Array(vec![Object::Int(0); 256]))
@@ -116,7 +122,10 @@ fn retag_untagged_pdf() {
     let mut session = TagSession::open(FIXTURE).expect("open untagged pdf");
     assert!(!session.is_empty(), "should find text runs");
     assert!(
-        session.runs.iter().any(|r| r.text.contains("Quarterly Report")),
+        session
+            .runs
+            .iter()
+            .any(|r| r.text.contains("Quarterly Report")),
         "heading text found: {:?}",
         session
             .runs

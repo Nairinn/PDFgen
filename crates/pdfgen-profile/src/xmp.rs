@@ -42,7 +42,9 @@ pub fn build(meta: &Metadata, ua_part: u32, claim_ua: bool) -> Vec<u8> {
 
     // Dublin Core: title, creator, description.
     if meta.title.as_deref().map(str::is_empty) != Some(true) {
-        rdf.push_str("<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n");
+        rdf.push_str(
+            "<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n",
+        );
         if let Some(t) = &meta.title {
             rdf.push_str(&format!(
                 "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:title>\n",

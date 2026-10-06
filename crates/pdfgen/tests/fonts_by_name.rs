@@ -13,14 +13,22 @@ fn fonts_by_name_end_to_end() {
     // System font by name (real Arial from /System/Library/Fonts/...).
     let arial = doc.font("Arial", "Bold").expect("system Arial resolves");
     // Built-in catalog by name.
-    let lib = doc.font("Liberation Serif", "Regular").expect("catalog font");
+    let lib = doc
+        .font("Liberation Serif", "Regular")
+        .expect("catalog font");
     // Standard-14 alias -> embedded look-alike (not compliant-breaking).
     let helv = doc.font("Helvetica", "Regular").expect("alias resolves");
     let _ = helv;
 
     let mut flow = doc.flow();
-    flow.paragraph_in(arial, 14.0, "This line uses system Arial Bold.").unwrap();
-    flow.paragraph_in(lib, 12.0, "This line uses Liberation Serif from the built-in catalog.").unwrap();
+    flow.paragraph_in(arial, 14.0, "This line uses system Arial Bold.")
+        .unwrap();
+    flow.paragraph_in(
+        lib,
+        12.0,
+        "This line uses Liberation Serif from the built-in catalog.",
+    )
+    .unwrap();
     drop(flow);
 
     let path = format!("{out_dir}/fonts_by_name.pdf");
@@ -35,10 +43,7 @@ fn fonts_by_name_end_to_end() {
         report.violations
     );
     assert!(
-        report
-            .human_review
-            .iter()
-            .any(|n| n.contains("Helvetica")),
+        report.human_review.iter().any(|n| n.contains("Helvetica")),
         "substitution noted: {:?}",
         report.human_review
     );

@@ -8,8 +8,8 @@ fn stream_large_document() {
     let out_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/output");
     let path = format!("{out_dir}/streamed_ua1.pdf");
 
-    let mut w = StreamWriter::create(&path, Profile::PdfUa1, "Streamed mega-doc", "en-US")
-        .expect("create");
+    let mut w =
+        StreamWriter::create(&path, Profile::PdfUa1, "Streamed mega-doc", "en-US").expect("create");
 
     // Large document: 500 sections in big chunks.
     for s in 0..500 {

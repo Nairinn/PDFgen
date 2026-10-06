@@ -36,7 +36,8 @@ fn script_catalog_fonts_pass() {
         )
         .unwrap();
         // Arabic: "مرحبا" (marhaba - hello)
-        flow.paragraph_in(ar, 12.0, "\u{0645}\u{0631}\u{062D}\u{0628}\u{0627}").unwrap();
+        flow.paragraph_in(ar, 12.0, "\u{0645}\u{0631}\u{062D}\u{0628}\u{0627}")
+            .unwrap();
         flow.paragraph_in(
             latin,
             12.0,

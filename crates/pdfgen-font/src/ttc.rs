@@ -45,8 +45,12 @@ pub fn extract_face(data: &[u8], index: u32) -> Option<Vec<u8>> {
     let mut data_end = 0usize;
     for t in 0..num_tables {
         let rec = dir_start + t * 16;
-        let len = u32::from_be_bytes([data[rec + 12], data[rec + 13], data[rec + 14], data[rec + 15]])
-            as usize;
+        let len = u32::from_be_bytes([
+            data[rec + 12],
+            data[rec + 13],
+            data[rec + 14],
+            data[rec + 15],
+        ]) as usize;
         let off = u32::from_be_bytes([data[rec + 8], data[rec + 9], data[rec + 10], data[rec + 11]])
             as usize;
         data_end = data_end.max(off.saturating_add(len));
@@ -105,8 +109,12 @@ pub fn extract_face(data: &[u8], index: u32) -> Option<Vec<u8>> {
         let mut sum: u32 = 0;
         let mut i = 0;
         while i + 4 <= out.len() {
-            sum = sum
-                .wrapping_add(u32::from_be_bytes([out[i], out[i + 1], out[i + 2], out[i + 3]]));
+            sum = sum.wrapping_add(u32::from_be_bytes([
+                out[i],
+                out[i + 1],
+                out[i + 2],
+                out[i + 3],
+            ]));
             i += 4;
         }
         if i < out.len() {

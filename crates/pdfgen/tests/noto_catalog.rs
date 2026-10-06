@@ -15,19 +15,29 @@ fn noto_catalog_fonts_embed_and_pass() {
     let sans = doc.font("Noto Sans", "Regular").expect("Noto Sans");
     let sans_b = doc.font("Noto Sans", "Bold").expect("Noto Sans Bold");
     let serif = doc.font("Noto Serif", "Bold").expect("Noto Serif Bold");
-    let mono = doc.font("Noto Sans Mono", "Regular").expect("Noto Sans Mono");
+    let mono = doc
+        .font("Noto Sans Mono", "Regular")
+        .expect("Noto Sans Mono");
 
     {
         let mut flow = doc.flow();
         flow.heading(1, "Noto Catalog Test").unwrap();
-        flow.paragraph_in(sans, 11.0, "This line uses Noto Sans Regular from the bundled catalog.")
-            .unwrap();
+        flow.paragraph_in(
+            sans,
+            11.0,
+            "This line uses Noto Sans Regular from the bundled catalog.",
+        )
+        .unwrap();
         flow.paragraph_in(sans_b, 11.0, "This line uses Noto Sans Bold.")
             .unwrap();
         flow.paragraph_in(serif, 11.0, "This line uses Noto Serif Bold.")
             .unwrap();
-        flow.paragraph_in(mono, 10.0, "This line uses Noto Sans Mono for code-like text.")
-            .unwrap();
+        flow.paragraph_in(
+            mono,
+            10.0,
+            "This line uses Noto Sans Mono for code-like text.",
+        )
+        .unwrap();
     }
 
     let path = out("noto_catalog_ua1.pdf");

@@ -9,7 +9,7 @@
 /// Build a subset font containing `used` glyphs (GIDs) plus gid 0.
 /// Returns the new sfnt bytes and the old->new GID mapping.
 pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)> {
-    let (tables, num_tables) = read_directory(data)?;
+    let (tables, _num_tables) = read_directory(data)?;
     let head = tables.get(b"head")?;
     let maxp = tables.get(b"maxp")?;
     let loca = tables.get(b"loca")?;
@@ -23,7 +23,7 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
     let long_loca = index_to_loc_format == 1;
     let num_glyphs = u16::from_be_bytes([maxp[4], maxp[5]]) as usize;
 
-    let loca_len = num_glyphs + 1;
+    let _loca_len = num_glyphs + 1;
     let loca_at = |i: usize| -> usize {
         if long_loca {
             u32::from_be_bytes([
@@ -133,7 +133,10 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
         offsets.iter().flat_map(|&o| o.to_be_bytes()).collect()
     };
     // loca must have numGlyphs+1 entries — offsets already has that many.
-    debug_assert_eq!(new_loca.len() / if can_short_loca { 2 } else { 4 }, new_num_glyphs + 1);
+    debug_assert_eq!(
+        new_loca.len() / if can_short_loca { 2 } else { 4 },
+        new_num_glyphs + 1
+    );
 
     // --- rewrite composite component GIDs inside new_glyf ---
     // (data was copied from the original, so old GIDs appear inline)
@@ -229,7 +232,9 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
 
     // Keep other tables verbatim (OS/2, name, post, GDEF? GSUB may
     // reference glyphs — drop layout tables to stay safe and small).
-    let keep_tags: &[&[u8; 4]] = &[b"OS/2", b"name", b"post", b"cvt ", b"fpgm", b"prep", b"gasp"];
+    let keep_tags: &[&[u8; 4]] = &[
+        b"OS/2", b"name", b"post", b"cvt ", b"fpgm", b"prep", b"gasp",
+    ];
     let mut out_tables: Vec<(&[u8; 4], Vec<u8>)> = Vec::new();
     out_tables.push((b"head", new_head));
     out_tables.push((b"hhea", new_hhea));
@@ -252,7 +257,8 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
     if dir_len % 16 != 0 {
         dir_len += 16 - (dir_len % 16);
     }
-    let mut out: Vec<u8> = Vec::with_capacity(dir_len + out_tables.iter().map(|(_, t)| t.len()).sum::<usize>());
+    let mut out: Vec<u8> =
+        Vec::with_capacity(dir_len + out_tables.iter().map(|(_, t)| t.len()).sum::<usize>());
     out.extend_from_slice(&[0x00, 0x01, 0x00, 0x00]); // TrueType
     let max_pow2 = {
         let mut p = 1usize;
@@ -279,7 +285,7 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
     while out.len() < dir_len {
         out.push(0);
     }
-    for (tag, bytes) in &out_tables {
+    for (_tag, bytes) in &out_tables {
         out.extend_from_slice(bytes);
         let pad = (4 - bytes.len() % 4) % 4;
         out.extend(std::iter::repeat(0u8).take(pad));
@@ -340,12 +346,8 @@ fn fix_head_adjustment(out: &mut [u8], num_tables: usize) -> Option<()> {
     for i in 0..num_tables {
         let rec = 12 + i * 16;
         if &out[rec..rec + 4] == b"head" {
-            let off = u32::from_be_bytes([
-                out[rec + 8],
-                out[rec + 9],
-                out[rec + 10],
-                out[rec + 11],
-            ]) as usize;
+            let off = u32::from_be_bytes([out[rec + 8], out[rec + 9], out[rec + 10], out[rec + 11]])
+                as usize;
             head_off = Some(off);
         }
     }
@@ -354,8 +356,12 @@ fn fix_head_adjustment(out: &mut [u8], num_tables: usize) -> Option<()> {
     let mut sum: u32 = 0;
     let mut i = 0;
     while i + 4 <= out.len() {
-        sum = sum
-            .wrapping_add(u32::from_be_bytes([out[i], out[i + 1], out[i + 2], out[i + 3]]));
+        sum = sum.wrapping_add(u32::from_be_bytes([
+            out[i],
+            out[i + 1],
+            out[i + 2],
+            out[i + 3],
+        ]));
         i += 4;
     }
     if i < out.len() {
@@ -370,11 +376,7 @@ fn fix_head_adjustment(out: &mut [u8], num_tables: usize) -> Option<()> {
 
 /// Rewrite every cmap subtable through the old->new GID remap, dropping
 /// mappings to glyphs that were removed (mapped to nothing).
-fn remap_cmap(
-    _data: &[u8],
-    cmap: &[u8],
-    remap: &[u16],
-) -> Option<Vec<u8>> {
+fn remap_cmap(_data: &[u8], cmap: &[u8], remap: &[u16]) -> Option<Vec<u8>> {
     // For simplicity and safety, build a fresh cmap with one format-4
     // subtable rebuilt from the original format 4 (platform 3 encoding 1).
     if cmap.len() < 4 {
@@ -432,10 +434,7 @@ fn rebuild_format4(sub: &[u8], remap: &[u16]) -> Option<Vec<u8>> {
         let end = u16::from_be_bytes([end_codes[seg * 2], end_codes[seg * 2 + 1]]);
         let start = u16::from_be_bytes([start_codes[seg * 2], start_codes[seg * 2 + 1]]);
         let delta = u16::from_be_bytes([id_delta[seg * 2], id_delta[seg * 2 + 1]]);
-        let roff_raw = u16::from_be_bytes([
-            id_range_off[seg * 2],
-            id_range_off[seg * 2 + 1],
-        ]);
+        let roff_raw = u16::from_be_bytes([id_range_off[seg * 2], id_range_off[seg * 2 + 1]]);
         if start == 0xFFFF {
             continue;
         }

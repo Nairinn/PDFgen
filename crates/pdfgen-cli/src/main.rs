@@ -168,7 +168,12 @@ fn print_file(path: &str, printer: Option<String>) -> Result<usize, String> {
     let files = render_to_pngs(path, opts, &tmp)?;
     // lpr takes multiple files in one job; lp needs one command per file.
     let lpr = std::process::Command::new("lpr")
-        .args(printer.as_deref().map(|p| vec!["-P", p]).unwrap_or_default())
+        .args(
+            printer
+                .as_deref()
+                .map(|p| vec!["-P", p])
+                .unwrap_or_default(),
+        )
         .args(files.iter().map(|f| f.as_os_str()))
         .status();
     match lpr {

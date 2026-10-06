@@ -74,7 +74,11 @@ fn commit_history_diff_revert() {
 
     // --- The reverted file still validates.
     let v = pdfgen_validate::validate(&out).unwrap();
-    assert!(v.is_clean(), "reverted file machine checks: {:?}", v.findings);
+    assert!(
+        v.is_clean(),
+        "reverted file machine checks: {:?}",
+        v.findings
+    );
 }
 
 #[test]

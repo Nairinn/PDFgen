@@ -32,7 +32,8 @@ pub struct Document {
     pub(crate) bookmarks: Vec<(u8, String, usize)>,
     /// Fonts that needed CID (Type0) encoding: font index -> used
     /// (char, glyph id) pairs.
-    pub(crate) cid_fonts: std::collections::BTreeMap<usize, std::collections::BTreeSet<(char, u16)>>,
+    pub(crate) cid_fonts:
+        std::collections::BTreeMap<usize, std::collections::BTreeSet<(char, u16)>>,
     /// Generate the document outline (bookmarks) from headings.
     pub(crate) want_outline: bool,
     /// Form fields recorded by the flow API, emitted as AcroForm at save.
@@ -126,7 +127,9 @@ impl Document {
     /// substitution in the save report.
     pub fn font(&mut self, family: &str, style: &str) -> Result<usize, Box<dyn std::error::Error>> {
         let (f, resolved) = self.registry.load(family, style)?;
-        if resolved.substituted && resolved.family.to_ascii_lowercase() != family.to_ascii_lowercase() {
+        if resolved.substituted
+            && resolved.family.to_ascii_lowercase() != family.to_ascii_lowercase()
+        {
             self.substitutions
                 .push((family.to_string(), resolved.family.clone()));
         }
@@ -184,10 +187,7 @@ impl Document {
     }
 
     /// Flow a bullet list; see [`Flow::bullet_list`].
-    pub fn flow_bullet_list(
-        &mut self,
-        items: &[&str],
-    ) -> Result<(), pdfgen_font::FontError> {
+    pub fn flow_bullet_list(&mut self, items: &[&str]) -> Result<(), pdfgen_font::FontError> {
         self.flow().bullet_list(items)
     }
 
@@ -451,7 +451,16 @@ impl Document {
                                 .and_then(|g| g.pieces.first().map(|p| p.0))
                         })
                         .unwrap_or(fallback_page);
-                    emit(doc, c, cr, r, page_refs, namespace, child_fallback, leaf_map);
+                    emit(
+                        doc,
+                        c,
+                        cr,
+                        r,
+                        page_refs,
+                        namespace,
+                        child_fallback,
+                        leaf_map,
+                    );
                 }
             } else if node.pieces.len() == 1 && node.pieces[0].0 == fallback_page {
                 e.set("K", i64::from(node.pieces[0].1));
@@ -494,7 +503,16 @@ impl Document {
                             .and_then(|c| c.pieces.first().map(|p| p.0))
                     })
                     .unwrap_or(pi);
-                emit(&mut doc, node, r, doc_elem, &page_refs, namespace, fallback, &mut leaf_map);
+                emit(
+                    &mut doc,
+                    node,
+                    r,
+                    doc_elem,
+                    &page_refs,
+                    namespace,
+                    fallback,
+                    &mut leaf_map,
+                );
             }
         }
 
@@ -763,16 +781,12 @@ impl Document {
         if f.is_cff {
             doc.set_stream(
                 ffile,
-                Stream::new(
-                    Dict::new().with("Subtype", "OpenType"),
-                    f.raw.clone(),
-                ),
+                Stream::new(Dict::new().with("Subtype", "OpenType"), f.raw.clone()),
             );
         } else {
             let used_gids: Vec<u16> = used.iter().map(|&(_, g)| g).collect();
             let mut program = f.raw.clone();
-            if let Some((sub, remap)) = pdfgen_font::subset::subset_true_type(&f.raw, &used_gids)
-            {
+            if let Some((sub, remap)) = pdfgen_font::subset::subset_true_type(&f.raw, &used_gids) {
                 // CID -> new GID table: 2 bytes per CID up to the largest
                 // used old gid (sparse entries default to glyph 0).
                 let max_old = used_gids.iter().copied().max().unwrap_or(0) as usize;
@@ -787,10 +801,7 @@ impl Document {
             }
             doc.set_stream(
                 ffile,
-                Stream::new(
-                    Dict::new().with("Length1", program.len() as i64),
-                    program,
-                ),
+                Stream::new(Dict::new().with("Length1", program.len() as i64), program),
             );
         }
 
@@ -805,7 +816,8 @@ impl Document {
         tu.push_str("/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n");
         tu.push_str("/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n");
         tu.push_str("1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n");
-        let mut entries: Vec<(u32, char)> = used.iter().map(|&(ch, g)| (u32::from(g), ch)).collect();
+        let mut entries: Vec<(u32, char)> =
+            used.iter().map(|&(ch, g)| (u32::from(g), ch)).collect();
         entries.sort_unstable();
         entries.dedup_by_key(|e| e.0);
         for chunk in entries.chunks(100) {
@@ -831,7 +843,10 @@ impl Document {
         };
         let mut fd = Dict::new();
         fd.set("Type", "FontDescriptor");
-        fd.set("FontName", Object::Name(Name::new(f.postscript_name.clone())));
+        fd.set(
+            "FontName",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        );
         fd.set("Flags", 4); // symbolic
         fd.set(
             "FontBBox",
@@ -872,7 +887,10 @@ impl Document {
                     let units = f.glyph_width_units(gids[i]).unwrap_or(0);
                     let w1000 = units as f64 * 1000.0 / scale;
                     run.push(Object::Real(
-                        pdfgen_core::fmt_real(w1000).parse::<f64>().unwrap_or(0.0).into(),
+                        pdfgen_core::fmt_real(w1000)
+                            .parse::<f64>()
+                            .unwrap_or(0.0)
+                            .into(),
                     ));
                     i += 1;
                 }
@@ -884,9 +902,16 @@ impl Document {
         cid_font.set("Type", "Font");
         cid_font.set(
             "Subtype",
-            if f.is_cff { "CIDFontType0" } else { "CIDFontType2" },
+            if f.is_cff {
+                "CIDFontType0"
+            } else {
+                "CIDFontType2"
+            },
         );
-        cid_font.set("BaseFont", Object::Name(Name::new(f.postscript_name.clone())));
+        cid_font.set(
+            "BaseFont",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        );
         cid_font.set(
             "CIDSystemInfo",
             Object::Dict(
@@ -924,7 +949,10 @@ impl Document {
         let mut t0 = Dict::new();
         t0.set("Type", "Font");
         t0.set("Subtype", "Type0");
-        t0.set("BaseFont", Object::Name(Name::new(f.postscript_name.clone())));
+        t0.set(
+            "BaseFont",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        );
         t0.set("Encoding", "Identity-H");
         t0.set("DescendantFonts", Object::Array(vec![Object::Ref(desc)]));
         t0.set("ToUnicode", ftouni);
@@ -973,7 +1001,10 @@ impl Document {
         // Descriptor.
         let mut fd = Dict::new();
         fd.set("Type", "FontDescriptor");
-        fd.set("FontName", Object::Name(Name::new(f.postscript_name.clone())));
+        fd.set(
+            "FontName",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        );
         fd.set("Flags", f.descriptor_flags());
         fd.set(
             "FontBBox",
@@ -996,7 +1027,10 @@ impl Document {
         let mut ff = Dict::new();
         ff.set("Type", "Font");
         ff.set("Subtype", "TrueType");
-        ff.set("BaseFont", Object::Name(Name::new(f.postscript_name.clone())));
+        ff.set(
+            "BaseFont",
+            Object::Name(Name::new(f.postscript_name.clone())),
+        );
         ff.set("FirstChar", 0);
         ff.set("LastChar", 255);
         ff.set("Widths", Object::Array(widths));

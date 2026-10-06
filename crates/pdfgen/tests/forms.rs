@@ -37,7 +37,10 @@ fn forms_create_fill_and_stay_compliant() {
 
     // The file has an AcroForm with two /TU-annotated fields.
     let bytes = std::fs::read(&path).unwrap();
-    assert!(bytes.windows(8).any(|w| w == b"AcroForm"), "AcroForm present");
+    assert!(
+        bytes.windows(8).any(|w| w == b"AcroForm"),
+        "AcroForm present"
+    );
     assert!(bytes.windows(3).any(|w| w == b"/TU"), "TU present");
     assert!(
         bytes.windows(9).any(|w| w == b"(fullname"),

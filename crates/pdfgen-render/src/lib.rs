@@ -99,7 +99,11 @@ fn crc32(data: &[u8]) -> u32 {
     for (i, t) in table.iter_mut().enumerate() {
         let mut c = i as u32;
         for _ in 0..8 {
-            c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+            c = if c & 1 != 0 {
+                0xEDB8_8320 ^ (c >> 1)
+            } else {
+                c >> 1
+            };
         }
         *t = c;
     }
@@ -649,8 +653,8 @@ fn run_ops(
                     g.nums.clear();
                 }
                 b"cm" | b"q" | b"Q" | b"W" | b"W*" | b"n" | b"gs" | b"cs" | b"CS" | b"sc"
-                | b"scn" | b"SC" | b"SCN" | b"G" | b"RG" | b"K" | b"k" | b"sh" | b"BI"
-                | b"ID" | b"EI" => {
+                | b"scn" | b"SC" | b"SCN" | b"G" | b"RG" | b"K" | b"k" | b"sh" | b"BI" | b"ID"
+                | b"EI" => {
                     g.nums.clear();
                 }
                 _ => {
@@ -763,14 +767,7 @@ fn show_text(
                 for (col, &a) in row_bytes.iter().enumerate() {
                     if a > 0 {
                         let (r, gg, b) = g.fill;
-                        bmp.set(
-                            dx + col as i64,
-                            dy + row as i64,
-                            r,
-                            gg,
-                            b,
-                            a,
-                        );
+                        bmp.set(dx + col as i64, dy + row as i64, r, gg, b, a);
                     }
                 }
             }
@@ -916,7 +913,10 @@ impl ttf_parser::OutlineBuilder for OutlineSink {
             return;
         }
         let p0 = self.cur;
-        let (c1, c2) = ((f64::from(x1), f64::from(y1)), (f64::from(x2), f64::from(y2)));
+        let (c1, c2) = (
+            (f64::from(x1), f64::from(y1)),
+            (f64::from(x2), f64::from(y2)),
+        );
         let end = (f64::from(x), f64::from(y));
         let n = 12;
         let mut last = p0;

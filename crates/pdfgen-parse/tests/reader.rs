@@ -85,7 +85,10 @@ fn repair_tolerates_broken_xref() {
         *b = b'X';
     }
     // Also remove the xref table marker.
-    let xref_idx = broken.windows(4).position(|w| w == b"xref").expect("has xref");
+    let xref_idx = broken
+        .windows(4)
+        .position(|w| w == b"xref")
+        .expect("has xref");
     for b in &mut broken[xref_idx..xref_idx + 4] {
         *b = b'Y';
     }

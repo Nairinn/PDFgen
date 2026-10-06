@@ -131,15 +131,13 @@ impl<'a> Lexer<'a> {
             return Err(ParseError::Malformed(start, "empty number".into()));
         }
         if saw_point {
-            Ok(Token::Real(
-                text.parse::<f64>()
-                    .map_err(|_| ParseError::Malformed(start, format!("bad real {text:?}")))?,
-            ))
+            Ok(Token::Real(text.parse::<f64>().map_err(|_| {
+                ParseError::Malformed(start, format!("bad real {text:?}"))
+            })?))
         } else {
-            Ok(Token::Int(
-                text.parse::<i64>()
-                    .map_err(|_| ParseError::Malformed(start, format!("bad int {text:?}")))?,
-            ))
+            Ok(Token::Int(text.parse::<i64>().map_err(|_| {
+                ParseError::Malformed(start, format!("bad int {text:?}"))
+            })?))
         }
     }
 
@@ -169,9 +167,7 @@ impl<'a> Lexer<'a> {
             out.push(raw[i]);
             i += 1;
         }
-        Ok(Token::Name(
-            String::from_utf8_lossy(&out).into_owned(),
-        ))
+        Ok(Token::Name(String::from_utf8_lossy(&out).into_owned()))
     }
 
     fn read_literal_string(&mut self) -> Result<Token, ParseError> {
@@ -228,7 +224,10 @@ impl<'a> Lexer<'a> {
             }
             self.pos += 1;
         }
-        Err(ParseError::Malformed(self.pos, "unterminated string".into()))
+        Err(ParseError::Malformed(
+            self.pos,
+            "unterminated string".into(),
+        ))
     }
 
     fn read_hex_string(&mut self) -> Result<Token, ParseError> {
@@ -251,7 +250,10 @@ impl<'a> Lexer<'a> {
             self.pos += 1;
         }
         if self.pos >= self.data.len() {
-            return Err(ParseError::Malformed(start, "unterminated hex string".into()));
+            return Err(ParseError::Malformed(
+                start,
+                "unterminated hex string".into(),
+            ));
         }
         if let Some(h) = hi {
             out.push(h << 4); // odd digit count: last high nibble + 0
@@ -280,10 +282,13 @@ impl<'a> Lexer<'a> {
             b"true" => Ok(Token::True),
             b"false" => Ok(Token::False),
             b"null" => Ok(Token::Null),
-            _ => Err(ParseError::Malformed(start, format!(
-                "unknown keyword {:?}",
-                String::from_utf8_lossy(&self.data[start..self.pos])
-            ))),
+            _ => Err(ParseError::Malformed(
+                start,
+                format!(
+                    "unknown keyword {:?}",
+                    String::from_utf8_lossy(&self.data[start..self.pos])
+                ),
+            )),
         }
     }
 

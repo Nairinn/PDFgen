@@ -42,10 +42,22 @@ fn asme_drawing_sheet_is_compliant() {
 
     // Title block: real tagged table.
     d.title_block(&[
-        TitleField { label: "TITLE", value: "BRACKET, MOUNTING".into() },
-        TitleField { label: "DWG NO", value: "A-1234-B".into() },
-        TitleField { label: "SCALE", value: "1:2".into() },
-        TitleField { label: "SHEET", value: "1 OF 1".into() },
+        TitleField {
+            label: "TITLE",
+            value: "BRACKET, MOUNTING".into(),
+        },
+        TitleField {
+            label: "DWG NO",
+            value: "A-1234-B".into(),
+        },
+        TitleField {
+            label: "SCALE",
+            value: "1:2".into(),
+        },
+        TitleField {
+            label: "SHEET",
+            value: "1 OF 1".into(),
+        },
     ]);
 
     // Part geometry (artifact) + dimensions.

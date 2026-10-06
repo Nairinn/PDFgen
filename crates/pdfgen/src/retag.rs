@@ -11,8 +11,7 @@
 //!    page content, a proper structure tree, and the accessibility report.
 
 use crate::document::Document;
-use crate::tounicode;
-use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
+use pdfgen_core::Object;
 use pdfgen_parse::PdfReader;
 use pdfgen_profile::{Profile, SaveReport};
 
@@ -31,6 +30,8 @@ pub struct TextRun {
 
 /// A retag session over an existing PDF.
 pub struct TagSession {
+    /// The parsed source; the session keeps it alive while tagging.
+    #[allow(dead_code)]
     reader: PdfReader,
     /// Extracted runs, in reading order per page.
     pub runs: Vec<TextRun>,
@@ -44,7 +45,9 @@ pub(crate) fn extract_text_runs(content: &[u8]) -> Vec<String> {
     let mut runs = Vec::new();
     let mut rest = &text[..];
     while let Some(start) = rest.find("BT") {
-        let Some(end_rel) = rest[start..].find("ET") else { break };
+        let Some(end_rel) = rest[start..].find("ET") else {
+            break;
+        };
         let block = &rest[start + 2..start + end_rel];
         // Simple approach: find every ( ... ) Tj and the array form.
         let bytes = block.as_bytes();
@@ -126,7 +129,8 @@ impl TagSession {
             // Decode if FlateDecode.
             let data: Vec<u8> = match content_stream.dict.get("Filter") {
                 Some(Object::Name(n)) if n.0 == "FlateDecode" => {
-                    crate::retag::inflate(&content_stream.data).unwrap_or_else(|| content_stream.data.clone())
+                    crate::retag::inflate(&content_stream.data)
+                        .unwrap_or_else(|| content_stream.data.clone())
                 }
                 _ => content_stream.data.clone(),
             };

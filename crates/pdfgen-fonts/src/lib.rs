@@ -29,38 +29,166 @@ pub struct CatalogEntry {
 
 /// The built-in catalog (Liberation + Noto families, all OFL-1.1).
 pub const CATALOG: &[CatalogEntry] = &[
-    CatalogEntry { family: "Liberation Sans", style: "Regular", file: "vendor/liberation/LiberationSans-Regular.ttf" },
-    CatalogEntry { family: "Liberation Sans", style: "Bold", file: "vendor/liberation/LiberationSans-Bold.ttf" },
-    CatalogEntry { family: "Liberation Sans", style: "Italic", file: "vendor/liberation/LiberationSans-Italic.ttf" },
-    CatalogEntry { family: "Liberation Sans", style: "Bold Italic", file: "vendor/liberation/LiberationSans-BoldItalic.ttf" },
-    CatalogEntry { family: "Liberation Serif", style: "Regular", file: "vendor/liberation/LiberationSerif-Regular.ttf" },
-    CatalogEntry { family: "Liberation Serif", style: "Bold", file: "vendor/liberation/LiberationSerif-Bold.ttf" },
-    CatalogEntry { family: "Liberation Serif", style: "Italic", file: "vendor/liberation/LiberationSerif-Italic.ttf" },
-    CatalogEntry { family: "Liberation Serif", style: "Bold Italic", file: "vendor/liberation/LiberationSerif-BoldItalic.ttf" },
-    CatalogEntry { family: "Liberation Mono", style: "Regular", file: "vendor/liberation/LiberationMono-Regular.ttf" },
-    CatalogEntry { family: "Liberation Mono", style: "Bold", file: "vendor/liberation/LiberationMono-Bold.ttf" },
-    CatalogEntry { family: "Liberation Mono", style: "Italic", file: "vendor/liberation/LiberationMono-Italic.ttf" },
-    CatalogEntry { family: "Liberation Mono", style: "Bold Italic", file: "vendor/liberation/LiberationMono-BoldItalic.ttf" },
-    CatalogEntry { family: "Noto Sans", style: "Regular", file: "vendor/noto/NotoSans-Regular.ttf" },
-    CatalogEntry { family: "Noto Sans", style: "Bold", file: "vendor/noto/NotoSans-Bold.ttf" },
-    CatalogEntry { family: "Noto Sans", style: "Italic", file: "vendor/noto/NotoSans-Italic.ttf" },
-    CatalogEntry { family: "Noto Sans", style: "Bold Italic", file: "vendor/noto/NotoSans-BoldItalic.ttf" },
-    CatalogEntry { family: "Noto Serif", style: "Regular", file: "vendor/noto/NotoSerif-Regular.ttf" },
-    CatalogEntry { family: "Noto Serif", style: "Bold", file: "vendor/noto/NotoSerif-Bold.ttf" },
-    CatalogEntry { family: "Noto Sans Mono", style: "Regular", file: "vendor/noto/NotoSansMono-Regular.ttf" },
-    CatalogEntry { family: "Noto Sans Mono", style: "Bold", file: "vendor/noto/NotoSansMono-Bold.ttf" },
-    CatalogEntry { family: "Noto Sans Myanmar", style: "Regular", file: "vendor/noto/NotoSansMyanmar-Regular.ttf" },
-    CatalogEntry { family: "Noto Sans Myanmar", style: "Bold", file: "vendor/noto/NotoSansMyanmar-Bold.ttf" },
-    CatalogEntry { family: "Noto Sans Thai", style: "Regular", file: "vendor/noto/NotoSansThai-Regular.ttf" },
-    CatalogEntry { family: "Noto Sans Thai", style: "Bold", file: "vendor/noto/NotoSansThai-Bold.ttf" },
-    CatalogEntry { family: "Noto Sans Arabic", style: "Regular", file: "vendor/noto/NotoSansArabic-Regular.ttf" },
-    CatalogEntry { family: "Noto Sans Arabic", style: "Bold", file: "vendor/noto/NotoSansArabic-Bold.ttf" },
-    CatalogEntry { family: "Noto Sans CJK JP", style: "Regular", file: "vendor/noto/NotoSansCJKjp-Regular.otf" },
-    CatalogEntry { family: "Noto Sans CJK JP", style: "Bold", file: "vendor/noto/NotoSansCJKjp-Bold.otf" },
-    CatalogEntry { family: "Atkinson Hyperlegible", style: "Regular", file: "vendor/accessibility/AtkinsonHyperlegible-Regular.ttf" },
-    CatalogEntry { family: "Atkinson Hyperlegible", style: "Bold", file: "vendor/accessibility/AtkinsonHyperlegible-Bold.ttf" },
-    CatalogEntry { family: "OpenDyslexic", style: "Regular", file: "vendor/accessibility/OpenDyslexic-Regular.otf" },
-    CatalogEntry { family: "OpenDyslexic", style: "Bold", file: "vendor/accessibility/OpenDyslexic-Bold.otf" },
+    CatalogEntry {
+        family: "Liberation Sans",
+        style: "Regular",
+        file: "vendor/liberation/LiberationSans-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Sans",
+        style: "Bold",
+        file: "vendor/liberation/LiberationSans-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Sans",
+        style: "Italic",
+        file: "vendor/liberation/LiberationSans-Italic.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Sans",
+        style: "Bold Italic",
+        file: "vendor/liberation/LiberationSans-BoldItalic.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Serif",
+        style: "Regular",
+        file: "vendor/liberation/LiberationSerif-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Serif",
+        style: "Bold",
+        file: "vendor/liberation/LiberationSerif-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Serif",
+        style: "Italic",
+        file: "vendor/liberation/LiberationSerif-Italic.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Serif",
+        style: "Bold Italic",
+        file: "vendor/liberation/LiberationSerif-BoldItalic.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Mono",
+        style: "Regular",
+        file: "vendor/liberation/LiberationMono-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Mono",
+        style: "Bold",
+        file: "vendor/liberation/LiberationMono-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Mono",
+        style: "Italic",
+        file: "vendor/liberation/LiberationMono-Italic.ttf",
+    },
+    CatalogEntry {
+        family: "Liberation Mono",
+        style: "Bold Italic",
+        file: "vendor/liberation/LiberationMono-BoldItalic.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans",
+        style: "Regular",
+        file: "vendor/noto/NotoSans-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans",
+        style: "Bold",
+        file: "vendor/noto/NotoSans-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans",
+        style: "Italic",
+        file: "vendor/noto/NotoSans-Italic.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans",
+        style: "Bold Italic",
+        file: "vendor/noto/NotoSans-BoldItalic.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Serif",
+        style: "Regular",
+        file: "vendor/noto/NotoSerif-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Serif",
+        style: "Bold",
+        file: "vendor/noto/NotoSerif-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans Mono",
+        style: "Regular",
+        file: "vendor/noto/NotoSansMono-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans Mono",
+        style: "Bold",
+        file: "vendor/noto/NotoSansMono-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans Myanmar",
+        style: "Regular",
+        file: "vendor/noto/NotoSansMyanmar-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans Myanmar",
+        style: "Bold",
+        file: "vendor/noto/NotoSansMyanmar-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans Thai",
+        style: "Regular",
+        file: "vendor/noto/NotoSansThai-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans Thai",
+        style: "Bold",
+        file: "vendor/noto/NotoSansThai-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans Arabic",
+        style: "Regular",
+        file: "vendor/noto/NotoSansArabic-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans Arabic",
+        style: "Bold",
+        file: "vendor/noto/NotoSansArabic-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "Noto Sans CJK JP",
+        style: "Regular",
+        file: "vendor/noto/NotoSansCJKjp-Regular.otf",
+    },
+    CatalogEntry {
+        family: "Noto Sans CJK JP",
+        style: "Bold",
+        file: "vendor/noto/NotoSansCJKjp-Bold.otf",
+    },
+    CatalogEntry {
+        family: "Atkinson Hyperlegible",
+        style: "Regular",
+        file: "vendor/accessibility/AtkinsonHyperlegible-Regular.ttf",
+    },
+    CatalogEntry {
+        family: "Atkinson Hyperlegible",
+        style: "Bold",
+        file: "vendor/accessibility/AtkinsonHyperlegible-Bold.ttf",
+    },
+    CatalogEntry {
+        family: "OpenDyslexic",
+        style: "Regular",
+        file: "vendor/accessibility/OpenDyslexic-Regular.otf",
+    },
+    CatalogEntry {
+        family: "OpenDyslexic",
+        style: "Bold",
+        file: "vendor/accessibility/OpenDyslexic-Bold.otf",
+    },
 ];
 
 /// Standard-14 name → look-alike family (PDF/UA needs embedded fonts).
@@ -193,7 +321,8 @@ impl FontRegistry {
         if let Some(dir) = Self::fonts_dir() {
             for e in CATALOG {
                 if e.family.to_ascii_lowercase() == key {
-                    let want = style_key.is_empty() || e.style.to_ascii_lowercase().contains(&style_key)
+                    let want = style_key.is_empty()
+                        || e.style.to_ascii_lowercase().contains(&style_key)
                         || (style_key == "regular" && e.style == "Regular")
                         || (style_key == "bold" && e.style == "Bold")
                         || (style_key == "italic" && e.style == "Italic")
@@ -240,8 +369,10 @@ impl FontRegistry {
                     if e.family.to_ascii_lowercase() == aliased {
                         let want = style_key.is_empty()
                             || (style_key == "regular" && e.style == "Regular")
-                            || (style_key == "bold" && (e.style == "Bold" || e.style == "Bold Italic"))
-                            || (style_key == "italic" && (e.style == "Italic" || e.style == "Bold Italic"))
+                            || (style_key == "bold"
+                                && (e.style == "Bold" || e.style == "Bold Italic"))
+                            || (style_key == "italic"
+                                && (e.style == "Italic" || e.style == "Bold Italic"))
                             || (style_key == "bold italic" && e.style == "Bold Italic")
                             || e.style == "Regular";
                         if want {
@@ -278,7 +409,11 @@ impl FontRegistry {
     }
 
     /// Resolve and load in one step.
-    pub fn load(&mut self, family: &str, style: &str) -> Result<(LoadedFont, Resolved), Box<dyn std::error::Error>> {
+    pub fn load(
+        &mut self,
+        family: &str,
+        style: &str,
+    ) -> Result<(LoadedFont, Resolved), Box<dyn std::error::Error>> {
         let r = self.resolve(family, style)?;
         let f = LoadedFont::load(&r.path)?;
         Ok((f, r))
@@ -314,7 +449,9 @@ fn scan_system_fonts() -> HashMap<String, HashMap<String, PathBuf>> {
 }
 
 fn scan_dir(dir: &Path, out: &mut HashMap<String, HashMap<String, PathBuf>>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {

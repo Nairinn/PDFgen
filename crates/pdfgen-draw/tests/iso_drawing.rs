@@ -23,10 +23,22 @@ fn iso_sheet_is_compliant() {
     // A3 landscape with the ISO 5457 frame and centring marks.
     let mut d = Drawing::new_iso(&mut doc, IsoSheet::A3);
     d.title_block(&[
-        TitleField { label: "TITLE", value: "FLANGE COVER".into() },
-        TitleField { label: "DWG NO", value: "ISO-77-001".into() },
-        TitleField { label: "SCALE", value: "1:1".into() },
-        TitleField { label: "SHEET", value: "A3".into() },
+        TitleField {
+            label: "TITLE",
+            value: "FLANGE COVER".into(),
+        },
+        TitleField {
+            label: "DWG NO",
+            value: "ISO-77-001".into(),
+        },
+        TitleField {
+            label: "SCALE",
+            value: "1:1".into(),
+        },
+        TitleField {
+            label: "SHEET",
+            value: "A3".into(),
+        },
     ]);
 
     // Part geometry + two dimensions.

@@ -132,8 +132,13 @@ impl<'a> Drawing<'a> {
         // ISO 5457: 10 mm trimming margin, 5 mm inner frame gap for A4,
         // 10 mm for larger sheets.
         let trim = 10.0 * 72.0 / 25.4;
-        let inner_gap = if matches!(sheet, IsoSheet::A4) { 5.0 } else { 10.0 } * 72.0 / 25.4;
-        let mut d = Drawing {
+        let inner_gap = if matches!(sheet, IsoSheet::A4) {
+            5.0
+        } else {
+            10.0
+        } * 72.0
+            / 25.4;
+        let d = Drawing {
             doc,
             w,
             h,
@@ -163,14 +168,24 @@ impl<'a> Drawing<'a> {
             // Left and right mid-edge horizontal marks.
             ops.push_str(&format!(
                 "0.35 w 0 {} {} {} m l S\n{} {} {} {} m l S\n",
-                half_h, mark, half_h,
-                w_ - mark, half_h, w_, half_h
+                half_h,
+                mark,
+                half_h,
+                w_ - mark,
+                half_h,
+                w_,
+                half_h
             ));
             // Top and bottom mid-edge vertical marks.
             ops.push_str(&format!(
                 "0.35 w {} 0 {} {} m l S\n{} {} {} {} m l S\n",
-                half_w, half_w, mark,
-                half_w, h_ - mark, half_w, h_
+                half_w,
+                half_w,
+                mark,
+                half_w,
+                h_ - mark,
+                half_w,
+                h_
             ));
         }
         d.doc.begin_artifact(d.page, "");
@@ -249,8 +264,7 @@ impl<'a> Drawing<'a> {
                     .with_scope("Column"),
             );
             tr.children.push(
-                Node::leaf("TD", f.value.clone(), 0, 8.0)
-                    .with_pieces(vec![(self.page, td_mcid)]),
+                Node::leaf("TD", f.value.clone(), 0, 8.0).with_pieces(vec![(self.page, td_mcid)]),
             );
             table.children.push(tr);
             y += row_h;
@@ -305,7 +319,12 @@ impl<'a> Drawing<'a> {
             let by = ux * 1.5;
             ops.push_str(&format!(
                 "{} {} m {} {} l {} {} l h f\n",
-                px, py, t1x + bx, t1y + by, t1x - bx, t1y - by
+                px,
+                py,
+                t1x + bx,
+                t1y + by,
+                t1x - bx,
+                t1y - by
             ));
         }
         let mid_x = (a1x + a2x) / 2.0;

@@ -129,9 +129,7 @@ impl Document {
 
     /// Load a font file directly by path.
     fn load_font_file(&self, path: String) -> PyResult<u32> {
-        self.doc
-            .load_font_file(&path)
-            .map_err(PdfError::new_err)
+        self.doc.load_font_file(&path).map_err(PdfError::new_err)
     }
 
     /// Register a font file under a family name for later font() calls.
@@ -162,12 +160,7 @@ impl Document {
     }
 
     /// Add a table. `widths` may be empty for equal columns.
-    fn table(
-        &self,
-        header: Vec<String>,
-        rows: Vec<Vec<String>>,
-        widths: Vec<f64>,
-    ) -> PyResult<()> {
+    fn table(&self, header: Vec<String>, rows: Vec<Vec<String>>, widths: Vec<f64>) -> PyResult<()> {
         self.doc
             .table(header, rows, widths)
             .map_err(PdfError::new_err)
@@ -198,8 +191,8 @@ impl Document {
         if !report.compliant && !self.warned.contains(&report.note) {
             self.warned.push(report.note.clone());
             Python::with_gil(|py| {
-                use std::ffi::CString;
                 use pyo3::PyTypeInfo;
+                use std::ffi::CString;
                 let note = CString::new(report.note.as_str()).unwrap();
                 let ty = PdfUaWarning::type_object(py);
                 let _ = PyErr::warn(py, ty.as_any(), note.as_c_str(), 1);

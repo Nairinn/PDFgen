@@ -72,15 +72,11 @@ pub struct DiffEntry {
 ///
 /// The file's existing bytes are never rewritten — the revision is an
 /// incremental-save section appended after the current `%%EOF`.
-pub fn commit(
-    path: impl AsRef<Path>,
-    message: &str,
-    author: &str,
-) -> Result<CommitInfo, String> {
+pub fn commit(path: impl AsRef<Path>, message: &str, author: &str) -> Result<CommitInfo, String> {
     let path = path.as_ref();
     let data = std::fs::read(path).map_err(|e| e.to_string())?;
 
-    let mut reader = PdfReader::from_bytes(data.clone()).map_err(|e| e.to_string())?;
+    let reader = PdfReader::from_bytes(data.clone()).map_err(|e| e.to_string())?;
     let trailer = reader.trailer().clone();
     let size = match trailer.get("Size") {
         Some(Object::Int(s)) => *s,
@@ -117,8 +113,14 @@ pub fn commit(
     // Revision record object.
     let mut record = pdfgen_core::Dict::new();
     record.set("N", rev_index as i64);
-    record.set("Message", Object::String(pdfgen_core::PdfString::text(message)));
-    record.set("Author", Object::String(pdfgen_core::PdfString::text(author)));
+    record.set(
+        "Message",
+        Object::String(pdfgen_core::PdfString::text(message)),
+    );
+    record.set(
+        "Author",
+        Object::String(pdfgen_core::PdfString::text(author)),
+    );
     record.set("Date", Object::String(pdfgen_core::PdfString::text(&date)));
     let mut head = format!("{record_num} 0 obj\n");
     pdfgen_core::write_object(&mut head, &Object::Dict(record));
@@ -156,10 +158,7 @@ pub fn commit(
     if let Some(info) = trailer.get("Info") {
         trailer_new.set("Info", info.clone());
     }
-    trailer_new.set(
-        "PDFgenRev",
-        Object::Ref(pdfgen_core::Ref::new(record_num)),
-    );
+    trailer_new.set("PDFgenRev", Object::Ref(pdfgen_core::Ref::new(record_num)));
     xref.push_str("trailer\n");
     pdfgen_core::write_object(&mut xref, &Object::Dict(trailer_new));
     let xref_off = cursor;
@@ -202,18 +201,11 @@ pub fn history(path: impl AsRef<Path>) -> Result<Vec<RevisionEntry>, String> {
 }
 
 /// Object-level diff between two revisions (1-based indexes).
-pub fn diff(
-    path: impl AsRef<Path>,
-    from: usize,
-    to: usize,
-) -> Result<Vec<DiffEntry>, String> {
+pub fn diff(path: impl AsRef<Path>, from: usize, to: usize) -> Result<Vec<DiffEntry>, String> {
     let data = std::fs::read(path).map_err(|e| e.to_string())?;
     let ends = eof_positions(&data);
     if from < 1 || to < 1 || from > ends.len() || to > ends.len() {
-        return Err(format!(
-            "revision out of range (1..={})",
-            ends.len()
-        ));
+        return Err(format!("revision out of range (1..={})", ends.len()));
     }
     let mut old = parse_prefix(&data[..ends[from - 1]])?;
     let mut new = parse_prefix(&data[..ends[to - 1]])?;
@@ -252,11 +244,7 @@ pub fn diff(
 }
 
 /// Restore an earlier revision byte-for-byte into a new file.
-pub fn revert(
-    path: impl AsRef<Path>,
-    to: usize,
-    out_path: impl AsRef<Path>,
-) -> Result<(), String> {
+pub fn revert(path: impl AsRef<Path>, to: usize, out_path: impl AsRef<Path>) -> Result<(), String> {
     let data = std::fs::read(path).map_err(|e| e.to_string())?;
     let ends = eof_positions(&data);
     if to < 1 || to > ends.len() {

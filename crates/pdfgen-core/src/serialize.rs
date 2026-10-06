@@ -25,8 +25,10 @@ pub fn fmt_real(v: f64) -> String {
 }
 /// Characters that force `#xx` escaping inside a name.
 fn name_needs_escape(b: u8) -> bool {
-    matches!(b, b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%' | b'#')
-        || !(0x21..=0x7e).contains(&b)
+    matches!(
+        b,
+        b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%' | b'#'
+    ) || !(0x21..=0x7e).contains(&b)
 }
 
 fn write_name(out: &mut String, name: &str) {

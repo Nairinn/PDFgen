@@ -27,14 +27,16 @@ fn lists_tables_figures_artifacts() {
     let mut flow = doc.flow();
     flow.header("Test Report — header furniture").unwrap();
     flow.heading(1, "Kitchen Sink Test").unwrap();
-    flow.paragraph("A document exercising every structure element the flow API can produce.").unwrap();
+    flow.paragraph("A document exercising every structure element the flow API can produce.")
+        .unwrap();
 
     flow.heading(2, "A list").unwrap();
     flow.bullet_list(&[
         "First bullet item with some text",
         "Second bullet item that is a little longer so it wraps once",
         "Third item",
-    ]).unwrap();
+    ])
+    .unwrap();
 
     flow.heading(2, "A table").unwrap();
     flow.table(
@@ -45,12 +47,15 @@ fn lists_tables_figures_artifacts() {
             vec!["3", "DATA", "Yellow with a longer note that wraps"],
         ],
         &[60.0, 120.0, 240.0],
-    ).unwrap();
+    )
+    .unwrap();
 
     flow.heading(2, "A figure").unwrap();
-    flow.figure(&img, "A solid red square, 32 by 32 pixels", 96.0, 96.0).unwrap();
+    flow.figure(&img, "A solid red square, 32 by 32 pixels", 96.0, 96.0)
+        .unwrap();
 
-    flow.paragraph("Closing paragraph after the figure.").unwrap();
+    flow.paragraph("Closing paragraph after the figure.")
+        .unwrap();
     flow.footer("Page furniture — footer").unwrap();
     drop(flow);
 

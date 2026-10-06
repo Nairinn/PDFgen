@@ -34,7 +34,7 @@ unsafe fn borrow<'a>(s: *const c_char) -> Result<&'a str, *mut c_char> {
 
 /// Allocate the error message for return to the caller.
 fn err(msg: &str) -> *mut c_char {
-    unsafe { CString::new(msg).unwrap_or_default().into_raw() }
+    CString::new(msg).unwrap_or_default().into_raw()
 }
 
 /// Turn a `Result<T, String>` into (out-param, error) per the conventions
@@ -60,10 +60,7 @@ unsafe fn ok_or_err<T>(r: Result<T, String>, out: *mut T) -> *mut c_char {
 /// [`pdfgen_destroy`]. Never block: an untagged/incomplete document is a
 /// save-time report, not an error here.
 #[no_mangle]
-pub unsafe extern "C" fn pdfgen_create(
-    profile: u32,
-    out: *mut *mut PdfDocument,
-) -> *mut c_char {
+pub unsafe extern "C" fn pdfgen_create(profile: u32, out: *mut *mut PdfDocument) -> *mut c_char {
     let p = match profile {
         0 => TargetProfile::Ua1,
         1 => TargetProfile::Ua2,
@@ -87,7 +84,10 @@ pub unsafe extern "C" fn pdfgen_destroy(doc: *mut PdfDocument) {
 
 /// Set the document title.
 #[no_mangle]
-pub unsafe extern "C" fn pdfgen_set_title(doc: *mut PdfDocument, title: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn pdfgen_set_title(
+    doc: *mut PdfDocument,
+    title: *const c_char,
+) -> *mut c_char {
     let doc = match unsafe { doc_mut(doc) } {
         Ok(d) => d,
         Err(e) => return e,
@@ -103,7 +103,10 @@ pub unsafe extern "C" fn pdfgen_set_title(doc: *mut PdfDocument, title: *const c
 
 /// Set the primary natural language.
 #[no_mangle]
-pub unsafe extern "C" fn pdfgen_set_lang(doc: *mut PdfDocument, lang: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn pdfgen_set_lang(
+    doc: *mut PdfDocument,
+    lang: *const c_char,
+) -> *mut c_char {
     let doc = match unsafe { doc_mut(doc) } {
         Ok(d) => d,
         Err(e) => return e,
@@ -212,7 +215,10 @@ pub unsafe extern "C" fn pdfgen_heading(
 
 /// Paragraph in the default font.
 #[no_mangle]
-pub unsafe extern "C" fn pdfgen_paragraph(doc: *mut PdfDocument, text: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn pdfgen_paragraph(
+    doc: *mut PdfDocument,
+    text: *const c_char,
+) -> *mut c_char {
     let doc = match unsafe { doc_mut(doc) } {
         Ok(d) => d,
         Err(e) => return e,
@@ -253,10 +259,7 @@ pub unsafe extern "C" fn pdfgen_free(s: *mut c_char) {
 /// 0 = profile name, 1 = note, 2 = violations ("id|message|fix" lines),
 /// 3 = human review items (one per line). Returns a Rust-owned string.
 #[no_mangle]
-pub unsafe extern "C" fn pdfgen_report_field(
-    report: *const Report,
-    which: u32,
-) -> *mut c_char {
+pub unsafe extern "C" fn pdfgen_report_field(report: *const Report, which: u32) -> *mut c_char {
     if report.is_null() {
         return err("null report handle");
     }

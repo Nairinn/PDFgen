@@ -288,7 +288,10 @@ fn flush_list_item(
 }
 
 fn find_byte(haystack: &[u8], from: usize, needle: u8) -> Option<usize> {
-    haystack[from..].iter().position(|&b| b == needle).map(|p| p + from)
+    haystack[from..]
+        .iter()
+        .position(|&b| b == needle)
+        .map(|p| p + from)
 }
 
 fn split_tag(inner: &str) -> (&str, &str) {

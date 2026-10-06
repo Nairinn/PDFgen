@@ -26,7 +26,8 @@ fn hello_ua1_and_ua2() {
         flow.heading(1, "Hello, tagged world!").unwrap();
         flow.paragraph("This PDF has a real structure tree, embedded fonts")
             .unwrap();
-        flow.paragraph("and an accessibility report on every save.").unwrap();
+        flow.paragraph("and an accessibility report on every save.")
+            .unwrap();
         drop(flow);
 
         let path = format!("{out_dir}/{name}.pdf");
@@ -66,7 +67,8 @@ fn flow_wraps_and_breaks_pages() {
     flow.paragraph(&long).unwrap();
     // A heading that must not be orphaned at a page bottom.
     flow.heading(2, "Not an orphan").unwrap();
-    flow.paragraph("Short paragraph after the keep-with-next heading.").unwrap();
+    flow.paragraph("Short paragraph after the keep-with-next heading.")
+        .unwrap();
     drop(flow);
 
     let path = format!("{out_dir}/multipage_ua1.pdf");
@@ -85,7 +87,9 @@ fn flow_wraps_and_breaks_pages() {
         panic!("no pages");
     };
     let pages = reader.get(pages_ref.id).unwrap();
-    let Object::Dict(pd) = &pages else { panic!("pages not a dict") };
+    let Object::Dict(pd) = &pages else {
+        panic!("pages not a dict")
+    };
     let count = match pd.get("Count") {
         Some(Object::Int(c)) => *c,
         _ => 0,

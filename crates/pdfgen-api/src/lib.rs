@@ -154,13 +154,7 @@ impl PdfDocument {
 
     /// Load an image file (PNG/JPEG) and place it as a figure with alt
     /// text. Empty alt marks the image decorative.
-    pub fn figure(
-        &self,
-        path: &str,
-        alt: &str,
-        width: f64,
-        height: f64,
-    ) -> Result<(), String> {
+    pub fn figure(&self, path: &str, alt: &str, width: f64, height: f64) -> Result<(), String> {
         self.lock()
             .flow_figure(path, alt, width, height)
             .map_err(|e| e.to_string())
