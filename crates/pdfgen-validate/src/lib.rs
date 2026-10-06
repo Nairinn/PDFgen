@@ -218,12 +218,30 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
 }
 
 /// Recursively check one structure element (and its children).
+/// Structure-tree walk with cycle protection: a visited set (element
+/// ids) plus a depth cap, so malicious trees cannot blow the stack.
 fn walk_element(
     reader: &mut PdfReader,
     id: u32,
     findings: &mut Vec<Finding>,
     review: &mut Vec<&'static str>,
 ) -> Result<(), String> {
+    let mut visited = std::collections::HashSet::new();
+    walk_element_inner(reader, id, findings, review, &mut visited, 0)
+}
+
+fn walk_element_inner(
+    reader: &mut PdfReader,
+    id: u32,
+    findings: &mut Vec<Finding>,
+    review: &mut Vec<&'static str>,
+    visited: &mut std::collections::HashSet<u32>,
+    depth: usize,
+) -> Result<(), String> {
+    const MAX_DEPTH: usize = 64;
+    if depth > MAX_DEPTH || !visited.insert(id) {
+        return Ok(());
+    }
     let obj = reader.get(id).map_err(|e| e.to_string())?;
     let Object::Dict(d) = obj else {
         return Ok(());
@@ -287,7 +305,7 @@ fn walk_element(
     if let Some(Object::Array(kids)) = d.get("K").cloned() {
         for kid in kids {
             if let Object::Ref(r) = kid {
-                walk_element(reader, r.id, findings, review)?;
+                walk_element_inner(reader, r.id, findings, review, visited, depth + 1)?;
             }
         }
     }

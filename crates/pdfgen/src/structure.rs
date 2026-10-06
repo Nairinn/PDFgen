@@ -95,16 +95,25 @@ impl Node {
         self
     }
 
-    /// Depth-first walk (self first).
+    /// Depth-first walk (self first), depth-capped so pathological trees
+    /// cannot exhaust the stack.
     pub fn walk<'a>(&'a self, f: &mut dyn FnMut(&'a Node)) {
-        f(self);
-        for c in &self.children {
-            c.walk(f);
-        }
+        walk_node(self, f, 0);
     }
 
     /// Count all nodes (self + descendants).
     pub fn count(&self) -> usize {
         1 + self.children.iter().map(Node::count).sum::<usize>()
+    }
+}
+
+fn walk_node<'a>(node: &'a Node, f: &mut dyn FnMut(&'a Node), depth: usize) {
+    const MAX_DEPTH: usize = 128;
+    if depth > MAX_DEPTH {
+        return;
+    }
+    f(node);
+    for c in &node.children {
+        walk_node(c, f, depth + 1);
     }
 }

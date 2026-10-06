@@ -186,31 +186,7 @@ pub fn render_all(path: &str, opts: RenderOptions) -> Result<Vec<Bitmap>, String
 // ------------------------------------------------------------- page model
 
 fn collect_pages(reader: &mut PdfReader) -> Result<Vec<u32>, String> {
-    let catalog = reader.catalog().map_err(|e| e.to_string())?;
-    let Some(Object::Ref(pages_ref)) = catalog.get("Pages").cloned() else {
-        return Err("catalog has no /Pages".into());
-    };
-    let mut out = Vec::new();
-    walk_pages(reader, pages_ref.id, &mut out)?;
-    Ok(out)
-}
-
-fn walk_pages(reader: &mut PdfReader, node_id: u32, out: &mut Vec<u32>) -> Result<(), String> {
-    let node = reader.get(node_id).map_err(|e| e.to_string())?;
-    let Object::Dict(d) = node else {
-        return Ok(());
-    };
-    match d.get("Kids").cloned() {
-        Some(Object::Array(kids)) => {
-            for k in kids {
-                if let Object::Ref(r) = k {
-                    walk_pages(reader, r.id, out)?;
-                }
-            }
-        }
-        _ => out.push(node_id),
-    }
-    Ok(())
+    reader.pages().map_err(|e| e.to_string())
 }
 
 fn media_box(reader: &mut PdfReader, page: &pdfgen_core::Dict) -> Result<(f64, f64), String> {

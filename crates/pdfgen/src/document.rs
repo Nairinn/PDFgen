@@ -695,7 +695,7 @@ impl Document {
                     // heading's own struct element.
                     let elem_ref = leaf_map
                         .iter()
-                        .find(|&&(lp, lm, r)| lp == page && lm == _mcid)
+                        .find(|&&(lp, lm, _r)| lp == page && lm == _mcid)
                         .map(|&(_, _, r)| r);
                     if let Some(r) = elem_ref {
                         // veraPDF/PDF 2.0: a dict destination is a

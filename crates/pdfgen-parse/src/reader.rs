@@ -462,7 +462,7 @@ impl PdfReader {
             return Ok(Object::Null); // cycle guard
         }
         match self.xref.get(&id).copied() {
-            Some(Entry::InUse(offset)) => {}
+            Some(Entry::InUse(_)) => {}
             Some(Entry::Compressed { stream, index }) => {
                 return self.get_from_object_stream(stream, index);
             }
@@ -524,7 +524,7 @@ impl PdfReader {
         }
         // Header: N pairs of (obj id, relative offset) in the decoded data.
         let header = String::from_utf8_lossy(&data[..first]);
-        let mut nums: Vec<u32> = header
+        let nums: Vec<u32> = header
             .split_whitespace()
             .filter_map(|t| t.parse::<u32>().ok())
             .collect();
@@ -683,6 +683,51 @@ impl PdfReader {
     }
 
     /// The catalog dictionary (`/Root` in the trailer).
+    /// All page object ids in document order, walking the page tree with
+    /// cycle protection (visited set + depth limit) so malicious trees
+    /// produce errors instead of stack overflows.
+    pub fn pages(&mut self) -> Result<Vec<u32>, ParseError> {
+        let catalog = self.catalog()?;
+        let Some(Object::Ref(pages_ref)) = catalog.get("Pages").cloned() else {
+            return Err(ParseError::Malformed(0, "catalog has no /Pages".into()));
+        };
+        let mut out = Vec::new();
+        let mut visited: std::collections::HashSet<u32> = std::collections::HashSet::new();
+        self.walk_page_node(pages_ref.id, &mut out, &mut visited, 0)?;
+        Ok(out)
+    }
+
+    /// Depth-limited page-tree walk. Leaves (no /Kids) are pages; internal
+    /// nodes recurse into /Kids. Cycles and excessive depth stop the walk.
+    fn walk_page_node(
+        &mut self,
+        node_id: u32,
+        out: &mut Vec<u32>,
+        visited: &mut std::collections::HashSet<u32>,
+        depth: usize,
+    ) -> Result<(), ParseError> {
+        const MAX_DEPTH: usize = 64;
+        if depth > MAX_DEPTH || !visited.insert(node_id) {
+            // Cycle or runaway depth: stop this branch.
+            return Ok(());
+        }
+        let node = self.get(node_id)?;
+        if let Object::Dict(d) = node {
+            match d.get("Kids").cloned() {
+                Some(Object::Array(kids)) => {
+                    for k in kids {
+                        if let Object::Ref(r) = k {
+                            self.walk_page_node(r.id, out, visited, depth + 1)?;
+                        }
+                    }
+                }
+                _ => out.push(node_id),
+            }
+        }
+        Ok(())
+    }
+
+    /// The document catalog dictionary (from the trailer /Root).
     pub fn catalog(&mut self) -> Result<Dict, ParseError> {
         let Some(Object::Ref(root)) = self.trailer.get("Root").cloned() else {
             return Err(ParseError::Malformed(0, "trailer has no /Root".into()));

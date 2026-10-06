@@ -20,11 +20,7 @@ pub struct PageText {
 /// Extract text from every page of a PDF file.
 pub fn extract_text(path: &str) -> Result<Vec<PageText>, Box<dyn std::error::Error>> {
     let mut reader = PdfReader::open(path)?;
-    let catalog = reader.catalog()?;
-    let Some(Object::Ref(pages_ref)) = catalog.get("Pages").cloned() else {
-        return Err("catalog has no /Pages".into());
-    };
-    let pages = retag::collect_page_refs(&mut reader, pages_ref.id)?;
+    let pages = reader.pages()?;
 
     let mut out = Vec::with_capacity(pages.len());
     for (pi, &page_id) in pages.iter().enumerate() {

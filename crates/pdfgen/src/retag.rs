@@ -109,12 +109,8 @@ impl TagSession {
         let mut reader = PdfReader::open(path)?;
         let mut runs = Vec::new();
 
-        // Walk the page tree.
-        let catalog = reader.catalog()?;
-        let Some(Object::Ref(pages_ref)) = catalog.get("Pages").cloned() else {
-            return Err("catalog has no /Pages".into());
-        };
-        let pages = collect_page_refs(&mut reader, pages_ref.id)?;
+        // Walk the page tree (pages() resolves the catalog internally).
+        let pages = reader.pages()?;
         for (pi, page_id) in pages.iter().enumerate() {
             let Object::Dict(page) = reader.get(*page_id)? else {
                 continue;
@@ -259,35 +255,6 @@ fn looks_like_page_number(t: &str) -> bool {
 }
 
 /// Depth-first page reference collection from a /Pages node.
-pub(crate) fn collect_page_refs(
-    reader: &mut PdfReader,
-    node: u32,
-) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
-    let mut out = Vec::new();
-    match reader.get(node)? {
-        Object::Dict(d) => {
-            let t = d
-                .get("Type")
-                .and_then(|o| match o {
-                    Object::Name(n) => Some(n.0.clone()),
-                    _ => None,
-                })
-                .unwrap_or_default();
-            if t == "Page" {
-                out.push(node);
-            } else if let Some(Object::Array(kids)) = d.get("Kids").cloned() {
-                for kid in kids {
-                    if let Object::Ref(r) = kid {
-                        out.extend(collect_page_refs(reader, r.id)?);
-                    }
-                }
-            }
-        }
-        _ => return Err("page tree node is not a dict".into()),
-    }
-    Ok(out)
-}
-
 /// zlib inflate, exposed for retag-internal use.
 pub(crate) fn inflate(data: &[u8]) -> Option<Vec<u8>> {
     use flate2::read::ZlibDecoder;
