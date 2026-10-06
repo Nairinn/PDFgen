@@ -248,22 +248,50 @@ impl PdfReader {
             let end = find_endstream(&self.data, body)?;
             (body, end)
         };
+        // /Length may be an indirect reference (common in the wild).
         let declared = match dict.get("Length") {
             Some(Object::Int(l)) => *l as usize,
+            Some(Object::Ref(r)) => match self.get(r.id) {
+                Ok(Object::Int(l)) => l as usize,
+                _ => end - body_start,
+            },
             _ => end - body_start,
         };
         let raw = &self.data[body_start..(body_start + declared).min(end)];
 
-        let filtered = matches!(
-            dict.get("Filter"),
-            Some(Object::Name(n)) if n.0 == "FlateDecode"
-        );
-        let bytes: Vec<u8> = if filtered {
+        // FlateDecode, via single name or a /Filter array.
+        let filtered = matches!(dict.get("Filter"), Some(Object::Name(n)) if n.0 == "FlateDecode")
+            || matches!(
+                dict.get("Filter"),
+                Some(Object::Array(items)) if items.iter().any(|o| matches!(o, Object::Name(n) if n.0 == "FlateDecode"))
+            );
+        let mut bytes: Vec<u8> = if filtered {
             inflate(raw)
                 .ok_or_else(|| ParseError::Malformed(offset, "zlib decode failed".into()))?
         } else {
             raw.to_vec()
         };
+
+        // PNG predictors (DecodeParms): /Predictor 12+ is nearly always
+        // present on real-world xref streams.
+        if let Some(parms) = dict.get("DecodeParms") {
+            match parms {
+                Object::Dict(parms) => {
+                    bytes = apply_predictors(bytes, parms)?;
+                }
+                Object::Array(parr) => {
+                    // One parms dict per filter; apply the first that
+                    // asks for a PNG predictor.
+                    for p in parr {
+                        if let Object::Dict(parms) = p {
+                            bytes = apply_predictors(bytes, parms)?;
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
 
         let w: Vec<usize> = match dict.get("W") {
             Some(Object::Array(items)) => items
@@ -789,6 +817,95 @@ fn find_endstream(data: &[u8], from: usize) -> Result<usize, ParseError> {
         i += 1;
     }
     Err(ParseError::Malformed(from, "endstream not found".into()))
+}
+
+/// Apply PNG predictors to a decoded stream per its /DecodeParms.
+/// Columns default to 1; /Predictor 2 = TIFF (unsupported, pass through);
+/// 10..=15 = PNG predictors with the per-row filter byte.
+fn apply_predictors(data: Vec<u8>, parms: &Dict) -> Result<Vec<u8>, ParseError> {
+    let predictor = match parms.get("Predictor") {
+        Some(Object::Int(p)) => *p as i64,
+        _ => return Ok(data),
+    };
+    if predictor < 10 {
+        // No PNG prediction (TIFF predictor 2 is not needed for xref
+        // streams in practice); leave the data as-is.
+        return Ok(data);
+    }
+    let colors = match parms.get("Colors") {
+        Some(Object::Int(c)) => (*c).max(1) as usize,
+        _ => 1,
+    };
+    let bpc = match parms.get("BitsPerComponent") {
+        Some(Object::Int(b)) => (*b).max(1) as usize,
+        _ => 8,
+    };
+    let columns = match parms.get("Columns") {
+        Some(Object::Int(c)) => (*c).max(1) as usize,
+        _ => 1,
+    };
+    let bpp = colors * bpc / 8; // bytes per pixel (1 for xref streams)
+    let row_len = colors * bpc * columns / 8;
+    if row_len == 0 || data.len() % (row_len + 1) != 0 {
+        // Not a clean predictor layout; best effort: return the raw data
+        // (callers treat xref failure as a repair-scan path).
+        return Ok(data);
+    }
+    let rows = data.len() / (row_len + 1);
+    let mut out: Vec<u8> = Vec::with_capacity(rows * row_len);
+    let mut prev: Vec<u8> = vec![0; row_len];
+    for r in 0..rows {
+        let base = r * (row_len + 1);
+        let filter = data[base];
+        let row = &data[base + 1..base + 1 + row_len];
+        let mut cur: Vec<u8> = row.to_vec();
+        match filter {
+            0 => {} // None
+            1 => {
+                // Sub
+                for i in bpp..row_len {
+                    cur[i] = cur[i].wrapping_add(cur[i - bpp]);
+                }
+            }
+            2 => {
+                // Up
+                for i in 0..row_len {
+                    cur[i] = cur[i].wrapping_add(prev[i]);
+                }
+            }
+            3 => {
+                // Average
+                for i in 0..row_len {
+                    let left = if i >= bpp { cur[i - bpp] as u16 } else { 0 };
+                    cur[i] = cur[i].wrapping_add(((left + prev[i] as u16) / 2) as u8);
+                }
+            }
+            4 => {
+                // Paeth
+                for i in 0..row_len {
+                    let a = if i >= bpp { cur[i - bpp] as i16 } else { 0 };
+                    let b = prev[i] as i16;
+                    let c = if i >= bpp { prev[i - bpp] as i16 } else { 0 };
+                    let p = a + b - c;
+                    let pa = (p - a).abs();
+                    let pb = (p - b).abs();
+                    let pc = (p - c).abs();
+                    let pred = if pa <= pb && pa <= pc {
+                        a
+                    } else if pb <= pc {
+                        b
+                    } else {
+                        c
+                    } as u8;
+                    cur[i] = cur[i].wrapping_add(pred);
+                }
+            }
+            _ => {}
+        }
+        out.extend_from_slice(&cur);
+        prev = cur;
+    }
+    Ok(out)
 }
 
 fn inflate(data: &[u8]) -> Option<Vec<u8>> {
