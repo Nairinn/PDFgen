@@ -376,6 +376,39 @@ impl<'a> Flow<'a> {
         Ok(())
     }
 
+    /// Text presented as a Figure (used when retagging documents whose
+    /// "figures" are textual): wraps like a paragraph but is tagged
+    /// Figure with the given alt text.
+    pub fn figure_text(&mut self, text: &str, alt: &str) -> Result<(), FontError> {
+        let lines = self.wrap(text, 0, 11.0)?;
+        let lh = 11.0 * LH;
+        let mut pieces: Vec<(usize, u32)> = Vec::new();
+        let mut i = 0usize;
+        while i < lines.len() {
+            let fit = (((self.y - self.margin) / lh).floor().max(0.0)) as usize;
+            if fit == 0 {
+                self.new_page();
+                continue;
+            }
+            let take = fit.min(lines.len() - i);
+            let chunk: Vec<String> = lines[i..i + take].to_vec();
+            let (mcid, y) = self.draw_lines("Figure", 0, 11.0, &chunk, self.margin)?;
+            self.y = y;
+            pieces.push((self.page_idx, mcid));
+            i += take;
+            if i < lines.len() {
+                self.new_page();
+            }
+        }
+        let mut fig = Node::leaf("Figure", text.to_string(), 0, 11.0).with_pieces(pieces);
+        if !alt.is_empty() {
+            fig.alt = Some(alt.to_string());
+        }
+        self.doc.pages[self.page_idx].nodes.push(fig);
+        self.sync_cursor();
+        Ok(())
+    }
+
     /// Page header furniture, drawn as a pagination artifact.
     pub fn header(&mut self, text: &str) -> Result<(), FontError> {
         let encoded = pdfgen_font::winansi::encode(text)?;

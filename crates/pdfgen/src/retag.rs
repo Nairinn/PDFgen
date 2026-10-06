@@ -171,8 +171,17 @@ impl TagSession {
         self
     }
 
-    /// Set alt text for a run (used for figure-like runs).
+    /// Set alt text for a run and mark it as a Figure, so the saved
+    /// document emits the alt on a real Figure structure element.
     pub fn set_alt(&mut self, i: usize, text: &str) -> &mut Self {
+        self.alt[i] = Some(text.to_string());
+        self.runs[i].tag = "Figure".into();
+        self.runs[i].artifact = false;
+        self
+    }
+
+    /// Set a run's alt without changing its tag (advanced use).
+    pub fn set_alt_only(&mut self, i: usize, text: &str) -> &mut Self {
         self.alt[i] = Some(text.to_string());
         self
     }
@@ -215,22 +224,26 @@ impl TagSession {
         // M2 scope: we re-emit extracted text as fresh tagged content.
         let mut doc = Document::new(profile);
         doc.title(title).lang(lang);
-        let arial = "/System/Library/Fonts/Supplemental/Arial.ttf";
-        if std::path::Path::new(arial).exists() {
-            doc.load_font(arial)?;
-        }
+        // Registry default: bundled Liberation Sans on any platform (the
+        // catalog fallbacks handle systems without it).
+        doc.font("Liberation Sans", "Regular")?;
 
         // Re-emit extracted text as fresh tagged, flowing content.
+        // Alt-marked figures emit a Figure element carrying the alt text.
         let mut flow = doc.flow();
-        for run in &self.runs {
+        for (i, run) in self.runs.iter().enumerate() {
             if run.artifact {
                 continue;
             }
-            let level = run.tag.strip_prefix('H').and_then(|n| n.parse::<u8>().ok());
-            match level {
-                Some(1) => flow.heading(1, &run.text)?,
-                Some(2) => flow.heading(2, &run.text)?,
-                Some(3) => flow.heading(3, &run.text)?,
+            match run.tag.as_str() {
+                "Figure" => {
+                    let alt = self.alt[i].as_deref().unwrap_or("");
+                    flow.figure_text(&run.text, alt)?;
+                }
+                t if t.starts_with('H') => {
+                    let level: u8 = t[1..].parse().unwrap_or(4).clamp(1, 6);
+                    flow.heading(level, &run.text)?;
+                }
                 _ => flow.paragraph(&run.text)?,
             }
         }
