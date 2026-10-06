@@ -405,6 +405,27 @@ impl FontRegistry {
                 }
             }
         }
+
+        // 6. Last resort: any system sans-serif (packaged installs have no
+        //    bundled fonts; degrade to the platform's default sans with a
+        //    substitution note rather than failing).
+        if let Some(sys) = self.system.as_ref() {
+            for probe in ["helvetica", "arial", "liberation sans", "dejavu sans", "noto sans"] {
+                if let Some(styles) = sys.get(probe) {
+                    if let Some(p) = styles
+                        .get("regular")
+                        .or_else(|| styles.values().next())
+                    {
+                        return Ok(Resolved {
+                            path: p.clone(),
+                            family: probe.to_string(),
+                            substituted: true,
+                        });
+                    }
+                }
+            }
+        }
+
         Err(RegistryError::NotFound(family.to_string()))
     }
 

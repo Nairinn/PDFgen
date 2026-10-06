@@ -79,12 +79,24 @@ reimplementation from the ISO specifications with different priorities:
 | Drawing kit | ASME Y14 sheets A–F, tagged title-block table, Y14.5 dimensions, Y14.35 revision block wired to file history — bracket drawing passes veraPDF **942/942** |
 | Layout | Word wrap with real font metrics, page breaks, cross-page paragraphs (MCR), keep-with-next |
 | Content | Headings, paragraphs, bullet lists (`L/LI/Lbl/LBody`), tables (`Table/TR/TH` with `Scope`/`TD`), figures with alt text, PNG + JPEG, header/footer artifacts |
-| Fonts | By-name registry: built-in catalog (Liberation, OFL), system fonts (recursive scan), standard-14 aliases, user-registered files, substitution notes |
+| Fonts | By-name registry: built-in catalog (Liberation + Noto incl. Myanmar/Thai/Arabic/CJK JP + accessibility faces, OFL), system fonts (recursive scan), standard-14 aliases, user-registered files, TrueType CID subsetting, substitution notes |
 | Reader | Classic + xref-stream + hybrid xref, lazy resolution, repair mode for broken files |
 | Retag | Import any PDF, extract text, auto/manual tagging, save compliant |
 | Reports | Machine checks with Matterhorn IDs + human-review checklist on every save |
 | Bindings | Python (PyO3, abi3 ≥ 3.9, `PdfUaWarning` on non-compliant saves), Kotlin/Java (UniFFI + JNA, Java 11+), and Java 22+ (`java.lang.foreign` FFM, no JNI/JNA) — all generate veraPDF-valid PDFs |
 | CID fonts | Text WinAnsi can't encode flows through Type0 Identity-H composite fonts automatically (Myanmar, Korean, Greek, CJK); TTC collections sliced to standalone programs |
+
+## Fonts in packaged installs
+
+The bundled font files (OFL) live in `fonts/vendor/` at the repo root — outside any crate directory, so **crate packages never ship the fonts** (crates.io caps packages at 10 MB; the CJK faces alone are 16 MB each). Resolution order at runtime:
+
+1. `PDFGEN_FONTS_DIR` (build-time env var, relocated installs)
+2. The repo checkout (`fonts/` relative to the workspace)
+3. System fonts by family name (licensed fonts you own work here)
+4. A bundled-catalog look-alike (with a substitution note in the save report)
+5. Any system sans-serif, flagged as substituted — the save always succeeds
+
+So a `cargo add pdfgen`-style install degrades gracefully: documents still build with system fonts and the report shows what was substituted. Clone the repo (or point `PDFGEN_FONTS_DIR` at our `fonts/`) to use the full bundled catalog.
 
 ## What's coming next
 

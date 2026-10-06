@@ -13,3 +13,9 @@ thiserror = "2"
 
 [lints]
 workspace = true
+
+# NOTE: the font files live at <workspace>/fonts/vendor (outside this
+# crate directory, so they are never packaged into the .crate). Runtime
+# resolution: repo checkouts find them relative to CARGO_MANIFEST_DIR;
+# installed-from-crates.io builds fall back to system fonts or
+# PDFGEN_FONTS_DIR (see fonts_dir() in src/lib.rs).
