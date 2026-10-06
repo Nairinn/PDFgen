@@ -17,7 +17,4 @@ pub enum CoreError {
         /// Containing object number.
         id: u32,
     },
-    /// A dictionary key was used where a name was expected.
-    #[error("dictionary key is not a valid name: {0}")]
-    InvalidName(String),
 }

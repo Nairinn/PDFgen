@@ -13,34 +13,6 @@ pub struct Content {
     next_mcid: u32,
 }
 
-/// Structure type of a marked-content sequence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TagType {
-    /// Heading at level 1-6.
-    Heading(u8),
-    /// Paragraph.
-    Paragraph,
-    /// Part/div grouping marker (no direct content).
-    Other(&'static str),
-}
-
-impl TagType {
-    /// The PDF structure type name.
-    pub fn pdf_name(self) -> String {
-        match self {
-            TagType::Heading(1) => "H1".into(),
-            TagType::Heading(2) => "H2".into(),
-            TagType::Heading(3) => "H3".into(),
-            TagType::Heading(4) => "H4".into(),
-            TagType::Heading(5) => "H5".into(),
-            TagType::Heading(6) => "H6".into(),
-            TagType::Heading(n) => format!("H{n}"),
-            TagType::Paragraph => "P".into(),
-            TagType::Other(s) => s.into(),
-        }
-    }
-}
-
 /// Escape bytes for a literal string in a content stream.
 fn escape_literal(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() + 8);

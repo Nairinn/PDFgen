@@ -224,14 +224,6 @@ impl LoadedFont {
         face.glyph_hor_advance(g).map(i64::from)
     }
 
-    /// Width of a glyph (by GID) in points at the given size.
-    pub fn glyph_width_pt(&self, gid: u16, size: f64) -> Option<f64> {
-        let face = ttf_parser::Face::parse(&self.raw, 0).ok()?;
-        let g = ttf_parser::GlyphId(gid);
-        let w = face.glyph_hor_advance(g)?;
-        Some(f64::from(w) * size / f64::from(self.units_per_em))
-    }
-
     /// Flag bits for `/Flags` in the font descriptor.
     pub fn descriptor_flags(&self) -> i64 {
         // 32 = non-symbolic.

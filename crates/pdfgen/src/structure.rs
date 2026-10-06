@@ -18,7 +18,6 @@ pub struct Node {
     /// Marked as artifact instead of real content?
     pub artifact: bool,
     /// Artifact subtype (`Header`, `Footer`) when `artifact` is set.
-    pub artifact_subtype: String,
     /// Alt text for figures and images (PDF/UA 13-004).
     pub alt: Option<String>,
     /// Table cell scope: `Column`, `Row`, or `Both` (PDF/UA 15-003).
@@ -39,7 +38,6 @@ impl Node {
             children: Vec::new(),
             pieces: Vec::new(),
             artifact: false,
-            artifact_subtype: String::new(),
             alt: None,
             scope: String::new(),
             font,
@@ -55,7 +53,6 @@ impl Node {
             children: Vec::new(),
             pieces: Vec::new(),
             artifact: false,
-            artifact_subtype: String::new(),
             alt: None,
             scope: String::new(),
             font: 0,
@@ -88,22 +85,10 @@ impl Node {
         self
     }
 
-    /// Mark this node as a pagination artifact.
-    pub fn artifact(mut self, subtype: &str) -> Self {
-        self.artifact = true;
-        self.artifact_subtype = subtype.to_string();
-        self
-    }
-
     /// Depth-first walk (self first), depth-capped so pathological trees
     /// cannot exhaust the stack.
     pub fn walk<'a>(&'a self, f: &mut dyn FnMut(&'a Node)) {
         walk_node(self, f, 0);
-    }
-
-    /// Count all nodes (self + descendants).
-    pub fn count(&self) -> usize {
-        1 + self.children.iter().map(Node::count).sum::<usize>()
     }
 }
 

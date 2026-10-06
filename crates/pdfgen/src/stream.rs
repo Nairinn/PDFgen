@@ -85,10 +85,6 @@ mod ids {
     pub const METADATA: u32 = 3;
     /// 4+: 4 objects per font (dict, descriptor, file, tounicode).
     pub const FONT_BASE: u32 = 4;
-    /// After the fonts, dynamic objects start here. (Layout constant
-    /// kept for readers of the ID scheme.)
-    #[allow(dead_code)]
-    pub const DYNAMIC_BASE: u32 = 4;
 }
 
 /// Streaming PDF/UA writer. Create, push event batches, [`finish`].

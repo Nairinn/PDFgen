@@ -1,7 +1,7 @@
 //! Flowing content: text, lists, tables, figures, with wrapping and page
 //! breaks. Everything lands in a nested structure tree.
 
-use crate::image::{Image, ImageKind};
+use crate::image::Image;
 use crate::structure::Node;
 use pdfgen_font::FontError;
 
@@ -513,6 +513,3 @@ impl<'a> Flow<'a> {
         Ok(())
     }
 }
-
-#[allow(unused_imports)]
-use ImageKind as _FlowImageKind;
