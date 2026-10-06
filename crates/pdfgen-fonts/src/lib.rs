@@ -274,27 +274,36 @@ impl FontRegistry {
             .insert(style.to_ascii_lowercase(), path.into());
     }
 
-    fn fonts_dir() -> Option<PathBuf> {
-        // The fonts/ directory lives at the workspace root. CARGO_MANIFEST_DIR
-        // for this crate is <root>/crates/pdfgen-fonts, so walk up twice.
-        // Also honor PDFGEN_FONTS_DIR for relocated installs.
-        let candidates: Vec<PathBuf> = option_env!("PDFGEN_FONTS_DIR")
-            .map(PathBuf::from)
-            .into_iter()
-            .chain([
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts"),
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fonts"),
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("fonts"),
-            ])
-            .collect();
-        for p in candidates {
-            if let Ok(c) = p.canonicalize() {
-                if c.is_dir() {
-                    return Some(c);
+    /// Cached fonts directory (the probe runs canonicalize up to 3x per
+    /// resolve otherwise). Computed once per process.
+    fn fonts_dir() -> Option<&'static PathBuf> {
+        static DIR: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+        DIR.get_or_init(|| {
+            // Runtime relocation: PDFGEN_FONTS_DIR wins when it names a
+            // directory (documented as a runtime env var).
+            let mut candidates: Vec<PathBuf> = std::env::var_os("PDFGEN_FONTS_DIR")
+                .map(PathBuf::from)
+                .into_iter()
+                .chain([
+                    // The fonts/ directory lives at the workspace root.
+                    // CARGO_MANIFEST_DIR for this crate is
+                    // <root>/crates/pdfgen-fonts, so walk up twice.
+                    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts"),
+                    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fonts"),
+                    Path::new(env!("CARGO_MANIFEST_DIR")).join("fonts"),
+                ])
+                .collect();
+            candidates.dedup();
+            for p in candidates {
+                if let Ok(c) = p.canonicalize() {
+                    if c.is_dir() {
+                        return Some(c);
+                    }
                 }
             }
-        }
-        None
+            None
+        })
+        .as_ref()
     }
 
     /// Resolve a family+style to a file, checking user fonts, then the
