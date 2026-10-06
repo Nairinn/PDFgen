@@ -50,7 +50,10 @@ fn outline_links_siblings_not_flat_chain() {
     let pdfgen_core::Object::Int(count) = outl.get("Count").cloned().unwrap() else {
         panic!("no Count");
     };
-    assert_eq!(count, 5, "outlines Count must count all open items, got {count}");
+    assert_eq!(
+        count, 5,
+        "outlines Count must count all open items, got {count}"
+    );
 
     // Walk: Chapter Two (last root child) Prev -> Chapter One (first root
     // child), NOT Subsection B1.
@@ -75,7 +78,10 @@ fn outline_links_siblings_not_flat_chain() {
         pdfgen_core::Object::String(s) => s.decode(),
         _ => panic!("no title"),
     };
-    assert_eq!(sa_title, "Chapter Two", "root siblings must chain Chapter One -> Chapter Two, got {sa_title}");
+    assert_eq!(
+        sa_title, "Chapter Two",
+        "root siblings must chain Chapter One -> Chapter Two, got {sa_title}"
+    );
 
     // Subsection B1 must not have /Next at all (it is an only child).
     let pdfgen_core::Object::Ref(f_child) = c1.get("First").cloned().unwrap() else {
@@ -85,5 +91,8 @@ fn outline_links_siblings_not_flat_chain() {
     let pdfgen_core::Object::Int(c1_count) = c1.get("Count").cloned().unwrap() else {
         panic!("Chapter One has no Count");
     };
-    assert_eq!(c1_count, 3, "Chapter One counts its 3 descendants (A, B, B1), got {c1_count}");
+    assert_eq!(
+        c1_count, 3,
+        "Chapter One counts its 3 descendants (A, B, B1), got {c1_count}"
+    );
 }

@@ -5,7 +5,7 @@ use crate::page::PageData;
 use crate::stream::flate_compress;
 use crate::structure::Node;
 use crate::tounicode;
-use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
+use pdfgen_core::{Dict, Name, Object, PdfString, Real, Ref, Stream};
 use pdfgen_font::LoadedFont;
 use pdfgen_fonts::FontRegistry;
 use pdfgen_profile::{xmp, Metadata, Profile, SaveReport, Status, Violation};
@@ -28,8 +28,9 @@ pub struct Document {
     pub(crate) images: Vec<Image>,
     /// Page size in points (all pages share it for now).
     pub page_size: (f64, f64),
-    /// Bookmark entries collected from headings: (level, text, page).
-    pub(crate) bookmarks: Vec<(u8, String, usize)>,
+    /// Bookmark entries collected from headings:
+    /// (level, text, page, mcid).
+    pub(crate) bookmarks: Vec<(u8, String, usize, u32)>,
     /// Flow y-cursor (baseline of the next line) carried across flow()
     /// calls so consecutive flows continue on the same page.
     pub(crate) flow_y: Option<f64>,
@@ -39,6 +40,8 @@ pub struct Document {
     /// (char, glyph id) pairs.
     pub(crate) cid_fonts:
         std::collections::BTreeMap<usize, std::collections::BTreeSet<(char, u16)>>,
+    /// WinAnsi bytes actually drawn per font (for subsetting).
+    pub(crate) winansi_used: std::collections::BTreeMap<usize, [bool; 256]>,
     /// Generate the document outline (bookmarks) from headings.
     pub(crate) want_outline: bool,
     /// Form fields recorded by the flow API, emitted as AcroForm at save.
@@ -61,6 +64,7 @@ impl Document {
             flow_y: None,
             flow_page: 0,
             cid_fonts: Default::default(),
+            winansi_used: Default::default(),
             want_outline: true,
             fields: Vec::new(),
         }
@@ -338,19 +342,33 @@ impl Document {
         // --- Fonts -----------------------------------------------------
         // A font can be used both ways in one document: WinAnsi lines use
         // F<idx>, CID lines use F<idx>cid. Emit both variants.
-        let mut font_refs: Vec<Ref> = Vec::new();
+        // Emit only fonts that were actually used (WinAnsi bytes or CID
+        // glyphs); unused faces drop out of the file entirely.
+        let mut font_refs: Vec<Option<Ref>> = Vec::new();
         let mut cid_refs: Vec<Option<Ref>> = Vec::new();
         for (i, f) in self.fonts.iter().enumerate() {
-            let r = Self::emit_font(&mut doc, f);
-            font_refs.push(r);
-            match self.cid_fonts.get(&i).filter(|s| !s.is_empty()) {
-                Some(used) => cid_refs.push(Some(Self::emit_font_type0(&mut doc, f, used))),
-                None => cid_refs.push(None),
+            let win_used = self.winansi_used.get(&i);
+            let cid_used = self.cid_fonts.get(&i).filter(|s| !s.is_empty());
+            if win_used.is_none() && cid_used.is_none() {
+                font_refs.push(None);
+                cid_refs.push(None);
+                continue;
             }
+            let r = match win_used {
+                Some(used) => Some(Self::emit_font(&mut doc, f, used)),
+                None => None,
+            };
+            font_refs.push(r);
+            cid_refs.push(match cid_used {
+                Some(used) => Some(Self::emit_font_type0(&mut doc, f, used)),
+                None => None,
+            });
         }
         let mut font_res = Dict::new();
-        for (i, &r) in font_refs.iter().enumerate() {
-            font_res.set(format!("F{i}"), r);
+        for (i, r) in font_refs.iter().enumerate() {
+            if let Some(r) = r {
+                font_res.set(format!("F{i}"), *r);
+            }
         }
         for (i, r) in cid_refs.iter().enumerate() {
             if let Some(r) = r {
@@ -634,7 +652,7 @@ impl Document {
             // with a smaller level (classic outline construction).
             let mut parent_of: Vec<Option<usize>> = vec![None; self.bookmarks.len()];
             let mut last_at_level: [Option<usize>; 7] = [None; 7];
-            for (i, &(level, _, _)) in self.bookmarks.iter().enumerate() {
+            for (i, &(level, _, _, _)) in self.bookmarks.iter().enumerate() {
                 let lvl = level.min(6) as usize;
                 let mut parent = None;
                 for l in (0..lvl).rev() {
@@ -661,7 +679,7 @@ impl Document {
                 }
             }
 
-            for (i, &(_level, ref title, page)) in self.bookmarks.iter().enumerate() {
+            for (i, &(_level, ref title, page, _mcid)) in self.bookmarks.iter().enumerate() {
                 let mut item = Dict::new();
                 item.set("Title", PdfString::text(title));
                 item.set(
@@ -671,16 +689,45 @@ impl Document {
                         None => Object::Ref(outlines_root),
                     },
                 );
-                item.set(
-                    "Dest",
-                    Object::Array(vec![
-                        Object::Ref(page_refs[page.min(n_pages - 1)]),
-                        Object::Name(Name::new("XYZ")),
-                        Object::Null,
-                        Object::Null,
-                        Object::Null,
-                    ]),
-                );
+                if self.profile == Profile::PdfUa2 {
+                    // UA-2: intra-document destinations must be structure
+                    // destinations (ISO 32000-2 12.3.2.3): point at the
+                    // heading's own struct element.
+                    let elem_ref = leaf_map
+                        .iter()
+                        .find(|&&(lp, lm, r)| lp == page && lm == _mcid)
+                        .map(|&(_, _, r)| r);
+                    if let Some(r) = elem_ref {
+                        // veraPDF/PDF 2.0: a dict destination is a
+                        // structure destination when it has an /SD key.
+                        let mut sd = Dict::new();
+                        sd.set("SD", Object::Array(vec![Object::Ref(r)]));
+                        item.set("Dest", Object::Dict(sd));
+                    } else {
+                        // Fallback to the classic explicit destination.
+                        item.set(
+                            "Dest",
+                            Object::Array(vec![
+                                Object::Ref(page_refs[page.min(n_pages - 1)]),
+                                Object::Name(Name::new("XYZ")),
+                                Object::Null,
+                                Object::Null,
+                                Object::Null,
+                            ]),
+                        );
+                    }
+                } else {
+                    item.set(
+                        "Dest",
+                        Object::Array(vec![
+                            Object::Ref(page_refs[page.min(n_pages - 1)]),
+                            Object::Name(Name::new("XYZ")),
+                            Object::Null,
+                            Object::Null,
+                            Object::Null,
+                        ]),
+                    );
+                }
                 // Siblings only: link to the neighbors that share OUR parent.
                 let sibs = match parent_of[i] {
                     Some(p) => &children_of[p],
@@ -992,7 +1039,7 @@ impl Document {
 
     /// Emit the four objects for one embedded TrueType font; returns the
     /// font dictionary ref.
-    fn emit_font(doc: &mut pdfgen_core::Document, f: &LoadedFont) -> Ref {
+    fn emit_font(doc: &mut pdfgen_core::Document, f: &LoadedFont, used_bytes: &[bool; 256]) -> Ref {
         let fdict = doc.alloc();
         let fdesc = doc.alloc();
         let ffile = doc.alloc();
@@ -1007,34 +1054,68 @@ impl Document {
                 None => Object::Int(0),
             })
             .collect();
-        let to_thousandths = |v: f64| {
-            Object::Real(
-                pdfgen_core::fmt_real(v * 1000.0 / scale)
-                    .parse::<f64>()
-                    .unwrap_or(0.0)
-                    .into(),
-            )
-        };
+        let to_thousandths = |v: f64| Object::Real(Real((v * 1000.0 / scale).round()));
 
-        // Font file (uncompressed for M1).
+        // Subset the program to the used WinAnsi glyphs with the classic
+        // simple-font renumbering (glyph for byte b lands at GID b and
+        // the cmap maps b -> b), so the dictionary Widths and the
+        // embedded program stay consistent. A stable 6-letter subset
+        // tag marks the subset font name (ABCDEF+Name, per the spec).
+        let mut base_font_name = f.postscript_name.clone();
+        let mut program: Vec<u8> = f.raw.clone();
+        if !f.is_cff {
+            let mut byte_to_gid: [Option<u16>; 256] = [None; 256];
+            for (byte, &u) in used_bytes.iter().enumerate() {
+                if u {
+                    if let Some(unit) = pdfgen_font::winansi_unit_for_byte(byte as u8) {
+                        if let Some(ch) = char::from_u32(u32::from(unit)) {
+                            byte_to_gid[byte] = f.glyph_index(ch);
+                        }
+                    }
+                }
+            }
+            if let Some((sub, _)) = pdfgen_font::subset::subset_winansi(&f.raw, &byte_to_gid) {
+                // Stable subset tag derived from the font name so
+                // repeated saves are reproducible.
+                let mut hash: u32 = 5381;
+                for b in f.postscript_name.bytes() {
+                    hash = hash.wrapping_mul(33).wrapping_add(u32::from(b));
+                }
+                const A: &[u8; 26] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                let tag: String = (0..6)
+                    .map(|k| A[((hash >> (k * 4)) % 26) as usize] as char)
+                    .collect();
+                base_font_name = format!("{tag}+{}", f.postscript_name);
+                program = sub;
+            }
+        }
+
+        // Font program, Flate-compressed.
+        let compressed = flate_compress(&program);
         doc.set_stream(
             ffile,
             Stream::new(
-                Dict::new().with("Length1", f.raw.len() as i64),
-                f.raw.clone(),
+                Dict::new()
+                    .with("Filter", "FlateDecode")
+                    .with("Length1", program.len() as i64),
+                compressed,
             ),
         );
 
-        // ToUnicode CMap.
-        doc.set_stream(ftouni, Stream::new(Dict::new(), tounicode::build_winansi()));
+        // ToUnicode CMap, Flate-compressed.
+        let tu = tounicode::build_winansi();
+        doc.set_stream(
+            ftouni,
+            Stream::new(
+                Dict::new().with("Filter", "FlateDecode"),
+                flate_compress(&tu),
+            ),
+        );
 
         // Descriptor.
         let mut fd = Dict::new();
         fd.set("Type", "FontDescriptor");
-        fd.set(
-            "FontName",
-            Object::Name(Name::new(f.postscript_name.clone())),
-        );
+        fd.set("FontName", Object::Name(Name::new(base_font_name.clone())));
         fd.set("Flags", f.descriptor_flags());
         fd.set(
             "FontBBox",
@@ -1057,10 +1138,7 @@ impl Document {
         let mut ff = Dict::new();
         ff.set("Type", "Font");
         ff.set("Subtype", "TrueType");
-        ff.set(
-            "BaseFont",
-            Object::Name(Name::new(f.postscript_name.clone())),
-        );
+        ff.set("BaseFont", Object::Name(Name::new(base_font_name)));
         ff.set("FirstChar", 0);
         ff.set("LastChar", 255);
         ff.set("Widths", Object::Array(widths));

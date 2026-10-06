@@ -9,6 +9,37 @@
 /// Build a subset font containing `used` glyphs (GIDs) plus gid 0.
 /// Returns the new sfnt bytes and the old->new GID mapping.
 pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)> {
+    subset_impl(data, used, None)
+}
+
+/// Subset for a SIMPLE font with WinAnsiEncoding: glyphs are renumbered
+/// so the glyph for WinAnsi byte b sits at new GID b (and the cmap maps
+/// b -> b). This keeps the font dictionary's FirstChar/LastChar/Widths
+/// and the embedded program consistent, which validators check.
+pub fn subset_winansi(
+    data: &[u8],
+    byte_to_gid: &[Option<u16>; 256],
+) -> Option<(Vec<u8>, [Option<u16>; 256])> {
+    // Byte-ordered placement: new GID = byte, with .notdef at 0.
+    let used: Vec<u16> = byte_to_gid.iter().flatten().copied().collect();
+    let (out, remap) = subset_impl(data, &used, Some(byte_to_gid))?;
+    // Result byte->new gid map.
+    let mut new_map: [Option<u16>; 256] = [None; 256];
+    for b in 0..256 {
+        if let Some(g) = byte_to_gid[b] {
+            new_map[b] = Some(remap[g as usize]);
+        }
+    }
+    Some((out, new_map))
+}
+
+fn subset_impl(
+    data: &[u8],
+    used: &[u16],
+    // WinAnsi placement mode: map of byte -> original gid; the glyph is
+    // renumbered so its new GID equals the byte. None = dense order.
+    byte_map: Option<&[Option<u16>; 256]>,
+) -> Option<(Vec<u8>, Vec<u16>)> {
     let (tables, _num_tables) = read_directory(data)?;
     let head = tables.get(b"head")?;
     let maxp = tables.get(b"maxp")?;
@@ -95,12 +126,43 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
     }
 
     // --- gid remap: old -> new ---
+    // With a placement function (WinAnsi mode), each kept glyph goes to a
+    // chosen new GID (the byte it renders for); spares land after 256.
+    // Otherwise new GIDs are assigned densely in ascending order.
     let mut remap: Vec<u16> = vec![0; num_glyphs];
+    let mut placement: std::collections::HashMap<u32, u16> = Default::default();
+    let mut next_spare: u32 = 256;
     let mut new_glyfs: Vec<u16> = Vec::new();
-    for old in 0..num_glyphs {
-        if keep[old] {
-            remap[old] = new_glyfs.len() as u16;
-            new_glyfs.push(old as u16);
+    if let Some(byte_map) = byte_map {
+        // Byte-driven placement: every byte that maps to a glyph gets that
+        // glyph at GID == byte (even when several bytes share one glyph).
+        for (b, g) in byte_map.iter().enumerate() {
+            if let Some(old) = g {
+                let slot = b as u32;
+                placement.insert(slot, *old);
+                remap[*old as usize] = slot as u16;
+            }
+        }
+        // Everything else that must be kept (components, .notdef) lands
+        // past the byte range at spare slots.
+        for old in 0..num_glyphs {
+            if keep[old] && !byte_map.iter().any(|g| *g == Some(old as u16)) {
+                let s = next_spare;
+                next_spare += 1;
+                placement.insert(s, old as u16);
+                remap[old] = s as u16;
+            }
+        }
+        let max_slot = placement.keys().copied().max().unwrap_or(0);
+        for slot in 0..=max_slot {
+            new_glyfs.push(placement.get(&slot).copied().unwrap_or(0));
+        }
+    } else {
+        for old in 0..num_glyphs {
+            if keep[old] {
+                remap[old] = new_glyfs.len() as u16;
+                new_glyfs.push(old as u16);
+            }
         }
     }
     let new_num_glyphs = new_glyfs.len();
@@ -219,7 +281,23 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
     // fonts with explicit CID/ToUnicode mapping; the in-font cmap is only
     // used by fontconfig probes. But our probe() uses cmap...
     // Compromise: rewrite format 4 entries through the remap.
-    let new_cmap = remap_cmap(data, tables.get(b"cmap")?, &remap);
+    let new_cmap = if let Some(bmap) = byte_map {
+        // WinAnsi simple-font mode. Validators resolve a simple font's
+        // bytes through WinAnsi to UNICODE and then the embedded cmap,
+        // so the rebuilt cmap must map codepoint -> new GID, where the
+        // new GID equals the byte that renders it.
+        let mut pairs: Vec<(u16, u16)> = Vec::new(); // (codepoint, gid)
+        for (b, g) in bmap.iter().enumerate() {
+            if g.is_some() {
+                if let Some(unit) = crate::winansi::unit_for_byte(b as u8) {
+                    pairs.push((unit, b as u16));
+                }
+            }
+        }
+        Some(build_cmap_pairs(&pairs))
+    } else {
+        remap_cmap(data, tables.get(b"cmap")?, &remap)
+    };
 
     // --- assemble the new sfnt ---
     let mut new_maxp = maxp.to_vec();
@@ -295,6 +373,63 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
     fix_head_adjustment(&mut out, total)?;
     let _ = units_per_em;
     Some((out, remap))
+}
+
+/// Build a minimal cmap with one format-4 subtable (3,1) mapping each
+/// (codepoint, gid) pair. The required final 0xFFFF segment maps to
+/// glyph 0. Segments group consecutive codepoints whose gids are also
+/// consecutive (idDelta = gid - code); everything else gets its own
+/// segment with delta and no range-offset table.
+fn build_cmap_pairs(pairs: &[(u16, u16)]) -> Vec<u8> {
+    let mut pts = pairs.to_vec();
+    pts.sort_unstable();
+    pts.dedup();
+    // Group: consecutive codepoints with constant (gid - code).
+    let mut segs: Vec<(u16, u16, i32)> = Vec::new(); // start, end, delta
+    for &(cp, gid) in &pts {
+        let d = i32::from(gid) - i32::from(cp);
+        match segs.last_mut() {
+            Some(seg) if seg.1 + 1 == cp && seg.2 == d => seg.1 = cp,
+            _ => segs.push((cp, cp, d)),
+        }
+    }
+    segs.push((0xFFFF, 0xFFFF, 1));
+    let n = segs.len();
+
+    let mut out: Vec<u8> = Vec::with_capacity(16 + n * 8);
+    out.extend_from_slice(&[0, 0]);
+    out.extend_from_slice(&1u16.to_be_bytes());
+    out.extend_from_slice(&3u16.to_be_bytes());
+    out.extend_from_slice(&1u16.to_be_bytes());
+    out.extend_from_slice(&12u32.to_be_bytes());
+    out.extend_from_slice(&4u16.to_be_bytes());
+    out.extend_from_slice(&((16 + n * 8) as u16).to_be_bytes());
+    out.extend_from_slice(&0u16.to_be_bytes());
+    out.extend_from_slice(&((n * 2) as u16).to_be_bytes());
+    let max_pow2 = {
+        let mut p = 1usize;
+        while p * 2 <= n {
+            p *= 2;
+        }
+        p
+    };
+    out.extend_from_slice(&((max_pow2 * 2) as u16).to_be_bytes());
+    out.extend_from_slice(&(max_pow2.trailing_zeros() as u16).to_be_bytes());
+    out.extend_from_slice(&((n * 2) as u16 - (max_pow2 * 2) as u16).to_be_bytes());
+    for &(_, end, _) in &segs {
+        out.extend_from_slice(&end.to_be_bytes());
+    }
+    out.extend_from_slice(&0u16.to_be_bytes()); // reserved pad
+    for &(start, _, _) in &segs {
+        out.extend_from_slice(&start.to_be_bytes());
+    }
+    for &(_, _, d) in &segs {
+        out.extend_from_slice(&(d as u16).to_be_bytes());
+    }
+    for _ in 0..n {
+        out.extend_from_slice(&0u16.to_be_bytes()); // idRangeOffset
+    }
+    out
 }
 
 fn read_directory(data: &[u8]) -> Option<(std::collections::BTreeMap<[u8; 4], Vec<u8>>, usize)> {
@@ -409,7 +544,7 @@ fn remap_cmap(_data: &[u8], cmap: &[u8], remap: &[u16]) -> Option<Vec<u8>> {
     out.extend_from_slice(&1u16.to_be_bytes());
     out.extend_from_slice(&3u16.to_be_bytes());
     out.extend_from_slice(&1u16.to_be_bytes());
-    out.extend_from_slice(&12u32.to_be_bytes()[2..4]); // offset = 12 (u16)
+    out.extend_from_slice(&12u16.to_be_bytes()); // subtable offset (u16 fields)
     out.extend_from_slice(&built);
 
     Some(out)

@@ -69,6 +69,14 @@ impl<'a> Flow<'a> {
         self.y = self.height - self.margin;
     }
 
+    /// Record WinAnsi byte usage for font 0 (the fixed-F0 draw paths).
+    fn mark_winansi_f0(&mut self, bytes: &[u8]) {
+        let slot = self.doc.winansi_used.entry(0).or_insert([false; 256]);
+        for &b in bytes {
+            slot[usize::from(b)] = true;
+        }
+    }
+
     fn ensure_space(&mut self, needed: f64) {
         if self.y - self.margin < needed {
             self.new_page();
@@ -136,6 +144,11 @@ impl<'a> Flow<'a> {
         for line in lines {
             match pdfgen_font::winansi::encode(line) {
                 Ok(encoded) => {
+                    // Record byte usage for font subsetting at save time.
+                    let slot = self.doc.winansi_used.entry(font).or_insert([false; 256]);
+                    for &b in &encoded {
+                        slot[usize::from(b)] = true;
+                    }
                     pd.content.text(&format!("F{font}"), size, x, y, &encoded);
                 }
                 Err(_) => {
@@ -184,10 +197,11 @@ impl<'a> Flow<'a> {
         self.ensure_space(needed);
         let (mcid, y) = self.draw_lines(&format!("H{level}"), 0, size, &lines, self.margin)?;
         self.y = y;
-        // Bookmark entry for the outline (built at save).
+        // Bookmark entry for the outline (built at save); the mcid lets
+        // UA-2 saves point at the heading's structure element.
         self.doc
             .bookmarks
-            .push((level, text.to_string(), self.page_idx));
+            .push((level, text.to_string(), self.page_idx, mcid));
         self.doc.pages[self.page_idx].nodes.push(
             Node::leaf(format!("H{level}"), text.to_string(), 0, size)
                 .with_pieces(vec![(self.page_idx, mcid)]),
@@ -299,6 +313,12 @@ impl<'a> Flow<'a> {
                 let mut y = self.y;
                 for line in lines {
                     let encoded = pdfgen_font::winansi::encode(line)?;
+                    {
+                        let slot = self.doc.winansi_used.entry(0).or_insert([false; 256]);
+                        for &b in &encoded {
+                            slot[usize::from(b)] = true;
+                        }
+                    }
                     pd.content.text("F0", 11.0, x + PAD, y - 13.0, &encoded);
                     y -= 11.0 * LH;
                 }
@@ -336,6 +356,12 @@ impl<'a> Flow<'a> {
                 let mut y = self.y;
                 for line in lines {
                     let encoded = pdfgen_font::winansi::encode(line)?;
+                    {
+                        let slot = self.doc.winansi_used.entry(0).or_insert([false; 256]);
+                        for &b in &encoded {
+                            slot[usize::from(b)] = true;
+                        }
+                    }
                     pd.content.text("F0", 11.0, x + PAD, y - 13.0, &encoded);
                     y -= 11.0 * LH;
                 }
@@ -412,6 +438,7 @@ impl<'a> Flow<'a> {
     /// Page header furniture, drawn as a pagination artifact.
     pub fn header(&mut self, text: &str) -> Result<(), FontError> {
         let encoded = pdfgen_font::winansi::encode(text)?;
+        self.mark_winansi_f0(&encoded);
         let pd = &mut self.doc.pages[self.page_idx];
         pd.content.begin_artifact("Header");
         pd.content
@@ -434,6 +461,7 @@ impl<'a> Flow<'a> {
 
         // Label text, tagged.
         let encoded = pdfgen_font::winansi::encode(label)?;
+        self.mark_winansi_f0(&encoded);
         let pd = &mut self.doc.pages[self.page_idx];
         let mcid = pd.content.begin_tag("Caption");
         pd.content
@@ -471,6 +499,7 @@ impl<'a> Flow<'a> {
     /// Page footer furniture, drawn as a pagination artifact.
     pub fn footer(&mut self, text: &str) -> Result<(), FontError> {
         let encoded = pdfgen_font::winansi::encode(text)?;
+        self.mark_winansi_f0(&encoded);
         let pd = &mut self.doc.pages[self.page_idx];
         pd.content.begin_artifact("Footer");
         pd.content.text("F0", 9.0, self.margin, 36.0, &encoded);
