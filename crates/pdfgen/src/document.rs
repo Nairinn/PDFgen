@@ -606,7 +606,9 @@ impl Document {
             pg.set("StructParents", pi as i64);
             pg.set("Tabs", "S");
             doc.set(page_refs[pi], Object::Dict(pg));
-            let content_bytes = std::mem::take(&mut self.pages[pi].content).finish();
+            // Non-destructive: the page content stays intact so the
+            // document can be saved again.
+            let content_bytes = self.pages[pi].content.finish_ref();
             doc.set_stream(contents_refs[pi], Stream::new(Dict::new(), content_bytes));
         }
 

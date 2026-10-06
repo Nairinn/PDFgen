@@ -39,6 +39,35 @@ fn flow_calls_share_one_page() {
     );
 }
 
+/// P0-3: saving twice must produce identical, non-blank output.
+#[test]
+fn save_twice_produces_identical_output() {
+    const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+    if !std::path::Path::new(ARIAL).exists() {
+        eprintln!("skipping: no Arial on this machine");
+        return;
+    }
+    let mut doc = Document::new(Profile::PdfUa1);
+    doc.title("Save twice").lang("en-US");
+    doc.load_font(ARIAL).unwrap();
+    doc.flow_heading(1, "Persistent heading").unwrap();
+    doc.flow_paragraph("This content must survive the first save intact.")
+        .unwrap();
+
+    let first = out("save_twice_1.pdf");
+    let report1 = doc.save(&first).unwrap();
+    assert_eq!(report1.status, Status::Compliant);
+    let second = out("save_twice_2.pdf");
+    let report2 = doc.save(&second).unwrap();
+    assert_eq!(report2.status, Status::Compliant);
+
+    let a = std::fs::read(&first).unwrap();
+    let b = std::fs::read(&second).unwrap();
+    assert!(!a.is_empty() && a.len() > 10_000, "first save has content");
+    assert_eq!(a.len(), b.len(), "second save must match the first");
+    assert_eq!(a, b, "byte-identical output expected on re-save");
+}
+
 /// P0-2: explicit pages keep their own sizes; the flow page stays Letter.
 #[test]
 fn explicit_pages_keep_own_sizes() {

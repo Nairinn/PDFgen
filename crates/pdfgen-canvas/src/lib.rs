@@ -165,4 +165,10 @@ impl Content {
     pub fn finish(self) -> Vec<u8> {
         self.ops.into_bytes()
     }
+
+    /// Finish without consuming: returns the same bytes, leaving the
+    /// builder intact so a document can be saved more than once.
+    pub fn finish_ref(&self) -> Vec<u8> {
+        self.ops.clone().into_bytes()
+    }
 }
