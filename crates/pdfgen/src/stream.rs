@@ -992,16 +992,7 @@ fn word_width_pt(f: &pdfgen_font::LoadedFont, word: &str, size: f64, scale: f64)
 
 /// Append escaped literal-string bytes into the scratch buffer.
 fn push_escaped(out: &mut String, bytes: &[u8]) {
-    for &b in bytes {
-        match b {
-            b'(' | b')' | b'\\' => {
-                out.push('\\');
-                out.push(b as char);
-            }
-            0x20..=0x7e => out.push(b as char),
-            _ => out.push_str(&format!("\\{b:03o}")),
-        }
-    }
+    pdfgen_core::escape_bytes_into(out, bytes);
 }
 
 /// DEFLATE-compress a page stream (zlib wrapper, as PDF FlateDecode wants).

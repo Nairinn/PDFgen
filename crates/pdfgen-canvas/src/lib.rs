@@ -44,16 +44,7 @@ impl TagType {
 /// Escape bytes for a literal string in a content stream.
 fn escape_literal(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() + 8);
-    for &b in bytes {
-        match b {
-            b'(' | b')' | b'\\' => {
-                s.push('\\');
-                s.push(b as char);
-            }
-            0x20..=0x7e => s.push(b as char),
-            _ => s.push_str(&format!("\\{b:03o}")),
-        }
-    }
+    pdfgen_core::escape_bytes_into(&mut s, bytes);
     s
 }
 

@@ -125,7 +125,7 @@ impl TagSession {
             // Decode if FlateDecode.
             let data: Vec<u8> = match content_stream.dict.get("Filter") {
                 Some(Object::Name(n)) if n.0 == "FlateDecode" => {
-                    crate::retag::inflate(&content_stream.data)
+                    pdfgen_parse::inflate(&content_stream.data)
                         .unwrap_or_else(|| content_stream.data.clone())
                 }
                 _ => content_stream.data.clone(),
@@ -252,16 +252,4 @@ impl TagSession {
 
 fn looks_like_page_number(t: &str) -> bool {
     !t.is_empty() && t.len() <= 12 && t.chars().all(|c| c.is_ascii_digit() || c == '-')
-}
-
-/// Depth-first page reference collection from a /Pages node.
-/// zlib inflate, exposed for retag-internal use.
-pub(crate) fn inflate(data: &[u8]) -> Option<Vec<u8>> {
-    use flate2::read::ZlibDecoder;
-    use std::io::Read;
-    let mut out = Vec::new();
-    ZlibDecoder::new(data)
-        .read_to_end(&mut out)
-        .ok()
-        .map(|_| out)
 }

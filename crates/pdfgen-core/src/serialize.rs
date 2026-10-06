@@ -42,9 +42,11 @@ fn write_name(out: &mut String, name: &str) {
     }
 }
 
-fn write_string(out: &mut String, s: &PdfString) {
-    out.push('(');
-    for &b in &s.0 {
+/// Append the PDF literal-string form of raw bytes into `out`
+/// (escaping parens/backslash, octal for bytes outside 0x20-0x7E).
+/// The ONE escaper - canvas, stream and draw all call this.
+pub fn escape_bytes_into(out: &mut String, bytes: &[u8]) {
+    for &b in bytes {
         match b {
             b'(' | b')' | b'\\' => {
                 out.push('\\');
@@ -54,6 +56,11 @@ fn write_string(out: &mut String, s: &PdfString) {
             _ => out.push_str(&format!("\\{b:03o}")),
         }
     }
+}
+
+fn write_string(out: &mut String, s: &PdfString) {
+    out.push('(');
+    escape_bytes_into(out, &s.0);
     out.push(')');
 }
 

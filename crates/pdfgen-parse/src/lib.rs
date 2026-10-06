@@ -15,6 +15,18 @@ mod reader;
 
 pub use lexer::{Lexer, Token};
 pub use pdf_string::{read_hex, read_literal};
+
+/// zlib-inflate bytes (FlateDecode without predictors). Returns None on
+/// invalid streams.
+pub fn inflate(data: &[u8]) -> Option<Vec<u8>> {
+    use flate2::read::ZlibDecoder;
+    use std::io::Read as _;
+    let mut out = Vec::new();
+    ZlibDecoder::new(data)
+        .read_to_end(&mut out)
+        .ok()
+        .map(|_| out)
+}
 pub use reader::{PdfReader, RepairInfo};
 
 use thiserror::Error;

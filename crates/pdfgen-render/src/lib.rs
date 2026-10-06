@@ -230,22 +230,14 @@ fn page_content(reader: &mut PdfReader, page: &pdfgen_core::Dict) -> Result<Vec<
             continue;
         };
         let data: Vec<u8> = match s.dict.get("Filter") {
-            Some(Object::Name(n)) if n.0 == "FlateDecode" => inflate(&s.data)?,
+            Some(Object::Name(n)) if n.0 == "FlateDecode" => {
+                pdfgen_parse::inflate(&s.data).ok_or_else(|| "zlib".to_string())?
+            }
             _ => s.data.clone(),
         };
         joined.extend_from_slice(&data);
     }
     Ok(joined)
-}
-
-fn inflate(data: &[u8]) -> Result<Vec<u8>, String> {
-    use flate2::read::ZlibDecoder;
-    use std::io::Read as _;
-    let mut out = Vec::new();
-    ZlibDecoder::new(data)
-        .read_to_end(&mut out)
-        .map_err(|e| format!("zlib: {e}"))?;
-    Ok(out)
 }
 
 /// A resolved font for glyph rasterization.
@@ -291,7 +283,8 @@ fn collect_fonts(
                             if let Ok(Object::Stream(s)) = reader.get(cm.id) {
                                 cid_to_gid = Some(match s.dict.get("Filter") {
                                     Some(Object::Name(n)) if n.0 == "FlateDecode" => {
-                                        inflate(&s.data).unwrap_or_else(|_| s.data.clone())
+                                        pdfgen_parse::inflate(&s.data)
+                                            .unwrap_or_else(|| s.data.clone())
                                     }
                                     _ => s.data.clone(),
                                 });
@@ -328,7 +321,7 @@ fn load_font_file2(reader: &mut PdfReader, desc_id: u32) -> Option<Vec<u8>> {
     };
     Some(match s.dict.get("Filter") {
         Some(Object::Name(n)) if n.0 == "FlateDecode" => {
-            inflate(&s.data).unwrap_or_else(|_| s.data.clone())
+            pdfgen_parse::inflate(&s.data).unwrap_or_else(|| s.data.clone())
         }
         _ => s.data.clone(),
     })
@@ -384,7 +377,9 @@ fn collect_xobjects(
             _ => "DeviceRGB".into(),
         };
         let data: Vec<u8> = match s.dict.get("Filter") {
-            Some(Object::Name(n)) if n.0 == "FlateDecode" => inflate(&s.data)?,
+            Some(Object::Name(n)) if n.0 == "FlateDecode" => {
+                pdfgen_parse::inflate(&s.data).ok_or_else(|| "zlib".to_string())?
+            }
             _ => s.data.clone(),
         };
         let rgb = decode_image(&data, w, h, bpc, &cs)?;
