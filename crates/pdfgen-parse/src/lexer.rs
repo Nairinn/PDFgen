@@ -69,11 +69,13 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     /// New lexer at byte 0.
+    #[must_use] 
     pub fn new(data: &'a [u8]) -> Self {
         Lexer { data, pos: 0 }
     }
 
     /// Current byte offset.
+    #[must_use] 
     pub fn pos(&self) -> usize {
         self.pos
     }
@@ -120,8 +122,6 @@ impl<'a> Lexer<'a> {
             } else if b == b'.' {
                 saw_point = true;
                 self.pos += 1;
-            } else if b == b'-' {
-                break;
             } else {
                 break;
             }
@@ -141,7 +141,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_name(&mut self) -> Result<Token, ParseError> {
+    fn read_name(&mut self) -> Token {
         self.pos += 1; // consume '/'
         let start = self.pos;
         while self.pos < self.data.len() {
@@ -167,7 +167,7 @@ impl<'a> Lexer<'a> {
             out.push(raw[i]);
             i += 1;
         }
-        Ok(Token::Name(String::from_utf8_lossy(&out).into_owned()))
+        Token::Name(String::from_utf8_lossy(&out).into_owned())
     }
 
     fn read_literal_string(&mut self) -> Result<Token, ParseError> {
@@ -299,7 +299,7 @@ impl<'a> Lexer<'a> {
         };
         match b {
             b'+' | b'-' | b'.' | b'0'..=b'9' => self.read_number().map(Some),
-            b'/' => self.read_name().map(Some),
+            b'/' => Ok(Some(self.read_name())),
             b'(' => self.read_literal_string().map(Some),
             b'[' => {
                 self.pos += 1;
@@ -334,6 +334,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Read a stream's raw bytes given the byte range of the body.
+    #[must_use] 
     pub fn stream_body(&self, range: Range<usize>) -> &[u8] {
         &self.data[range]
     }

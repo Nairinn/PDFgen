@@ -279,21 +279,18 @@ impl StreamWriter {
                 // The figure piece belongs to the open element (or its own
                 // top-level element when none is open) for the ParentTree.
                 let piece = (page, mcid);
-                match self.open.last_mut() {
-                    Some(elem) => elem.pieces.push(piece),
-                    None => {
-                        // Standalone figure: make it a top-level element.
-                        self.open.push(OpenElem {
-                            tag: "Figure".into(),
-                            alt: None,
-                            pieces: vec![piece],
-                            children: Vec::new(),
-                            scope: None,
-                        });
-                        // Close it right away.
-                        let elem = self.open.pop().expect("just pushed");
-                        self.record_elem(elem);
-                    }
+                if let Some(elem) = self.open.last_mut() { elem.pieces.push(piece) } else {
+                    // Standalone figure: make it a top-level element.
+                    self.open.push(OpenElem {
+                        tag: "Figure".into(),
+                        alt: None,
+                        pieces: vec![piece],
+                        children: Vec::new(),
+                        scope: None,
+                    });
+                    // Close it right away.
+                    let elem = self.open.pop().expect("just pushed");
+                    self.record_elem(elem);
                 }
                 self.y = y;
             }
@@ -364,7 +361,7 @@ impl StreamWriter {
                 let is_space = text.as_bytes().get(i) == Some(&b' ');
                 if is_space {
                     if let Some(ws) = word_start.take() {
-                        let w = word_width_pt(&f, &text[ws..i], size, scale);
+                        let w = word_width_pt(f, &text[ws..i], size, scale);
                         pack_word(
                             &mut lines,
                             &mut cur,
@@ -383,7 +380,7 @@ impl StreamWriter {
                 }
             }
             if let Some(ws) = word_start.take() {
-                let w = word_width_pt(&f, &text[ws..], size, scale);
+                let w = word_width_pt(f, &text[ws..], size, scale);
                 pack_word(
                     &mut lines,
                     &mut cur,
@@ -416,7 +413,7 @@ impl StreamWriter {
             let mut scratch = std::mem::take(&mut self.scratch);
             scratch.clear();
             use std::fmt::Write as _;
-            let _ = write!(scratch, "/{tag} <</MCID {mcid}>> BDC\n");
+            let _ = writeln!(scratch, "/{tag} <</MCID {mcid}>> BDC");
             let mut y = self.y;
             for line in &lines[i..i + take] {
                 let encoded = pdfgen_font::winansi::encode(line)
@@ -664,8 +661,7 @@ impl StreamWriter {
                             rec.pieces
                                 .first()
                                 .map(|p| self.page_ids[p.0])
-                                .map(Ref::new)
-                                .unwrap_or(Ref::new(ids::PAGES)),
+                                .map_or(Ref::new(ids::PAGES), Ref::new),
                         ),
                     );
                     let kids: Vec<Object> = rec

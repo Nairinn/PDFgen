@@ -24,6 +24,9 @@ use std::io::Read;
 /// Errors from the HTML converter.
 #[derive(Debug, thiserror::Error)]
 pub enum HtmlError {
+    /// Reading the HTML source failed.
+    #[error("html IO: {0}")]
+    Io(String),
     /// Malformed HTML (unclosed tag, bad nesting).
     #[error("html: {0}")]
     Parse(String),
@@ -53,7 +56,7 @@ pub fn html_file_to_pdf(
     let mut html = String::new();
     std::fs::File::open(html_path)
         .and_then(|mut f| f.read_to_string(&mut html))
-        .map_err(|e| HtmlError::Parse(e.to_string()))?;
+        .map_err(|e| HtmlError::Io(e.to_string()))?;
     html_to_pdf(&html, out_path, title, lang)
 }
 
@@ -85,10 +88,10 @@ pub fn html_to_pdf(
                 let name = html[i + 2..end].trim().to_ascii_lowercase();
                 match name.as_str() {
                     "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "td" | "th" => {
-                        flush_block(&mut batch, &mut text, &block_tag(&name).unwrap())?;
+                        flush_block(&mut batch, &mut text, &block_tag(&name).unwrap());
                     }
                     "li" => {
-                        flush_list_item(&mut batch, &mut text, in_list)?;
+                        flush_list_item(&mut batch, &mut text, in_list);
                     }
                     "ul" | "ol" => {
                         in_list = false;
@@ -217,11 +220,7 @@ fn normalize_ws(s: &str) -> String {
 }
 
 /// Close a block element: text becomes one Text event, then End.
-fn flush_block(
-    batch: &mut Vec<StreamEvent>,
-    text: &mut String,
-    tag: &str,
-) -> Result<(), HtmlError> {
+fn flush_block(batch: &mut Vec<StreamEvent>, text: &mut String, tag: &str) {
     let _ = tag;
     let cleaned = normalize_ws(text);
     if !cleaned.is_empty() {
@@ -233,15 +232,10 @@ fn flush_block(
     }
     *text = String::new();
     batch.push(StreamEvent::End);
-    Ok(())
 }
 
 /// Close an <li>: Lbl bullet + LBody text inside the open L.
-fn flush_list_item(
-    batch: &mut Vec<StreamEvent>,
-    text: &mut String,
-    in_list: bool,
-) -> Result<(), HtmlError> {
+fn flush_list_item(batch: &mut Vec<StreamEvent>, text: &mut String, in_list: bool) {
     if !in_list {
         // li outside a list: treat as a plain paragraph.
         let cleaned = normalize_ws(text);
@@ -253,7 +247,7 @@ fn flush_list_item(
             });
         }
         *text = String::new();
-        return Ok(());
+        return;
     }
     batch.push(StreamEvent::Begin {
         tag: "LI".into(),
@@ -284,7 +278,6 @@ fn flush_list_item(
     *text = String::new();
     batch.push(StreamEvent::End);
     batch.push(StreamEvent::End); // close LI
-    Ok(())
 }
 
 fn find_byte(haystack: &[u8], from: usize, needle: u8) -> Option<usize> {
@@ -307,7 +300,9 @@ fn extract_attr(tag_rest: &str, attr: &str) -> Option<String> {
     let needle = format!("{attr}=");
     let pos = lower.find(&needle)?;
     let after = &tag_rest[pos + needle.len()..];
-    let quote = after.chars().next()?;
+    let Some(quote) = after.chars().next() else {
+        return None;
+    };
     if quote != '"' && quote != '\'' {
         return None;
     }

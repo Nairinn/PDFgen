@@ -162,8 +162,7 @@ fn print_file(path: &str, printer: Option<String>) -> Result<usize, String> {
         "pdfgen-print-{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0)
+            .map_or(0, |d| d.as_millis())
     ));
     let files = render_to_pngs(path, opts, &tmp)?;
     // lpr takes multiple files in one job; lp needs one command per file.

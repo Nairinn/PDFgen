@@ -33,7 +33,7 @@ fn build_object_stream_pdf() -> Vec<u8> {
     };
 
     let mut pdf: Vec<u8> = b"%PDF-1.5\n%\xe2\xe3\xcf\xd3\n".to_vec();
-    let mut off = |pdf: &mut Vec<u8>| pdf.len() as u64;
+    let off = |pdf: &mut Vec<u8>| pdf.len() as u64;
 
     // Object 3: page.
     let o3 = off(&mut pdf);
@@ -52,7 +52,7 @@ fn build_object_stream_pdf() -> Vec<u8> {
     );
     let stm_start = pdf.len();
     pdf.extend_from_slice(&compressed);
-    pdf.extend_from_slice(format!("\nendstream\nendobj\n").as_bytes());
+    pdf.extend_from_slice("\nendstream\nendobj\n".to_string().as_bytes());
     let _ = stm_start;
 
     // Xref STREAM as object 5, with type-2 entries for objects 1 and 2.
@@ -69,7 +69,7 @@ fn build_object_stream_pdf() -> Vec<u8> {
         (1, o6, 0), // obj 6
     ];
     let mut data = Vec::new();
-    for &(t, f1, f2) in rows.iter() {
+    for &(t, f1, f2) in &rows {
         data.push(t);
         data.extend_from_slice(&(f1 as u32).to_be_bytes());
         data.extend_from_slice(&(f2 as u16).to_be_bytes());

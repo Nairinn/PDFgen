@@ -119,11 +119,8 @@ impl PdfReader {
         // The newest entry for an object wins (it was inserted first; we
         // only insert when absent).
         let mut visited: std::collections::HashSet<u64> = std::collections::HashSet::new();
-        loop {
-            let prev = match self.trailer.get("Prev") {
-                Some(Object::Int(p)) => *p as u64,
-                _ => break,
-            };
+        while let Some(Object::Int(prev_i)) = self.trailer.get("Prev") {
+            let prev = *prev_i as u64;
             if prev as usize >= self.data.len() || !visited.insert(prev) {
                 break; // out of range or a loop: stop, keep what we have
             }
@@ -155,6 +152,7 @@ impl PdfReader {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines)]
     fn load_classic_xref(&mut self, offset: usize) -> Result<(), ParseError> {
         {
             let mut lx = Lexer::new(&self.data);
@@ -278,14 +276,14 @@ impl PdfReader {
         if let Some(parms) = dict.get("DecodeParms") {
             match parms {
                 Object::Dict(parms) => {
-                    bytes = apply_predictors(bytes, parms)?;
+                    bytes = apply_predictors(bytes, parms);
                 }
                 Object::Array(parr) => {
                     // One parms dict per filter; apply the first that
                     // asks for a PNG predictor.
                     for p in parr {
                         if let Object::Dict(parms) = p {
-                            bytes = apply_predictors(bytes, parms)?;
+                            bytes = apply_predictors(bytes, parms);
                             break;
                         }
                     }
@@ -435,12 +433,14 @@ impl PdfReader {
     }
 
     /// All object numbers known to the reader (sorted).
+    #[must_use] 
     pub fn object_ids(&self) -> &[u32] {
         &self.known
     }
 
     /// Known object offsets: (id, byte offset) for every in-use entry.
     /// Used by the revision crate to re-emit xref tables.
+    #[must_use] 
     pub fn object_offsets(&self) -> Vec<(u32, u64)> {
         let mut out: Vec<(u32, u64)> = self
             .xref
@@ -567,7 +567,7 @@ impl PdfReader {
             .objstm_cache
             .get(&stream)
             .and_then(|c| c.get(index as usize).cloned());
-        obj.ok_or_else(|| ParseError::ObjectNotFound(stream))
+        obj.ok_or(ParseError::ObjectNotFound(stream))
     }
 
     /// Decode a stream's bytes through its /Filter (single name or array),
@@ -630,64 +630,62 @@ impl PdfReader {
             }
         }
         // Body: dict (+stream), array, or scalar.
-        match lx.peek() {
-            Some(b'<') => {
-                lx.next_token()?; // DictOpen
-                let open = lx.pos() - 2;
-                let dict = parse_dict(data, &mut lx, open)?;
-                // Stream body?
-                let save = lx.pos();
-                lx.skip_trivia();
-                if matches!(lx.next_token()?, Some(Token::StreamKeyword)) {
-                    // Trust /Length when present: binary streams may contain
-                    // the bytes "endstream" inside their data.
-                    let mut body_start = lx.pos();
-                    if data.get(body_start) == Some(&b'\r')
-                        && data.get(body_start + 1) == Some(&b'\n')
-                    {
-                        body_start += 2;
-                    } else if data.get(body_start) == Some(&b'\n') {
-                        body_start += 1;
-                    }
-                    let end = match dict.get("Length") {
-                        Some(Object::Int(l)) if (body_start + *l as usize) <= data.len() => {
-                            let e = body_start + *l as usize;
-                            // Sanity: endstream must follow (after EOL).
-                            let mut probe = e;
-                            if data.get(probe) == Some(&b'\r') {
-                                probe += 1;
-                            }
-                            if data.get(probe) == Some(&b'\n') {
-                                probe += 1;
-                            }
-                            if data[probe..].starts_with(b"endstream") {
-                                e
-                            } else {
-                                // /Length lied; fall back to scanning.
-                                find_endstream(data, body_start)?
-                            }
-                        }
-                        _ => find_endstream(data, body_start)?,
-                    };
-                    let raw = data[body_start..end].to_vec();
-                    return Ok(Object::Stream(Stream { dict, data: raw }));
+        if let Some(b'<') = lx.peek() {
+            lx.next_token()?; // DictOpen
+            let open = lx.pos() - 2;
+            let dict = parse_dict(data, &mut lx, open)?;
+            // Stream body?
+            let save = lx.pos();
+            lx.skip_trivia();
+            if matches!(lx.next_token()?, Some(Token::StreamKeyword)) {
+                // Trust /Length when present: binary streams may contain
+                // the bytes "endstream" inside their data.
+                let mut body_start = lx.pos();
+                if data.get(body_start) == Some(&b'\r')
+                    && data.get(body_start + 1) == Some(&b'\n')
+                {
+                    body_start += 2;
+                } else if data.get(body_start) == Some(&b'\n') {
+                    body_start += 1;
                 }
-                lx.seek(save);
-                Ok(Object::Dict(dict))
-            }
-            _ => {
-                let Some(v) = parse_value(data, &mut lx)? else {
-                    return Err(ParseError::Malformed(
-                        offset as usize,
-                        "object body missing".into(),
-                    ));
+                let end = match dict.get("Length") {
+                    Some(Object::Int(l)) if (body_start + *l as usize) <= data.len() => {
+                        let e = body_start + *l as usize;
+                        // Sanity: endstream must follow (after EOL).
+                        let mut probe = e;
+                        if data.get(probe) == Some(&b'\r') {
+                            probe += 1;
+                        }
+                        if data.get(probe) == Some(&b'\n') {
+                            probe += 1;
+                        }
+                        if data[probe..].starts_with(b"endstream") {
+                            e
+                        } else {
+                            // /Length lied; fall back to scanning.
+                            find_endstream(data, body_start)?
+                        }
+                    }
+                    _ => find_endstream(data, body_start)?,
                 };
-                Ok(v)
+                let raw = data[body_start..end].to_vec();
+                return Ok(Object::Stream(Stream { dict, data: raw }));
             }
+            lx.seek(save);
+            Ok(Object::Dict(dict))
+        } else {
+            let Some(v) = parse_value(data, &mut lx)? else {
+                return Err(ParseError::Malformed(
+                    offset as usize,
+                    "object body missing".into(),
+                ));
+            };
+            Ok(v)
         }
     }
 
     /// The trailer dictionary (catalog `/Root`, `/Info`, `/ID`, …).
+    #[must_use] 
     pub fn trailer(&self) -> &Dict {
         &self.trailer
     }
@@ -781,20 +779,14 @@ fn parse_value(data: &[u8], lx: &mut Lexer<'_>) -> Result<Option<Object>, ParseE
     match lx.next_token()? {
         Some(Token::Int(a)) => {
             let save = lx.pos();
-            match lx.next_token()? {
-                Some(Token::Int(_gen)) => match lx.next_token()? {
-                    Some(Token::RefKeyword) => {
-                        Ok(Some(Object::Ref(Ref::new(u32::try_from(a).unwrap_or(0)))))
-                    }
-                    _ => {
-                        lx.seek(save);
-                        Ok(Some(Object::Int(a)))
-                    }
-                },
-                _ => {
-                    lx.seek(save);
-                    Ok(Some(Object::Int(a)))
-                }
+            if let Some(Token::Int(_gen)) = lx.next_token()? { if let Some(Token::RefKeyword) = lx.next_token()? {
+                Ok(Some(Object::Ref(Ref::new(u32::try_from(a).unwrap_or(0)))))
+            } else {
+                lx.seek(save);
+                Ok(Some(Object::Int(a)))
+            } } else {
+                lx.seek(save);
+                Ok(Some(Object::Int(a)))
             }
         }
         Some(Token::Real(v)) => Ok(Some(Object::Real(Real(v)))),
@@ -877,15 +869,15 @@ fn find_endstream(data: &[u8], from: usize) -> Result<usize, ParseError> {
 /// Apply PNG predictors to a decoded stream per its /DecodeParms.
 /// Columns default to 1; /Predictor 2 = TIFF (unsupported, pass through);
 /// 10..=15 = PNG predictors with the per-row filter byte.
-fn apply_predictors(data: Vec<u8>, parms: &Dict) -> Result<Vec<u8>, ParseError> {
+fn apply_predictors(data: Vec<u8>, parms: &Dict) -> Vec<u8> {
     let predictor = match parms.get("Predictor") {
-        Some(Object::Int(p)) => *p as i64,
-        _ => return Ok(data),
+        Some(Object::Int(p)) => *p,
+        _ => return data,
     };
     if predictor < 10 {
         // No PNG prediction (TIFF predictor 2 is not needed for xref
         // streams in practice); leave the data as-is.
-        return Ok(data);
+        return data;
     }
     let colors = match parms.get("Colors") {
         Some(Object::Int(c)) => (*c).max(1) as usize,
@@ -904,7 +896,7 @@ fn apply_predictors(data: Vec<u8>, parms: &Dict) -> Result<Vec<u8>, ParseError> 
     if row_len == 0 || data.len() % (row_len + 1) != 0 {
         // Not a clean predictor layout; best effort: return the raw data
         // (callers treat xref failure as a repair-scan path).
-        return Ok(data);
+        return data;
     }
     let rows = data.len() / (row_len + 1);
     let mut out: Vec<u8> = Vec::with_capacity(rows * row_len);
@@ -960,7 +952,7 @@ fn apply_predictors(data: Vec<u8>, parms: &Dict) -> Result<Vec<u8>, ParseError> 
         out.extend_from_slice(&cur);
         prev = cur;
     }
-    Ok(out)
+    out
 }
 
 fn inflate(data: &[u8]) -> Option<Vec<u8>> {

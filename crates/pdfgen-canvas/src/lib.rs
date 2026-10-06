@@ -22,6 +22,7 @@ fn escape_literal(bytes: &[u8]) -> String {
 
 impl Content {
     /// New empty content stream.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -70,6 +71,7 @@ impl Content {
     }
 
     /// Number of MCIDs handed out so far.
+    #[must_use] 
     pub fn mcid_count(&self) -> u32 {
         self.next_mcid
     }
@@ -125,12 +127,14 @@ impl Content {
     }
 
     /// Finish: return the raw content stream bytes.
+    #[must_use] 
     pub fn finish(self) -> Vec<u8> {
         self.ops.into_bytes()
     }
 
     /// Finish without consuming: returns the same bytes, leaving the
     /// builder intact so a document can be saved more than once.
+    #[must_use] 
     pub fn finish_ref(&self) -> Vec<u8> {
         self.ops.clone().into_bytes()
     }

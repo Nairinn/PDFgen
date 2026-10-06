@@ -197,7 +197,12 @@ pub fn fill_text_field(
 
 /// Hex-encode bytes for a PDF hex string.
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02X}")).collect()
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        use std::fmt::Write as _;
+        let _ = write!(out, "{b:02X}");
+    }
+    out
 }
 
 /// Byte offset of the last `startxref` value in the file.
@@ -208,7 +213,7 @@ fn last_startxref(data: &[u8]) -> Option<u64> {
     let num: String = s
         .trim_start()
         .chars()
-        .take_while(|c| c.is_ascii_digit())
+        .take_while(char::is_ascii_digit)
         .collect();
     num.parse::<u64>().ok()
 }

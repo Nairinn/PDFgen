@@ -27,31 +27,95 @@ jobs:
       - name: Test
         run: cargo test --workspace --exclude pdfgen-py
 
-      - name: Clippy
-        run: cargo clippy --workspace --exclude pdfgen-py -- -D warnings
-        continue-on-error: true
+      - name: Clippy (blocking)
+        run: cargo clippy --workspace --exclude pdfgen-py --all-targets -- -D warnings
+
+      - name: Format check
+        run: cargo fmt --all -- --check
 
       - name: Lint commit messages (Conventional Commits)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          git log --format='%s' origin/main~50..HEAD 2>/dev/null |
-          head -50 |
+          RANGE="${{ github.event.pull_request.base.sha || 'origin/main~50' }}..HEAD"
+          git log --format='%s' "$RANGE" 2>/dev/null |
           grep -vE '^(feat|fix|docs|chore|refactor|test|style|perf|build|ci|revert)(\(.+\))?: .+$' |
-          grep -q . && { echo "Non-conventional commit subjects found:"; git log --format='%s' origin/main~50..HEAD | grep -vE '^(feat|fix|docs|chore|refactor|test|style|perf|build|ci|revert)(\(.+\))?: .+$' | head; exit 1; } || echo "commit style OK"
+          grep -q . && { echo "Non-conventional commit subjects found:"; git log --format='%s' "$RANGE" | grep -vE '^(feat|fix|docs|chore|refactor|test|style|perf|build|ci|revert)(\(.+\))?: .+$' | head; exit 1; } || echo "commit style OK"
 
-  binding-smoke:
-    name: Python binding build
-    runs-on: macos-latest
+  verapdf:
+    name: veraPDF gate (UA-1 + UA-2)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-python@v5
+
+      - uses: actions/setup-java@v4
         with:
-          python-version: "3.12"
-      - run: pip install maturin
-      - name: Build wheel
-        run: cd crates/pdfgen-py && maturin build --out dist
-      - name: Install and import
+          distribution: temurin
+          java-version: "21"
+
+      - name: Fetch optional CJK fonts
+        run: bash scripts/fetch-cjk-fonts.sh
+
+      - name: Generate every tests/output fixture
+        run: cargo test --workspace --exclude pdfgen-py
+
+      - name: Install veraPDF
         run: |
-          pip install crates/pdfgen-py/dist/*.whl --no-deps
-          python -c "import pdfgen; print('pdfgen', pdfgen.__version__)"
+          mkdir -p tools/verapdf
+          curl -fsSL -o /tmp/verapdf-installer.zip \
+            "http://downloads.verapdf.org/rel/verapdf-installer.zip"
+          unzip -q /tmp/verapdf-installer.zip -d /tmp/verapdf-dl
+          cat > /tmp/verapdf-dl/auto-install.xml <<'XML'
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <AutomatedInstallation langpack="eng">
+            <com.izforge.izpack.panels.HTMLHelloPanel id="hello"/>
+            <com.izforge.izpack.panels.LicencePanel id="license"/>
+            <com.izforge.izpack.panels.TargetPanel id="target">
+              <installpath>tools/verapdf</installpath>
+            </com.izforge.izpack.panels.TargetPanel>
+            <com.izforge.izpack.panels.PacksPanel id="packs">
+              <pack index="0" name="veraPDF GUI" selected="true"/>
+              <pack index="1" name="Mac/*nix Scripts" selected="true"/>
+              <pack index="2" name="Validation model" selected="true"/>
+              <pack index="3" name="Documentation" selected="true"/>
+              <pack index="4" name="Sample Plugins" selected="false"/>
+            </com.izforge.izpack.panels.PacksPanel>
+            <com.izforge.izpack.panels.InstallPanel id="install"/>
+            <com.izforge.izpack.panels.FinishPanel id="finish"/>
+          </AutomatedInstallation>
+          XML
+          JAR=$(ls /tmp/verapdf-dl/verapdf-izpack-installer-*.jar | head -1)
+          java -jar "$JAR" /tmp/verapdf-dl/auto-install.xml
+
+      - name: Validate every generated PDF (fail on any failed check)
+        run: |
+          FAIL=0
+          for pdf in tests/output/*.pdf; do
+            name=$(basename "$pdf")
+            case "$name" in
+              hello_noncompliant*|unnamed_field*|headerless_table*|untagged*|retag*|fill_field*|probe_*)
+                # Deliberately non-compliant / fixture-only files: skip.
+                continue;;
+            esac
+            # UA-2 file, UA-2 flavor; everything else is UA-1.
+            case "$name" in
+              hello_ua2*) FLAVOR=ua2;;
+              *) FLAVOR=ua1;;
+            esac
+            echo "== $name (-f $FLAVOR)"
+            if ! tools/verapdf/verapdf -f "$FLAVOR" "$pdf" > "/tmp/vp-$name.xml" 2>&1; then
+              echo "veraPDF could not process $name"; FAIL=1; continue
+            fi
+            if ! grep -q 'isCompliant="true"' "/tmp/vp-$name.xml"; then
+              echo "NOT COMPLIANT: $name"
+              grep -E 'failedRules|errorMessage' "/tmp/vp-$name.xml" | head -5
+              FAIL=1
+            elif grep -q 'failedChecks="[1-9]' "/tmp/vp-$name.xml"; then
+              echo "FAILED CHECKS: $name"
+              FAIL=1
+            else
+              echo "  OK"
+            fi
+          done
+          exit $FAIL

@@ -781,7 +781,7 @@ fn show_text(
         }
         let advance = face
             .glyph_hor_advance(gid)
-            .map(|a| f64::from(a))
+            .map(f64::from)
             .unwrap_or(upem / 2.0)
             * size_px
             / upem;

@@ -104,24 +104,21 @@ impl<'a> Flow<'a> {
         Ok(crate::wrap::wrap(text, max_w, |word| {
             // Measure with the real encoding: WinAnsi bytes when the
             // word encodes, per-glyph advances otherwise.
-            match pdfgen_font::winansi::encode(word) {
-                Ok(bytes) => bytes
-                    .iter()
-                    .filter_map(|&b| f.width_for_byte(b))
-                    .map(|w| f64::from(w) / scale * size)
-                    .sum(),
-                Err(_) => {
-                    // CID measurement: per-char cmap advances.
-                    let mut total = 0.0f64;
-                    for ch in word.chars() {
-                        if let Some(g) = f.glyph_index(ch) {
-                            if let Some(w) = f.glyph_width_units(g) {
-                                total += w as f64 / scale * size;
-                            }
+            if let Ok(bytes) = pdfgen_font::winansi::encode(word) { bytes
+            .iter()
+            .filter_map(|&b| f.width_for_byte(b))
+            .map(|w| f64::from(w) / scale * size)
+            .sum() } else {
+                // CID measurement: per-char cmap advances.
+                let mut total = 0.0f64;
+                for ch in word.chars() {
+                    if let Some(g) = f.glyph_index(ch) {
+                        if let Some(w) = f.glyph_width_units(g) {
+                            total += w as f64 / scale * size;
                         }
                     }
-                    total
                 }
+                total
             }
         }))
     }
@@ -147,33 +144,30 @@ impl<'a> Flow<'a> {
         let mcid = pd.content.begin_tag(tag);
         let mut y = self.y;
         for line in lines {
-            match pdfgen_font::winansi::encode(line) {
-                Ok(encoded) => {
-                    // Record byte usage for font subsetting at save time.
-                    let slot = self.doc.winansi_used.entry(font).or_insert([false; 256]);
-                    for &b in &encoded {
-                        slot[usize::from(b)] = true;
-                    }
-                    pd.content.text(&format!("F{font}"), size, x, y, &encoded);
+            if let Ok(encoded) = pdfgen_font::winansi::encode(line) {
+                // Record byte usage for font subsetting at save time.
+                let slot = self.doc.winansi_used.entry(font).or_insert([false; 256]);
+                for &b in &encoded {
+                    slot[usize::from(b)] = true;
                 }
-                Err(_) => {
-                    // CID path: WinAnsi cannot encode this text. Map chars
-                    // to glyph IDs; record them so save() emits a Type0
-                    // font with CID widths and a matching ToUnicode. CID
-                    // text uses the separate F<idx>cid resource so the
-                    // simple (WinAnsi) font stays valid for other lines.
-                    let f = &self.doc.fonts[font];
-                    let (cids, chars) = pdfgen_font::cid::encode(line, f)?;
-                    let used = self.doc.cid_fonts.entry(font).or_default();
-                    for (c, g) in chars.iter().zip(&cids) {
-                        used.insert((*c, *g));
-                    }
-                    let mut bytes = Vec::with_capacity(cids.len() * 2);
-                    for cid in cids {
-                        bytes.extend_from_slice(&cid.to_be_bytes());
-                    }
-                    pd.content.text(&format!("F{font}cid"), size, x, y, &bytes);
+                pd.content.text(&format!("F{font}"), size, x, y, &encoded);
+            } else {
+                // CID path: WinAnsi cannot encode this text. Map chars
+                // to glyph IDs; record them so save() emits a Type0
+                // font with CID widths and a matching ToUnicode. CID
+                // text uses the separate F<idx>cid resource so the
+                // simple (WinAnsi) font stays valid for other lines.
+                let f = &self.doc.fonts[font];
+                let (cids, chars) = pdfgen_font::cid::encode(line, f)?;
+                let used = self.doc.cid_fonts.entry(font).or_default();
+                for (c, g) in chars.iter().zip(&cids) {
+                    used.insert((*c, *g));
                 }
+                let mut bytes = Vec::with_capacity(cids.len() * 2);
+                for cid in cids {
+                    bytes.extend_from_slice(&cid.to_be_bytes());
+                }
+                pd.content.text(&format!("F{font}cid"), size, x, y, &bytes);
             }
             y -= lh;
         }
@@ -182,6 +176,7 @@ impl<'a> Flow<'a> {
     }
 
     /// Vertical space remaining on the current page.
+    #[must_use] 
     pub fn remaining(&self) -> f64 {
         self.y - self.margin
     }
@@ -283,7 +278,7 @@ impl<'a> Flow<'a> {
         rows: &[Vec<&str>],
         widths: &[f64],
     ) -> Result<(), FontError> {
-        let n_cols = header.len().max(rows.first().map(Vec::len).unwrap_or(0));
+        let n_cols = header.len().max(rows.first().map_or(0, Vec::len));
         if n_cols == 0 {
             return Ok(());
         }
@@ -355,7 +350,7 @@ impl<'a> Flow<'a> {
             let mut x = self.margin;
             let mut y_top = self.y;
             for (ci, lines) in wrapped.iter().enumerate() {
-                let cell_text = row.get(ci).map(|s| s.to_string()).unwrap_or_default();
+                let cell_text = row.get(ci).map(std::string::ToString::to_string).unwrap_or_default();
                 let pd = &mut self.doc.pages[self.page_idx];
                 let mcid = pd.content.begin_tag("TD");
                 let mut y = self.y;

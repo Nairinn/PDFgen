@@ -11,6 +11,7 @@
 /// are already absolute within the collection), so only the table records
 /// and checksums are rebuilt — table data is referenced by absolute
 /// offsets into the original buffer, which is copied wholesale.
+#[must_use] 
 pub fn extract_face(data: &[u8], index: u32) -> Option<Vec<u8>> {
     if data.len() < 12 || &data[0..4] != b"ttcf" {
         return None;

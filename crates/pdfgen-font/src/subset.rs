@@ -6,8 +6,13 @@
 //! that reference glyph IDs, and rebuild the checksum. Composite glyphs
 //! keep their referenced components.
 
+/// sfnt table directory: tag -> table bytes (copied), plus the count.
+type Tables = std::collections::BTreeMap<[u8; 4], Vec<u8>>;
+
 /// Build a subset font containing `used` glyphs (GIDs) plus gid 0.
 /// Returns the new sfnt bytes and the old->new GID mapping.
+#[must_use] 
+#[allow(clippy::too_many_lines)]
 pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)> {
     subset_impl(data, used, None)
 }
@@ -16,6 +21,7 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
 /// so the glyph for WinAnsi byte b sits at new GID b (and the cmap maps
 /// b -> b). This keeps the font dictionary's FirstChar/LastChar/Widths
 /// and the embedded program consistent, which validators check.
+#[must_use] 
 pub fn subset_winansi(
     data: &[u8],
     byte_to_gid: &[Option<u16>; 256],
@@ -54,7 +60,6 @@ fn subset_impl(
     let long_loca = index_to_loc_format == 1;
     let num_glyphs = u16::from_be_bytes([maxp[4], maxp[5]]) as usize;
 
-    let _loca_len = num_glyphs + 1;
     let loca_at = |i: usize| -> usize {
         if long_loca {
             u32::from_be_bytes([
@@ -130,7 +135,7 @@ fn subset_impl(
     // chosen new GID (the byte it renders for); spares land after 256.
     // Otherwise new GIDs are assigned densely in ascending order.
     let mut remap: Vec<u16> = vec![0; num_glyphs];
-    let mut placement: std::collections::HashMap<u32, u16> = Default::default();
+    let mut placement: std::collections::HashMap<u32, u16> = std::collections::HashMap::new();
     let mut next_spare: u32 = 256;
     let mut new_glyfs: Vec<u16> = Vec::new();
     if let Some(byte_map) = byte_map {
@@ -146,7 +151,7 @@ fn subset_impl(
         // Everything else that must be kept (components, .notdef) lands
         // past the byte range at spare slots.
         for old in 0..num_glyphs {
-            if keep[old] && !byte_map.iter().any(|g| *g == Some(old as u16)) {
+            if keep[old] && !byte_map.contains(&Some(old as u16)) {
                 let s = next_spare;
                 next_spare += 1;
                 placement.insert(s, old as u16);
@@ -185,7 +190,7 @@ fn subset_impl(
     }
     offsets.push(new_glyf.len() as u32);
 
-    let can_short_loca = *offsets.last().unwrap() / 2 <= u16::MAX as u32;
+    let can_short_loca = u16::try_from(*offsets.last().unwrap() / 2).is_ok();
     let new_loca: Vec<u8> = if can_short_loca {
         offsets
             .iter()
@@ -271,7 +276,7 @@ fn subset_impl(
         new_hmtx.extend_from_slice(&lsb.to_be_bytes());
     }
     // All glyphs get their own metric now; set numHMetrics = glyph count.
-    let mut new_hhea = hhea.to_vec();
+    let mut new_hhea = hhea.clone();
     new_hhea[34..36].copy_from_slice(&(new_num_glyphs as u16).to_be_bytes());
 
     // --- cmap: build a minimal format-4 map for Unicode BMP chars that
@@ -300,12 +305,12 @@ fn subset_impl(
     };
 
     // --- assemble the new sfnt ---
-    let mut new_maxp = maxp.to_vec();
+    let mut new_maxp = maxp.clone();
     new_maxp[4..6].copy_from_slice(&(new_num_glyphs as u16).to_be_bytes());
 
-    let mut new_head = head.to_vec();
+    let mut new_head = head.clone();
     // indexToLocFormat
-    let fmt: i16 = if can_short_loca { 0 } else { 1 };
+    let fmt: i16 = i16::from(!can_short_loca);
     new_head[50..52].copy_from_slice(&fmt.to_be_bytes());
 
     // Keep other tables verbatim (OS/2, name, post, GDEF? GSUB may
@@ -313,8 +318,7 @@ fn subset_impl(
     let keep_tags: &[&[u8; 4]] = &[
         b"OS/2", b"name", b"post", b"cvt ", b"fpgm", b"prep", b"gasp",
     ];
-    let mut out_tables: Vec<(&[u8; 4], Vec<u8>)> = Vec::new();
-    out_tables.push((b"head", new_head));
+    let mut out_tables: Vec<(&[u8; 4], Vec<u8>)> = vec![(b"head", new_head)];
     out_tables.push((b"hhea", new_hhea));
     out_tables.push((b"maxp", new_maxp));
     out_tables.push((b"hmtx", new_hmtx));
@@ -325,7 +329,7 @@ fn subset_impl(
     out_tables.push((b"glyf", new_glyf));
     for tag in keep_tags {
         if let Some(bytes) = tables.get(*tag) {
-            out_tables.push((tag, bytes.to_vec()));
+            out_tables.push((tag, bytes.clone()));
         }
     }
     out_tables.sort_by(|a, b| a.0.cmp(b.0));
@@ -366,7 +370,7 @@ fn subset_impl(
     for (_tag, bytes) in &out_tables {
         out.extend_from_slice(bytes);
         let pad = (4 - bytes.len() % 4) % 4;
-        out.extend(std::iter::repeat(0u8).take(pad));
+        out.extend(std::iter::repeat_n(0u8, pad));
     }
 
     // checkSumAdjustment
@@ -432,7 +436,7 @@ fn build_cmap_pairs(pairs: &[(u16, u16)]) -> Vec<u8> {
     out
 }
 
-fn read_directory(data: &[u8]) -> Option<(std::collections::BTreeMap<[u8; 4], Vec<u8>>, usize)> {
+fn read_directory(data: &[u8]) -> Option<(Tables, usize)> {
     if data.len() < 12 || &data[0..4] != b"\x00\x01\x00\x00" {
         return None;
     }
@@ -574,7 +578,7 @@ fn rebuild_format4(sub: &[u8], remap: &[u16]) -> Option<Vec<u8>> {
     let mut segs: Vec<(u16, u16, u16)> = Vec::new(); // start, end, new_gid_base
     for &(c, g) in &pairs {
         match segs.last_mut() {
-            Some(seg) if seg.1 + 1 == c && g == seg.2.wrapping_add(c as u16 - seg.0 as u16) => {
+            Some(seg) if seg.1 + 1 == c && g == seg.2.wrapping_add(c - seg.0) => {
                 seg.1 = c;
             }
             _ => segs.push((c, c, g)),

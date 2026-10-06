@@ -34,6 +34,7 @@ pub enum Sheet {
 impl Sheet {
     /// Landscape size in points (ASME Y14.1: A=8.5x11, B=11x17, C=17x22,
     /// D=22x34, E=34x44, F=28x40 inches; width x height).
+    #[must_use] 
     pub fn points(self) -> (f64, f64) {
         const IN: f64 = 72.0;
         match self {
@@ -64,6 +65,7 @@ pub enum IsoSheet {
 
 impl IsoSheet {
     /// Landscape size in points.
+    #[must_use] 
     pub fn points(self) -> (f64, f64) {
         let mm = |w: f64, h: f64| (w * 72.0 / 25.4, h * 72.0 / 25.4);
         match self {
@@ -76,6 +78,7 @@ impl IsoSheet {
     }
 
     /// Size designation as text ("A4").
+    #[must_use] 
     pub fn letter(self) -> &'static str {
         match self {
             IsoSheet::A4 => "A4",
@@ -229,9 +232,9 @@ impl<'a> Drawing<'a> {
         let mut ops = String::new();
         for i in 0..=n {
             let y = y0 + row_h * i as f64;
-            ops.push_str(&format!("0.5 w {} {} {} 0 re S\n", x0, y, block_w));
+            ops.push_str(&format!("0.5 w {x0} {y} {block_w} 0 re S\n"));
         }
-        ops.push_str(&format!("0.5 w {} {} 0 {} re S\n", x0, y0, block_h));
+        ops.push_str(&format!("0.5 w {x0} {y0} 0 {block_h} re S\n"));
         self.doc.begin_artifact(self.page, "");
         self.doc.raw_ops(self.page, &ops);
         self.doc.end_artifact(self.page);
@@ -277,7 +280,7 @@ impl<'a> Drawing<'a> {
 
     /// Draw a stroked part outline rectangle (geometry → artifact).
     pub fn part_rect(&mut self, x: f64, y: f64, w: f64, h: f64) {
-        let ops = format!("1.0 w {} {} {} {} re S\n", x, y, w, h);
+        let ops = format!("1.0 w {x} {y} {w} {h} re S\n");
         self.doc.begin_artifact(self.page, "");
         self.doc.raw_ops(self.page, &ops);
         self.doc.end_artifact(self.page);
@@ -309,9 +312,9 @@ impl<'a> Drawing<'a> {
         let arrow = 4.0;
 
         let mut ops = String::new();
-        ops.push_str(&format!("0.35 w {} {} {} {} m l S\n", x1, y1, a1x, a1y));
-        ops.push_str(&format!("0.35 w {} {} {} {} m l S\n", x2, y2, a2x, a2y));
-        ops.push_str(&format!("0.5 w {} {} {} {} m l S\n", a1x, a1y, a2x, a2y));
+        ops.push_str(&format!("0.35 w {x1} {y1} {a1x} {a1y} m l S\n"));
+        ops.push_str(&format!("0.35 w {x2} {y2} {a2x} {a2y} m l S\n"));
+        ops.push_str(&format!("0.5 w {a1x} {a1y} {a2x} {a2y} m l S\n"));
         let ux = dx / len;
         let uy = dy / len;
         for (px, py, sx) in [(a1x, a1y, 1.0), (a2x, a2y, -1.0)] {
@@ -382,9 +385,9 @@ impl<'a> Drawing<'a> {
         let mut ops = String::new();
         for i in 0..=n + 1 {
             let y = y0 + row_h * i as f64;
-            ops.push_str(&format!("0.5 w {} {} {} 0 re S\n", x0, y, block_w));
+            ops.push_str(&format!("0.5 w {x0} {y} {block_w} 0 re S\n"));
         }
-        ops.push_str(&format!("0.5 w {} {} 0 {} re S\n", x0, y0, block_h));
+        ops.push_str(&format!("0.5 w {x0} {y0} 0 {block_h} re S\n"));
         self.doc.begin_artifact(self.page, "");
         self.doc.raw_ops(self.page, &ops);
         self.doc.end_artifact(self.page);

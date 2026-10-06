@@ -145,11 +145,13 @@ impl TagSession {
     }
 
     /// Number of extracted text runs.
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.runs.len()
     }
 
     /// True when no text was found.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.runs.is_empty()
     }

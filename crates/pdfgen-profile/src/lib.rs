@@ -30,6 +30,7 @@ pub enum Profile {
 
 impl Profile {
     /// Core PDF version this profile writes.
+    #[must_use] 
     pub fn pdf_version(self) -> pdfgen_core::PdfVersion {
         match self {
             Profile::PdfUa1 => pdfgen_core::PdfVersion::V1_7,
@@ -38,6 +39,7 @@ impl Profile {
     }
 
     /// `pdfuaid:part` XMP value.
+    #[must_use] 
     pub fn ua_part(self) -> u32 {
         match self {
             Profile::PdfUa1 => 1,
@@ -46,6 +48,7 @@ impl Profile {
     }
 
     /// Human-readable name for reports.
+    #[must_use] 
     pub fn name(self) -> &'static str {
         match self {
             Profile::PdfUa1 => "PDF/UA-1",
@@ -78,6 +81,7 @@ pub mod rules {
     );
 
     /// Build a Violation from a (id, message, fix) tuple.
+    #[must_use] 
     pub fn violation(t: (&str, &str, &str)) -> super::Violation {
         super::Violation {
             id: t.0.into(),
@@ -122,6 +126,7 @@ pub struct SaveReport {
 
 impl SaveReport {
     /// The user-facing note, mirroring the plan's wording.
+    #[must_use] 
     pub fn note(&self) -> Option<String> {
         match self.status {
             Status::Compliant => None,

@@ -212,10 +212,12 @@ const STANDARD_14: &[(&str, &str, &str)] = &[
 ];
 
 /// Resolve a standard-14 / common name to its look-alike family.
+#[must_use] 
+#[allow(clippy::too_many_lines)]
 pub fn standard14_family(name: &str) -> Option<(&'static str, &'static str)> {
     STANDARD_14
         .iter()
-        .find(|(alias, _, _)| eq_ignore_case(*alias, name))
+        .find(|(alias, _, _)| eq_ignore_case(alias, name))
         .map(|(_, family, style)| (*family, *style))
 }
 
@@ -253,6 +255,7 @@ pub struct FontRegistry {
 
 impl FontRegistry {
     /// Debug/testing accessor: the scanned system font map, if any.
+    #[must_use] 
     pub fn system_scan(&self) -> &HashMap<String, HashMap<String, PathBuf>> {
         static EMPTY: std::sync::OnceLock<HashMap<String, HashMap<String, PathBuf>>> =
             std::sync::OnceLock::new();
@@ -262,6 +265,7 @@ impl FontRegistry {
     }
 
     /// New empty registry (no system scan yet).
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -333,7 +337,7 @@ impl FontRegistry {
                 if e.family.to_ascii_lowercase() == key {
                     let want = style_key.is_empty()
                         || e.style.to_ascii_lowercase().contains(&style_key)
-                        || style_matches(&style_key, &e.style);
+                        || style_matches(&style_key, e.style);
                     if want {
                         let p = dir.join(e.file);
                         if p.exists() {
@@ -385,7 +389,7 @@ impl FontRegistry {
             if let Some(dir) = Self::fonts_dir() {
                 for e in CATALOG {
                     if e.family.to_ascii_lowercase() == aliased
-                        && style_matches(&want_style, &e.style)
+                        && style_matches(&want_style, e.style)
                     {
                         let p = dir.join(e.file);
                         if p.exists() {
@@ -495,7 +499,7 @@ fn scan_dir(dir: &Path, out: &mut HashMap<String, HashMap<String, PathBuf>>) {
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
-            .map(|e| e.to_ascii_lowercase())
+            .map(str::to_ascii_lowercase)
             .unwrap_or_default();
         if !matches!(ext.as_str(), "ttf" | "otf") {
             continue;

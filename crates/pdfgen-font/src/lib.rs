@@ -125,7 +125,7 @@ impl LoadedFont {
         // WinAnsi byte -> Unicode -> glyph -> advance.
         let mut win_ansi_widths = [None::<u16>; 256];
         let mut any = false;
-        for byte in 0..=255usize {
+        for (byte, slot) in win_ansi_widths.iter_mut().enumerate() {
             let Some(unit) = winansi::unit_for_byte(byte as u8) else {
                 continue;
             };
@@ -134,7 +134,7 @@ impl LoadedFont {
                 continue;
             };
             if let Some(adv) = face.glyph_hor_advance(gid) {
-                win_ansi_widths[byte] = Some(adv);
+                *slot = Some(adv);
                 any = true;
             }
         }
@@ -162,11 +162,13 @@ impl LoadedFont {
     }
 
     /// Width of a WinAnsi-encoded byte in glyph units, if mapped.
+    #[must_use] 
     pub fn width_for_byte(&self, byte: u8) -> Option<u16> {
         self.win_ansi_widths[usize::from(byte)]
     }
 
     /// Width of a byte in points at the given font size.
+    #[must_use] 
     pub fn byte_width_pt(&self, byte: u8, size: f64) -> Option<f64> {
         self.width_for_byte(byte)
             .map(|w| f64::from(w) * size / f64::from(self.units_per_em))
@@ -203,15 +205,17 @@ impl LoadedFont {
     }
 
     /// True when the font's license flags restrict embedding.
+    #[must_use] 
     pub fn embedding_restricted(&self) -> bool {
         matches!(
             self.permissions,
-            Some(ttf_parser::Permissions::Restricted)
-                | Some(ttf_parser::Permissions::PreviewAndPrint)
+            Some(ttf_parser::Permissions::Restricted |
+ttf_parser::Permissions::PreviewAndPrint)
         )
     }
 
     /// Glyph ID for a Unicode character, for CID (Type0) encoding.
+    #[must_use] 
     pub fn glyph_index(&self, ch: char) -> Option<u16> {
         let face = ttf_parser::Face::parse(&self.raw, 0).ok()?;
         face.glyph_index(ch).map(|g| g.0)
@@ -225,6 +229,7 @@ impl LoadedFont {
     }
 
     /// Flag bits for `/Flags` in the font descriptor.
+    #[must_use] 
     pub fn descriptor_flags(&self) -> i64 {
         // 32 = non-symbolic.
         32
@@ -240,7 +245,7 @@ fn decode_name_record(data: &[u8], str_off: usize, rec_off: usize) -> Option<Str
     let off = u16::from_be_bytes([data[rec_off + 10], data[rec_off + 11]]) as usize;
     let raw = data.get(str_off + off..str_off + off + len)?;
     match (pid, eid) {
-        (0, _) | (3, 1) | (3, 10) => Some(decode_utf16be(raw)),
+        (0, _) | (3, 1 | 10) => Some(decode_utf16be(raw)),
         (1, 0) => Some(raw.iter().map(|&b| b as char).collect()),
         _ => None,
     }

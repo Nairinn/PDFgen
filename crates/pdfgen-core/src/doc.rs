@@ -19,6 +19,7 @@ pub struct Document {
 
 impl Document {
     /// New empty document.
+    #[must_use] 
     pub fn new() -> Self {
         Document::default()
     }
@@ -46,11 +47,13 @@ impl Document {
     }
 
     /// Borrow an object by reference, if assigned.
+    #[must_use] 
     pub fn get(&self, r: Ref) -> Option<&Object> {
         self.objects.get(r.id as usize - 1).and_then(|o| o.as_ref())
     }
 
     /// Number of allocated objects (the future `/Size`, including slot 0).
+    #[must_use] 
     pub fn size(&self) -> u32 {
         self.objects.len() as u32 + 1
     }
@@ -116,6 +119,7 @@ impl Document {
     }
 }
 
+#[allow(clippy::only_used_in_recursion)]
 fn check_no_nested_stream(obj: &Object, container: u32) -> Result<(), CoreError> {
     match obj {
         Object::Array(items) => {

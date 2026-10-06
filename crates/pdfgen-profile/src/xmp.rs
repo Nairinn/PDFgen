@@ -24,6 +24,7 @@ fn xml_escape(s: &str) -> String {
 /// The packet always carries the PDF/UA identifier when the document is
 /// compliant; when it is not, `claim_ua` is false and the packet instead
 /// records the document's accessibility status without claiming conformance.
+#[must_use] 
 pub fn build(meta: &Metadata, ua_part: u32, claim_ua: bool) -> Vec<u8> {
     let mut rdf = String::new();
 
@@ -41,7 +42,7 @@ pub fn build(meta: &Metadata, ua_part: u32, claim_ua: bool) -> Vec<u8> {
     }
 
     // Dublin Core: title, creator, description.
-    if meta.title.as_deref().map(str::is_empty) != Some(true) {
+    if meta.title.as_deref().is_none_or(|x| !str::is_empty(x)) {
         rdf.push_str(
             "<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n",
         );

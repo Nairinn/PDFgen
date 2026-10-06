@@ -35,6 +35,7 @@ pub struct Report {
 
 impl Report {
     /// True when no machine failures were found.
+    #[must_use] 
     pub fn is_clean(&self) -> bool {
         self.findings.is_empty()
     }
@@ -96,14 +97,14 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
                         context: "document".into(),
                     });
                 }
-                if !text.contains("dc:title") {
+                if text.contains("dc:title") {
+                    review.push("06-004: Confirm the dc:title clearly identifies the document");
+                } else {
                     findings.push(Finding {
                         id: "06-003".into(),
                         message: "XMP metadata does not contain dc:title".into(),
                         context: "document".into(),
                     });
-                } else {
-                    review.push("06-004: Confirm the dc:title clearly identifies the document");
                 }
             }
         }

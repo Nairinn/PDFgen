@@ -119,6 +119,7 @@ impl<'a> Page<'a> {
     }
 
     /// Remaining vertical space to the bottom margin.
+    #[must_use] 
     pub fn remaining(&self) -> f64 {
         self.y - self.margin
     }

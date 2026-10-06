@@ -4,6 +4,7 @@
 
 /// Decode one literal string starting at `i` (content[i] == b'(').
 /// Returns the decoded bytes and the index just past the closing paren.
+#[must_use] 
 pub fn read_literal(content: &[u8], i: usize) -> Option<(Vec<u8>, usize)> {
     if i >= content.len() || content[i] != b'(' {
         return None;
@@ -94,6 +95,7 @@ pub fn read_literal(content: &[u8], i: usize) -> Option<(Vec<u8>, usize)> {
 /// Decode one hex string starting at `i` (content[i] == b'<', with the
 /// next byte not b'<'). Returns the decoded bytes and the index just
 /// past the closing b'>'.
+#[must_use] 
 pub fn read_hex(content: &[u8], i: usize) -> Option<(Vec<u8>, usize)> {
     if i >= content.len() || content[i] != b'<' {
         return None;

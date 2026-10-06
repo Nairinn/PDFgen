@@ -134,7 +134,7 @@ pub fn commit(path: impl AsRef<Path>, message: &str, author: &str) -> Result<Com
     xref.push_str(&format!("xref\n0 {new_size}\n"));
     xref.push_str("0000000000 65535 f \n");
     let mut map: std::collections::HashMap<u32, u64> =
-        std::collections::HashMap::from_iter(offsets.iter().cloned());
+        std::collections::HashMap::from_iter(offsets.iter().copied());
     map.insert(record_num, record_off);
     for id in 1..new_size {
         match map.get(&id) {
@@ -299,7 +299,7 @@ fn last_startxref(data: &[u8]) -> Option<u64> {
     let digits: String = String::from_utf8_lossy(&data[pos + 9..])
         .trim_start()
         .chars()
-        .take_while(|c| c.is_ascii_digit())
+        .take_while(char::is_ascii_digit)
         .collect();
     digits.parse::<u64>().ok()
 }
@@ -336,8 +336,7 @@ fn revision_meta(prefix: &[u8]) -> Option<(String, String, String)> {
 fn now_rfc3339() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_secs());
     let days = secs / 86_400;
     let tod = secs % 86_400;
     let (y, m, d) = civil_from_days(days as i64);

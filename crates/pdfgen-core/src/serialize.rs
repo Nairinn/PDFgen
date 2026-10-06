@@ -4,6 +4,7 @@ use crate::{Dict, Name, Object, PdfString, Real, Stream};
 
 /// Format a real number the way PDF requires: plain decimal, no exponent,
 /// no trailing zero past the decimal point, max 4 fractional digits.
+#[must_use] 
 pub fn fmt_real(v: f64) -> String {
     if !v.is_finite() {
         return "0".to_string();

@@ -49,7 +49,7 @@ fn build_predicted_pdf() -> Vec<u8> {
     let n_rows = rows.len();
     let mut raw_rows = Vec::with_capacity(n_rows * (row_len + 1));
     let mut prev_row = vec![0u8; row_len];
-    for (t, f1, f2) in rows.iter() {
+    for (t, f1, f2) in &rows {
         let mut cur = vec![0u8; row_len];
         cur[0] = *t;
         cur[1..5].copy_from_slice(&(*f1 as u32).to_be_bytes());
@@ -92,7 +92,7 @@ fn build_predicted_pdf() -> Vec<u8> {
     ];
     let mut raw_rows2 = Vec::with_capacity(6 * (row_len + 1));
     let mut prev_row = vec![0u8; row_len];
-    for (t, f1, f2) in rows2.iter() {
+    for (t, f1, f2) in &rows2 {
         let mut cur = vec![0u8; row_len];
         cur[0] = *t;
         cur[1..5].copy_from_slice(&(*f1 as u32).to_be_bytes());
@@ -121,9 +121,7 @@ fn build_predicted_pdf() -> Vec<u8> {
     let o6_final = o6; // assumed stable
 
     pdf.extend_from_slice(
-        format!(
-            "6 0 obj\n<< /Type /XRef /Size 7 /Index [1 6] /W [1 4 2] /Root 1 0 R /Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 7 >> /Length 5 0 R >>\nstream\n"
-        )
+        "6 0 obj\n<< /Type /XRef /Size 7 /Index [1 6] /W [1 4 2] /Root 1 0 R /Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 7 >> /Length 5 0 R >>\nstream\n".to_string()
         .as_bytes(),
     );
     pdf.extend_from_slice(&compressed2);

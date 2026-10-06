@@ -62,6 +62,7 @@ pub struct Document {
 impl Document {
     /// New document targeting a profile.
     #[uniffi::constructor]
+    #[must_use] 
     pub fn new(profile: Profile) -> Arc<Self> {
         Arc::new(Document {
             inner: PdfDocument::new(profile.into()),
@@ -70,6 +71,7 @@ impl Document {
 
     /// New document with title and language set.
     #[uniffi::constructor]
+    #[must_use] 
     pub fn new_with(profile: Profile, title: String, lang: String) -> Arc<Self> {
         let inner = PdfDocument::new(profile.into());
         inner.set_title(&title);
@@ -209,6 +211,7 @@ pub struct VersionInfo {
 
 /// Library version metadata.
 #[uniffi::export]
+#[must_use] 
 pub fn version() -> VersionInfo {
     VersionInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),

@@ -3,6 +3,7 @@
 //! and the head checkSumAdjustment fix.
 
 /// Largest power of two <= n (directory searchRange math).
+#[must_use] 
 pub fn max_pow2(mut n: usize) -> usize {
     let mut p = 1usize;
     while p * 2 <= n {
@@ -24,6 +25,7 @@ pub fn write_directory_search(out: &mut [u8], num_tables: usize) {
 
 /// Big-endian u32 sum of `bytes` zero-padded to a 4-byte boundary (the
 /// sfnt table checksum).
+#[must_use] 
 pub fn sum32(bytes: &[u8]) -> u32 {
     let mut sum: u32 = 0;
     let mut i = 0;

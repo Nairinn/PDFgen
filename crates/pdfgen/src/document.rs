@@ -50,6 +50,7 @@ pub struct Document {
 
 impl Document {
     /// New document targeting a profile.
+    #[must_use] 
     pub fn new(profile: Profile) -> Self {
         Document {
             profile,
@@ -63,8 +64,8 @@ impl Document {
             bookmarks: Vec::new(),
             flow_y: None,
             flow_page: 0,
-            cid_fonts: Default::default(),
-            winansi_used: Default::default(),
+            cid_fonts: std::collections::BTreeMap::new(),
+            winansi_used: std::collections::BTreeMap::new(),
             want_outline: true,
             fields: Vec::new(),
         }
@@ -138,7 +139,7 @@ impl Document {
     pub fn font(&mut self, family: &str, style: &str) -> Result<usize, Box<dyn std::error::Error>> {
         let (f, resolved) = self.registry.load(family, style)?;
         if resolved.substituted
-            && resolved.family.to_ascii_lowercase() != family.to_ascii_lowercase()
+            && !resolved.family.eq_ignore_ascii_case(family)
         {
             self.substitutions
                 .push((family.to_string(), resolved.family.clone()));
@@ -246,8 +247,7 @@ impl Document {
             .meta
             .title
             .as_deref()
-            .map(str::trim)
-            .unwrap_or("")
+            .map_or("", str::trim)
             .is_empty()
         {
             v.push(pdfgen_profile::rules::violation(
@@ -313,6 +313,7 @@ impl Document {
     /// Serialize the document, write it to `path`, and return the
     /// accessibility report. The file is always written — compliance issues
     /// go into the report, and the file simply does not claim PDF/UA.
+    #[allow(clippy::too_many_lines)]
     pub fn save(&mut self, path: &str) -> Result<SaveReport, Box<dyn std::error::Error>> {
         // The output directory may not exist yet (fresh clone, CI); a
         // missing parent should never fail the write.
@@ -348,15 +349,9 @@ impl Document {
                 cid_refs.push(None);
                 continue;
             }
-            let r = match win_used {
-                Some(used) => Some(Self::emit_font(&mut doc, f, used)),
-                None => None,
-            };
+            let r = win_used.map(|used| Self::emit_font(&mut doc, f, used));
             font_refs.push(r);
-            cid_refs.push(match cid_used {
-                Some(used) => Some(Self::emit_font_type0(&mut doc, f, used)),
-                None => None,
-            });
+            cid_refs.push(cid_used.map(|used| Self::emit_font_type0(&mut doc, f, used)));
         }
         let mut font_res = Dict::new();
         for (i, r) in font_refs.iter().enumerate() {
@@ -422,7 +417,8 @@ impl Document {
 
         // Recursive emit: allocate refs for children depth-first while
         // building the parent dict, keeping node<->ref pairs in lockstep.
-        fn emit(
+        #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+    fn emit(
             doc: &mut pdfgen_core::Document,
             node: &Node,
             r: Ref,
@@ -832,6 +828,7 @@ impl Document {
     /// Emit a Type0 (composite) font with a CIDFontType2 descendant for
     /// text that WinAnsi cannot encode. `used` carries the (char, glyph)
     /// pairs actually drawn; widths and ToUnicode cover exactly those.
+    #[allow(clippy::too_many_lines)]
     fn emit_font_type0(
         doc: &mut pdfgen_core::Document,
         f: &LoadedFont,

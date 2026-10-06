@@ -60,6 +60,9 @@ unsafe fn ok_or_err<T>(r: Result<T, String>, out: *mut T) -> *mut c_char {
 /// [`pdfgen_destroy`]. Never block: an untagged/incomplete document is a
 /// save-time report, not an error here.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_create(profile: u32, out: *mut *mut PdfDocument) -> *mut c_char {
     let p = match profile {
         0 => TargetProfile::Ua1,
@@ -76,6 +79,9 @@ pub unsafe extern "C" fn pdfgen_create(profile: u32, out: *mut *mut PdfDocument)
 /// Destroy a document handle created by [`pdfgen_create`]. NULL is a
 /// no-op.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_destroy(doc: *mut PdfDocument) {
     if !doc.is_null() {
         unsafe { drop(Box::from_raw(doc)) };
@@ -84,6 +90,9 @@ pub unsafe extern "C" fn pdfgen_destroy(doc: *mut PdfDocument) {
 
 /// Set the document title.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_set_title(
     doc: *mut PdfDocument,
     title: *const c_char,
@@ -103,6 +112,9 @@ pub unsafe extern "C" fn pdfgen_set_title(
 
 /// Set the primary natural language.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_set_lang(
     doc: *mut PdfDocument,
     lang: *const c_char,
@@ -129,6 +141,9 @@ unsafe fn doc_mut(doc: *mut PdfDocument) -> Result<&'static mut PdfDocument, *mu
 
 /// Resolve a font by family + style; `out` receives the handle index.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_font(
     doc: *mut PdfDocument,
     family: *const c_char,
@@ -152,6 +167,9 @@ pub unsafe extern "C" fn pdfgen_font(
 
 /// Load a font file directly by path.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_load_font_file(
     doc: *mut PdfDocument,
     path: *const c_char,
@@ -170,6 +188,9 @@ pub unsafe extern "C" fn pdfgen_load_font_file(
 
 /// Register a font file under a family name.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_register_font(
     doc: *mut PdfDocument,
     family: *const c_char,
@@ -198,6 +219,9 @@ pub unsafe extern "C" fn pdfgen_register_font(
 
 /// Heading (level 1-6) in the default font.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_heading(
     doc: *mut PdfDocument,
     level: u8,
@@ -215,6 +239,9 @@ pub unsafe extern "C" fn pdfgen_heading(
 
 /// Paragraph in the default font.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_paragraph(
     doc: *mut PdfDocument,
     text: *const c_char,
@@ -231,6 +258,9 @@ pub unsafe extern "C" fn pdfgen_paragraph(
 
 /// Paragraph in a specific font handle and size.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_paragraph_in(
     doc: *mut PdfDocument,
     font: u32,
@@ -249,6 +279,9 @@ pub unsafe extern "C" fn pdfgen_paragraph_in(
 
 /// Release a Rust-owned string (error messages, report fields).
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_free(s: *mut c_char) {
     if !s.is_null() {
         unsafe { drop(CString::from_raw(s)) };
@@ -259,6 +292,9 @@ pub unsafe extern "C" fn pdfgen_free(s: *mut c_char) {
 /// 0 = profile name, 1 = note, 2 = violations ("id|message|fix" lines),
 /// 3 = human review items (one per line). Returns a Rust-owned string.
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_report_field(report: *const Report, which: u32) -> *mut c_char {
     if report.is_null() {
         return err("null report handle");
@@ -284,6 +320,9 @@ pub unsafe extern "C" fn pdfgen_report_field(report: *const Report, which: u32) 
 
 /// Convenience: is the saved report compliant?
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_report_compliant(report: *const Report) -> bool {
     if report.is_null() {
         return false;
@@ -296,6 +335,9 @@ pub unsafe extern "C" fn pdfgen_report_compliant(report: *const Report) -> bool 
 /// strings from it) with [`pdfgen_free_report`]. Returns NULL on success
 /// (the report still arrives via `out` even then).
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_save(
     doc: *mut PdfDocument,
     path: *const c_char,
@@ -322,6 +364,9 @@ pub unsafe extern "C" fn pdfgen_save(
 
 /// Free a report handle from [`pdfgen_save`].
 #[no_mangle]
+/// # Safety
+/// `doc` must be a pointer returned by `pdfgen_create` and not yet
+/// destroyed; string pointers must be valid UTF-8 or NULL.
 pub unsafe extern "C" fn pdfgen_free_report(report: *mut Report) {
     if !report.is_null() {
         unsafe { drop(Box::from_raw(report)) };
