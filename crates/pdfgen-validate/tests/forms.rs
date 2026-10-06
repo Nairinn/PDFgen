@@ -1,7 +1,7 @@
 //! Negative case: an AcroForm field without /TU must be flagged (28-001),
 //! and a field with a JS action must be flagged (28-002).
 
-use pdfgen_core::{Dict, Object, PdfString, PdfVersion, Ref, Stream};
+use pdfgen_core::{Dict, Object, PdfString, PdfVersion};
 
 fn out(name: &str) -> String {
     format!("{}/../../tests/output/{name}", env!("CARGO_MANIFEST_DIR"))

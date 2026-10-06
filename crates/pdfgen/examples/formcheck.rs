@@ -1,3 +1,6 @@
+//! Small end-to-end example: build a service-request form and
+//! print the accessibility report status.
+
 fn main() {
     let mut doc = pdfgen::Document::new(pdfgen::Profile::PdfUa1);
     doc.title("Service Request Form").lang("en-US");

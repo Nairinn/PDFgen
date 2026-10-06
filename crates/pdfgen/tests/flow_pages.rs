@@ -12,8 +12,9 @@ fn out(name: &str) -> String {
 fn flow_calls_share_one_page() {
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Flow continuity").lang("en-US");
-    doc.load_font("/System/Library/Fonts/Supplemental/Arial.ttf")
-        .unwrap();
+    // The bundled catalog font resolves on every platform - no system
+    // font dependency for CI runners.
+    doc.font("Liberation Sans", "Regular").unwrap();
     doc.flow_heading(1, "Heading").unwrap();
     doc.flow_paragraph("First paragraph body text.").unwrap();
     doc.flow_paragraph("Second paragraph body text.").unwrap();
@@ -42,14 +43,9 @@ fn flow_calls_share_one_page() {
 /// P0-3: saving twice must produce identical, non-blank output.
 #[test]
 fn save_twice_produces_identical_output() {
-    const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: no Arial on this machine");
-        return;
-    }
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Save twice").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.font("Liberation Sans", "Regular").unwrap();
     doc.flow_heading(1, "Persistent heading").unwrap();
     doc.flow_paragraph("This content must survive the first save intact.")
         .unwrap();
@@ -73,8 +69,7 @@ fn save_twice_produces_identical_output() {
 fn explicit_pages_keep_own_sizes() {
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Mixed sizes").lang("en-US");
-    doc.load_font("/System/Library/Fonts/Supplemental/Arial.ttf")
-        .unwrap();
+    doc.font("Liberation Sans", "Regular").unwrap();
 
     {
         let mut p1 = doc.add_page(300.0, 300.0);
