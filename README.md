@@ -83,15 +83,16 @@ reimplementation from the ISO specifications with different priorities:
 | Reader | Classic + xref-stream + hybrid xref, lazy resolution, repair mode for broken files |
 | Retag | Import any PDF, extract text, auto/manual tagging, save compliant |
 | Reports | Machine checks with Matterhorn IDs + human-review checklist on every save |
-| Bindings | Python (PyO3, abi3 ≥ 3.9, `PdfUaWarning` on non-compliant saves) and Kotlin/Java (UniFFI + JNA, Java 11+) — both generate veraPDF-valid PDFs |
+| Bindings | Python (PyO3, abi3 ≥ 3.9, `PdfUaWarning` on non-compliant saves), Kotlin/Java (UniFFI + JNA, Java 11+), and Java 22+ (`java.lang.foreign` FFM, no JNI/JNA) — all generate veraPDF-valid PDFs |
+| CID fonts | Text WinAnsi can't encode flows through Type0 Identity-H composite fonts automatically (Myanmar, Korean, Greek, CJK); TTC collections sliced to standalone programs |
 
 ## What's coming next
 
 - **More Matterhorn checks** (page/object level: 15-x tables, 16-x headings, 28-x annotations)
-- **ISO drawing conventions** (5457 sheets, 128 lines, 129 dimensions) on the same kit
 - **More catalog fonts** (Noto scripts, accessibility faces), CID subsetting
   for complex scripts
-- **Java 22+ FFM bindings**; Maven Central, PyPI and crates.io publishing
+- **Rendering** (display/print pipeline: rasterize pages, send to a printer)
+- Maven Central, PyPI and crates.io publishing
 - Full plan with milestones: [`docs/PLAN.md`](docs/PLAN.md)
 
 ## Layout
@@ -111,9 +112,12 @@ crates/
   pdfgen-uniffi    Kotlin/Java bindings (UniFFI)
   pdfgen-validate  Matterhorn machine checks (the `pdfgen validate` engine)
   pdfgen-revision  commit / history / diff / revert inside the PDF
-  pdfgen-draw      ASME Y14 drawing kit (sheets, title block, dimensions)
+  pdfgen-draw      ASME Y14 + ISO 5457 drawing kit (sheets, title block,
+                  dimensions, revision block)
+  pdfgen-ffi       C-ABI layer (cdylib) consumed by the Java FFM binding
   pdfgen-cli       the `pdfgen` command-line tool
-fonts/vendor/      bundled OFL fonts (Liberation family)
+fonts/vendor/      bundled OFL fonts (Liberation, Noto)
+bindings/          kotlin (UniFFI/JNA), java (FFM), python (PyO3 wheel)
 tests/output/      generated PDFs (gitignored) — all veraPDF-validated
 tools/verapdf/     local veraPDF install used as the external checker
 ```
