@@ -130,8 +130,6 @@ pub struct StreamWriter {
     images: Vec<crate::image::Image>,
     /// Image XObject object ids; 0 = not yet written.
     image_ids: Vec<u32>,
-    /// Images placed but not yet drawn: (image index, w, h, page, y, mcid).
-    pending_images: Vec<(usize, f64, f64, usize, f64, u32)>,
 }
 
 /// A structure element being built.
@@ -202,7 +200,6 @@ impl StreamWriter {
             scratch: String::with_capacity(4096),
             images: Vec::new(),
             image_ids: Vec::new(),
-            pending_images: Vec::new(),
         })
     }
 
@@ -250,30 +247,7 @@ impl StreamWriter {
             }
             StreamEvent::End => {
                 let elem = self.open.pop().ok_or(StreamError::NoElementToClose)?;
-                let idx = self.elems.len() as u32;
-                for &(page, mcid) in &elem.pieces {
-                    while self.mcid_map.len() <= page {
-                        self.mcid_map.push(Vec::new());
-                    }
-                    let row = &mut self.mcid_map[page];
-                    while row.len() <= mcid as usize {
-                        row.push(None);
-                    }
-                    row[mcid as usize] = Some(idx);
-                }
-                self.elems.push(ElemRecord {
-                    tag: elem.tag,
-                    alt: elem.alt,
-                    pieces: elem.pieces,
-                    children: elem.children,
-                    scope: elem.scope,
-                });
-                // Nest under the parent: a completed element becomes a
-                // CHILD of the innermost still-open element (lists hold
-                // LIs, LIs hold Lbl/LBody, tables hold TRs...).
-                if let Some(parent) = self.open.last_mut() {
-                    parent.children.push(idx);
-                }
+                self.record_elem(elem);
             }
             StreamEvent::PageBreak => self.flush_page()?,
             StreamEvent::Image {
@@ -281,27 +255,81 @@ impl StreamWriter {
                 width,
                 height,
             } => {
-                // Load and register the image; ids are assigned at finish
-                // in registration order, so record the index only.
+                // Load and register the image; the XObject is written on
+                // first use at the next page flush.
                 let img = crate::image::Image::load(&path)
                     .map_err(|e| StreamError::Font(e.to_string()))?;
                 let idx = self.images.len();
                 self.images.push(img);
                 self.image_ids.push(0);
-                // Reserve space on the current page and grab an MCID now.
+                // Reserve space, grab an MCID, and draw NOW: the draw op
+                // and the Figure's EMC go straight into the page content
+                // so later text cannot nest inside the Figure.
                 let page = self.page_ids.len();
                 let y = self.y - height;
                 let mcid = self.next_mcid;
                 self.next_mcid += 1;
-                self.page_content
-                    .push_str(&format!("/Figure <</MCID {mcid}>> BDC\n"));
-                // Placeholder draw op appended at flush; record placement.
-                self.pending_images
-                    .push((idx, width, height, page, y, mcid));
+                let mut op = format!(
+                    "/Figure <</MCID {mcid}>> BDC\nq {} 0 0 {} {} {} cm /Im{idx} Do Q\nEMC\n",
+                    pdfgen_core::fmt_real(width),
+                    pdfgen_core::fmt_real(height),
+                    pdfgen_core::fmt_real(MARGIN),
+                    pdfgen_core::fmt_real(y)
+                );
+                self.page_content.push_str(&op);
+                op.clear();
+                // The figure piece belongs to the open element (or its own
+                // top-level element when none is open) for the ParentTree.
+                let piece = (page, mcid);
+                match self.open.last_mut() {
+                    Some(elem) => elem.pieces.push(piece),
+                    None => {
+                        // Standalone figure: make it a top-level element.
+                        self.open.push(OpenElem {
+                            tag: "Figure".into(),
+                            alt: None,
+                            pieces: vec![piece],
+                            children: Vec::new(),
+                            scope: None,
+                        });
+                        // Close it right away.
+                        let elem = self.open.pop().expect("just pushed");
+                        self.record_elem(elem);
+                    }
+                }
                 self.y = y;
             }
         }
         Ok(())
+    }
+
+    /// Move a finished element into the record list, register its MCIDs in
+    /// the ParentTree map, and nest it under the still-open parent.
+    fn record_elem(&mut self, elem: OpenElem) {
+        let idx = self.elems.len() as u32;
+        for &(page, mcid) in &elem.pieces {
+            while self.mcid_map.len() <= page {
+                self.mcid_map.push(Vec::new());
+            }
+            let row = &mut self.mcid_map[page];
+            while row.len() <= mcid as usize {
+                row.push(None);
+            }
+            row[mcid as usize] = Some(idx);
+        }
+        // Nest under the parent: a completed element becomes a CHILD of
+        // the innermost still-open element (lists hold LIs, LIs hold
+        // Lbl/LBody, tables hold TRs...).
+        if let Some(parent) = self.open.last_mut() {
+            parent.children.push(idx);
+        }
+        self.elems.push(ElemRecord {
+            tag: elem.tag,
+            alt: elem.alt,
+            pieces: elem.pieces,
+            children: elem.children,
+            scope: elem.scope,
+        });
     }
 
     /// Draw wrapped lines inside marked content, splitting across page
@@ -428,28 +456,8 @@ impl StreamWriter {
         if self.page_content.is_empty() {
             return Ok(());
         }
-        // Pending image draw ops on THIS page: (idx, w, h, page, y, mcid).
-        let page_idx_now = self.page_ids.len();
-        let draws: Vec<(usize, f64, f64, usize, f64, u32)> = self
-            .pending_images
-            .iter()
-            .filter(|(_, _, _, pg, _, _)| *pg == page_idx_now)
-            .copied()
-            .collect();
-        for (idx, w, h, _pg, y, _mcid) in draws {
-            use std::fmt::Write as _;
-            let mut scratch = std::mem::take(&mut self.scratch);
-            let _ = write!(
-                scratch,
-                "q {} 0 0 {} {} {} cm /Im{idx} Do Q\nEMC\n",
-                pdfgen_core::fmt_real(w),
-                pdfgen_core::fmt_real(h),
-                pdfgen_core::fmt_real(MARGIN),
-                pdfgen_core::fmt_real(y)
-            );
-            self.page_content.push_str(&scratch);
-            self.scratch = scratch;
-        }
+        // Image draw ops are emitted inline at the Image event; nothing
+        // is deferred to flush.
 
         let content_id = self.alloc();
         let raw = std::mem::take(&mut self.page_content).into_bytes();
@@ -474,23 +482,22 @@ impl StreamWriter {
         let mut res = Dict::new();
         res.set("Font", Object::Dict(font_res));
 
-        // Emit image XObjects once, before this page's object serializes,
-        // so the Resources dictionary carries real ids.
+        // Emit image XObjects ONCE each (id 0 = not yet written), before
+        // this page's Resources serializes, so they carry real ids.
         if !self.images.is_empty() {
-            let images = std::mem::take(&mut self.images);
-            let ids_now: Vec<u32> = (0..images.len()).map(|_| self.alloc()).collect();
-            for (img, &xid) in images.iter().zip(&ids_now) {
-                emit_image_xobject(self, xid, img)?;
-            }
-            for (i, xid) in ids_now.iter().enumerate() {
-                self.image_ids[i] = *xid;
+            for i in 0..self.images.len() {
+                if self.image_ids[i] == 0 {
+                    let xid = self.alloc();
+                    let img = self.images[i].clone();
+                    emit_image_xobject(self, xid, &img)?;
+                    self.image_ids[i] = xid;
+                }
             }
             let mut xobj = Dict::new();
             for (i, &xid) in self.image_ids.iter().enumerate() {
                 xobj.set(format!("Im{i}"), Object::Ref(Ref::new(xid)));
             }
             res.set("XObject", Object::Dict(xobj));
-            self.images = images;
         }
         let mut pg = Dict::new();
         pg.set("Type", "Page");
