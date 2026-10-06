@@ -250,25 +250,19 @@ impl Document {
             .unwrap_or("")
             .is_empty()
         {
-            v.push(Violation {
-                id: "06-003".into(),
-                message: "XMP metadata stream does not contain dc:title".into(),
-                fix: "Call doc.title(\"…\") with a meaningful document title.".into(),
-            });
+            v.push(pdfgen_profile::rules::violation(
+                pdfgen_profile::rules::MISSING_TITLE,
+            ));
         }
         if self.meta.lang.is_none() {
-            v.push(Violation {
-                id: "11-006".into(),
-                message: "Natural language for the document cannot be determined".into(),
-                fix: "Call doc.lang(\"en-US\") (or the document's language).".into(),
-            });
+            v.push(pdfgen_profile::rules::violation(
+                pdfgen_profile::rules::MISSING_LANG,
+            ));
         }
         if self.pages.iter().all(|p| p.nodes.is_empty()) {
-            v.push(Violation {
-                id: "01-006".into(),
-                message: "No content has been tagged: the structure tree would be empty".into(),
-                fix: "Add at least one heading or paragraph before saving.".into(),
-            });
+            v.push(pdfgen_profile::rules::violation(
+                pdfgen_profile::rules::NO_TAGGED_CONTENT,
+            ));
         }
         for pd in &self.pages {
             for node in &pd.nodes {

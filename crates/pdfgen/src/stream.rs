@@ -581,31 +581,25 @@ impl StreamWriter {
     pub fn finish(mut self) -> Result<pdfgen_profile::SaveReport, StreamError> {
         self.flush_page()?;
 
-        let compliant =
-            !self.title.trim().is_empty() && !self.lang.is_empty() && !self.elems.is_empty();
+        // The same centralized rules the flow writer uses (pdfgen-profile
+        // rules:: table); compliance derives from the violations.
         let mut violations: Vec<pdfgen_profile::Violation> = Vec::new();
         if self.title.trim().is_empty() {
-            violations.push(pdfgen_profile::Violation {
-                id: "06-003".into(),
-                message: "XMP metadata stream does not contain dc:title".into(),
-                fix: "Pass a title to StreamWriter::create.".into(),
-            });
+            violations.push(pdfgen_profile::rules::violation(
+                pdfgen_profile::rules::MISSING_TITLE,
+            ));
         }
         if self.lang.is_empty() {
-            violations.push(pdfgen_profile::Violation {
-                id: "11-006".into(),
-                message: "Natural language cannot be determined".into(),
-                fix: "Pass a language to StreamWriter::create.".into(),
-            });
+            violations.push(pdfgen_profile::rules::violation(
+                pdfgen_profile::rules::MISSING_LANG,
+            ));
         }
         if self.elems.is_empty() {
-            violations.push(pdfgen_profile::Violation {
-                id: "01-006".into(),
-                message: "No content has been tagged".into(),
-                fix: "Push Begin/Text/End events before finishing.".into(),
-            });
+            violations.push(pdfgen_profile::rules::violation(
+                pdfgen_profile::rules::NO_TAGGED_CONTENT,
+            ));
         }
-        let status = if compliant {
+        let status = if violations.is_empty() {
             pdfgen_profile::Status::Compliant
         } else {
             pdfgen_profile::Status::NotCompliantYet
@@ -786,7 +780,8 @@ impl StreamWriter {
             authors: Vec::new(),
             description: None,
         };
-        let xmp_bytes = pdfgen_profile::xmp::build(&meta, self.profile.ua_part(), compliant);
+        let xmp_bytes =
+            pdfgen_profile::xmp::build(&meta, self.profile.ua_part(), violations.is_empty());
         let xmp = Stream {
             dict: Dict::new().with("Type", "Metadata").with("Subtype", "XML"),
             data: xmp_bytes,

@@ -54,6 +54,39 @@ impl Profile {
     }
 }
 
+/// Writer-side machine checks, centralized so Document::violations and
+/// StreamWriter::finish emit identical IDs and messages. IDs are
+/// Matterhorn 1.1 checkpoints.
+pub mod rules {
+    /// Missing XMP dc:title (Matterhorn 06-003).
+    pub const MISSING_TITLE: (&str, &str, &str) = (
+        "06-003",
+        "XMP metadata stream does not contain dc:title",
+        "Call doc.title(\"…\") with a meaningful document title.",
+    );
+    /// Document language not declared (Matterhorn 11-001).
+    pub const MISSING_LANG: (&str, &str, &str) = (
+        "11-001",
+        "Natural language for the document cannot be determined",
+        "Call doc.lang(\"en-US\") (or the document's language).",
+    );
+    /// Nothing tagged (Matterhorn 01-006).
+    pub const NO_TAGGED_CONTENT: (&str, &str, &str) = (
+        "01-006",
+        "No content has been tagged: the structure tree would be empty",
+        "Add at least one heading or paragraph before saving.",
+    );
+
+    /// Build a Violation from a (id, message, fix) tuple.
+    pub fn violation(t: (&str, &str, &str)) -> super::Violation {
+        super::Violation {
+            id: t.0.into(),
+            message: t.1.into(),
+            fix: t.2.into(),
+        }
+    }
+}
+
 /// One accessibility issue found while saving.
 #[derive(Debug, Clone)]
 pub struct Violation {
