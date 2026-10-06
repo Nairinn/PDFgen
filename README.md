@@ -89,9 +89,10 @@ reimplementation from the ISO specifications with different priorities:
 ## What's coming next
 
 - **More Matterhorn checks** (page/object level: 15-x tables, 16-x headings, 28-x annotations)
-- **More catalog fonts** (Noto scripts, accessibility faces), CID subsetting
-  for complex scripts
-- **Rendering** (display/print pipeline: rasterize pages, send to a printer)
+- **CID subsetting** (shrink embedded fonts to used glyphs)
+- **CJK fonts** (CFF/OTF embedding via FontFile3 for Noto Sans CJK)
+- **Accessibility fonts** (OpenDyslexic, Atkinson Hyperlegible) in the catalog
+- ~~Rendering~~ (done: `pdfgen render` / `pdfgen print`, embedded-font glyph rasterizer)
 - Maven Central, PyPI and crates.io publishing
 - Full plan with milestones: [`docs/PLAN.md`](docs/PLAN.md)
 
@@ -116,7 +117,7 @@ crates/
                   dimensions, revision block)
   pdfgen-ffi       C-ABI layer (cdylib) consumed by the Java FFM binding
   pdfgen-cli       the `pdfgen` command-line tool
-fonts/vendor/      bundled OFL fonts (Liberation, Noto)
+fonts/vendor/      bundled OFL fonts (Liberation, Noto incl. Myanmar/Thai/Arabic)
 bindings/          kotlin (UniFFI/JNA), java (FFM), python (PyO3 wheel)
 tests/output/      generated PDFs (gitignored) — all veraPDF-validated
 tools/verapdf/     local veraPDF install used as the external checker

@@ -752,7 +752,6 @@ impl Document {
         let desc = doc.alloc(); // CIDFontType2
         let fdesc = doc.alloc(); // FontDescriptor
         let ffile = doc.alloc(); // FontFile2
-        let cidtogid = doc.alloc();
         let ftouni = doc.alloc();
 
         // Font file (full embed; subsetting comes later).
@@ -764,20 +763,9 @@ impl Document {
             ),
         );
 
-        // CIDToGIDMap stream: 2 bytes per CID from 0..=max_gid.
-        let max_gid = used.iter().map(|(_, g)| *g).max().unwrap_or(0);
-        let mut map = vec![0u8; (usize::from(max_gid) + 1) * 2];
-        for &(_, g) in used {
-            let off = usize::from(g) * 2;
-            map[off..off + 2].copy_from_slice(&g.to_be_bytes());
-        }
-        doc.set_stream(
-            cidtogid,
-            Stream::new(
-                Dict::new().with("Filter", "FlateDecode"),
-                flate_compress(&map),
-            ),
-        );
+        // CIDToGIDMap: CIDs are glyph IDs directly (Identity-H), so the
+        // standard /Identity name applies — no stream needed. A stream
+        // map makes validators re-resolve glyphs and disagree.
 
         // ToUnicode CMap: 2-byte CID codes only (Identity-H); including
         // 1-byte codes here corrupts the codespace.
@@ -870,7 +858,7 @@ impl Document {
             ),
         );
         cid_font.set("FontDescriptor", fdesc);
-        cid_font.set("CIDToGIDMap", cidtogid);
+        cid_font.set("CIDToGIDMap", "Identity");
         // W: [ gid w gid w ... ] pairs (per-glyph widths in glyph units).
         cid_font.set("W", Object::Array(warray));
         doc.set(desc, Object::Dict(cid_font));

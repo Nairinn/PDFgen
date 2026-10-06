@@ -49,6 +49,12 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry { family: "Noto Serif", style: "Bold", file: "vendor/noto/NotoSerif-Bold.ttf" },
     CatalogEntry { family: "Noto Sans Mono", style: "Regular", file: "vendor/noto/NotoSansMono-Regular.ttf" },
     CatalogEntry { family: "Noto Sans Mono", style: "Bold", file: "vendor/noto/NotoSansMono-Bold.ttf" },
+    CatalogEntry { family: "Noto Sans Myanmar", style: "Regular", file: "vendor/noto/NotoSansMyanmar-Regular.ttf" },
+    CatalogEntry { family: "Noto Sans Myanmar", style: "Bold", file: "vendor/noto/NotoSansMyanmar-Bold.ttf" },
+    CatalogEntry { family: "Noto Sans Thai", style: "Regular", file: "vendor/noto/NotoSansThai-Regular.ttf" },
+    CatalogEntry { family: "Noto Sans Thai", style: "Bold", file: "vendor/noto/NotoSansThai-Bold.ttf" },
+    CatalogEntry { family: "Noto Sans Arabic", style: "Regular", file: "vendor/noto/NotoSansArabic-Regular.ttf" },
+    CatalogEntry { family: "Noto Sans Arabic", style: "Bold", file: "vendor/noto/NotoSansArabic-Bold.ttf" },
 ];
 
 /// Standard-14 name → look-alike family (PDF/UA needs embedded fonts).
