@@ -462,21 +462,10 @@ fn read_directory(data: &[u8]) -> Option<(std::collections::BTreeMap<[u8; 4], Ve
 }
 
 fn table_checksum(bytes: &[u8]) -> u32 {
-    let mut sum: u32 = 0;
-    let padded = bytes.len().wrapping_add(3) & !3;
-    let mut i = 0;
-    while i + 4 <= padded {
-        let mut word = [0u8; 4];
-        let end = (i + 4).min(bytes.len());
-        word[..end - i].copy_from_slice(&bytes[i..end]);
-        sum = sum.wrapping_add(u32::from_be_bytes(word));
-        i += 4;
-    }
-    sum
+    crate::sfnt::sum32(bytes)
 }
 
 fn fix_head_adjustment(out: &mut [u8], num_tables: usize) -> Option<()> {
-    // Find head in the directory, zero checkSumAdjustment, recompute.
     let mut head_off = None;
     for i in 0..num_tables {
         let rec = 12 + i * 16;
@@ -486,26 +475,7 @@ fn fix_head_adjustment(out: &mut [u8], num_tables: usize) -> Option<()> {
             head_off = Some(off);
         }
     }
-    let h = head_off?;
-    out[h + 8..h + 12].copy_from_slice(&0u32.to_be_bytes());
-    let mut sum: u32 = 0;
-    let mut i = 0;
-    while i + 4 <= out.len() {
-        sum = sum.wrapping_add(u32::from_be_bytes([
-            out[i],
-            out[i + 1],
-            out[i + 2],
-            out[i + 3],
-        ]));
-        i += 4;
-    }
-    if i < out.len() {
-        let mut last = [0u8; 4];
-        last[..out.len() - i].copy_from_slice(&out[i..]);
-        sum = sum.wrapping_add(u32::from_be_bytes(last));
-    }
-    let adjust = 0xB1B0_AFBAu32.wrapping_sub(sum);
-    out[h + 8..h + 12].copy_from_slice(&adjust.to_be_bytes());
+    crate::sfnt::fix_head_adjustment(out, head_off?);
     Some(())
 }
 

@@ -76,55 +76,21 @@ pub fn extract_face(data: &[u8], index: u32) -> Option<Vec<u8>> {
     out[12..12 + dir_len].copy_from_slice(&data[dir_start..dir_start + dir_len]);
 
     // Fix entrySelector / searchRange / rangeShift in the copied header.
-    let max_pow2 = {
-        let mut p = 1u16;
-        while p * 2 <= num_tables as u16 {
-            p *= 2;
-        }
-        p
-    };
-    let search_range = max_pow2 * 16;
-    out[6..8].copy_from_slice(&search_range.to_be_bytes());
-    let entry_sel = max_pow2.trailing_zeros() as u16;
-    out[8..10].copy_from_slice(&entry_sel.to_be_bytes());
-    let range_shift = (num_tables * 16) as u16 - search_range;
-    out[10..12].copy_from_slice(&range_shift.to_be_bytes());
+    crate::sfnt::write_directory_search(&mut out, num_tables);
 
     // head.checkSumAdjustment must match the new whole-font checksum:
-    // zero it, sum the font as big-endian u32 words (zero-padded), then
-    // store 0xB1B0AFBA - sum.
+    // find the head table's offset in the copied directory.
     let mut head_off = None;
     for t in 0..num_tables {
         let rec = 12 + t * 16;
         if &out[rec..rec + 4] == b"head" {
             let off = u32::from_be_bytes([out[rec + 8], out[rec + 9], out[rec + 10], out[rec + 11]])
                 as usize;
-            if off + 12 <= out.len() {
-                head_off = Some(off);
-            }
+            head_off = Some(off);
         }
     }
     if let Some(h) = head_off {
-        out[h + 8..h + 12].copy_from_slice(&0u32.to_be_bytes());
-        let mut sum: u32 = 0;
-        let mut i = 0;
-        while i + 4 <= out.len() {
-            sum = sum.wrapping_add(u32::from_be_bytes([
-                out[i],
-                out[i + 1],
-                out[i + 2],
-                out[i + 3],
-            ]));
-            i += 4;
-        }
-        if i < out.len() {
-            let mut last = [0u8; 4];
-            last[..out.len() - i].copy_from_slice(&out[i..]);
-            sum = sum.wrapping_add(u32::from_be_bytes(last));
-        }
-        let adjust = 0xB1B0_AFBAu32.wrapping_sub(sum);
-        out[h + 8..h + 12].copy_from_slice(&adjust.to_be_bytes());
+        crate::sfnt::fix_head_adjustment(&mut out, h);
     }
-
     Some(out)
 }

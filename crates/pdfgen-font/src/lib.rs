@@ -6,6 +6,7 @@ pub use winansi::encode_char as winansi_encode_char;
 pub use winansi::unit_for_byte as winansi_unit_for_byte;
 
 pub mod cid;
+pub mod sfnt;
 pub mod subset;
 pub mod ttc;
 pub mod winansi;
