@@ -14,7 +14,7 @@
 //! [`crate::Document`] stays for small documents and full editing.
 
 use pdfgen_core::{Dict, Name, Object, PdfString, Ref, Stream};
-use std::io::{Seek, Write};
+use std::io::Write;
 
 /// One layout event, in document order.
 #[derive(Debug, Clone)]
