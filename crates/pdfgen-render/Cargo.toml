@@ -1,0 +1,16 @@
+[package]
+name = "pdfgen-render"
+version = "0.1.0"
+edition = "2021"
+description = "Rasterize PDF pages to in-memory bitmaps (display/print pipeline)"
+license = "MIT"
+
+[dependencies]
+pdfgen-core = { path = "../pdfgen-core" }
+pdfgen-parse = { path = "../pdfgen-parse" }
+pdfgen-font = { path = "../pdfgen-font" }
+flate2 = "1"
+ttf-parser = "0.24"
+
+[dev-dependencies]
+pdfgen = { path = "../pdfgen" }

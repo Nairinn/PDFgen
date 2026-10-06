@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 pdfgen-validate = { workspace = true }
+pdfgen-render = { path = "../pdfgen-render" }
 
 [lints]
 workspace = true

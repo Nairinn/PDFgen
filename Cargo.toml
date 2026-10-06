@@ -16,6 +16,7 @@ members = [
     "crates/pdfgen-revision",
     "crates/pdfgen-draw",
     "crates/pdfgen-ffi",
+    "crates/pdfgen-render",
 ]
 
 [workspace.package]

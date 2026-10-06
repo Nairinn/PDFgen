@@ -419,6 +419,7 @@ dependencies = [
 name = "pdfgen-cli"
 version = "0.1.0"
 dependencies = [
+ "pdfgen-render",
  "pdfgen-validate",
 ]
 
@@ -452,7 +453,7 @@ version = "0.1.0"
 dependencies = [
  "pdfgen-core",
  "thiserror",
- "ttf-parser",
+ "ttf-parser 0.25.1",
 ]
 
 [[package]]
@@ -485,6 +486,18 @@ version = "0.1.0"
 dependencies = [
  "pdfgen-api",
  "pyo3",
+]
+
+[[package]]
+name = "pdfgen-render"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "pdfgen",
+ "pdfgen-core",
+ "pdfgen-font",
+ "pdfgen-parse",
+ "ttf-parser 0.24.1",
 ]
 
 [[package]]
@@ -880,6 +893,12 @@ name = "toml_writer"
 version = "1.1.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
+
+[[package]]
+name = "ttf-parser"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5be21190ff5d38e8b4a2d3b6a3ae57f612cc39c96e83cedeaf7abc338a8bac4a"
 
 [[package]]
 name = "ttf-parser"
