@@ -145,7 +145,60 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
 
     let _ = Profile::PdfUa1; // UA-2 rule set arrives with the reader's NS walk.
 
-    // -- Structure-tree walk: tables (15-x), headings (14-x), figures (13-x) --
+    // -- Annotation / form-field checks (Matterhorn 28-x) --
+    if let Some(acro_obj) = catalog.get("AcroForm").cloned() {
+        // The AcroForm entry may be a direct dict or (usual) an indirect
+        // ref to one.
+        let acro: pdfgen_core::Dict = match acro_obj {
+            Object::Dict(d) => d,
+            Object::Ref(r) => match reader.get(r.id) {
+                Ok(Object::Dict(d)) => d,
+                _ => {
+                    // Not a dict: skip checks.
+                    pdfgen_core::Dict::new()
+                }
+            },
+            _ => pdfgen_core::Dict::new(),
+        };
+        if let Some(Object::Array(fields)) = acro.get("Fields").cloned() {
+            for f in fields {
+                let Object::Ref(fr) = f else { continue };
+                let Ok(Object::Dict(fd)) = reader.get(fr.id) else { continue };
+                let ctx = format!("field {}", fr.id);
+                // 28-001: interactive form fields need a TU (accessible
+                // name). /T alone is a raw field name, not an accessible
+                // label, so it does not satisfy the checkpoint.
+                let named = match fd.get("TU") {
+                    Some(Object::String(s)) => !s.0.is_empty(),
+                    Some(_) => true,
+                    None => false,
+                };
+                if !named {
+                    findings.push(Finding {
+                        id: "28-001".into(),
+                        message: "Form field has no accessible name (/TU)".into(),
+                        context: ctx.clone(),
+                    });
+                }
+                // 28-002: no JavaScript actions on the field.
+                if let Some(Object::Dict(aa)) = fd.get("AA").cloned() {
+                    let has_action = aa
+                        .0
+                        .iter()
+                        .any(|(k, _)| matches!(k.0.as_str(), "K" | "V" | "F" | "C"));
+                    if has_action {
+                        findings.push(Finding {
+                            id: "28-002".into(),
+                            message: "Form field has an action that may be a script".into(),
+                            context: ctx.clone(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Structure-tree walk: tables (15-x), headings (14-x), figures (13-x) --
     if let Some(Object::Ref(root_ref)) = catalog.get("StructTreeRoot").cloned() {
         let root = reader.get(root_ref.id).map_err(|e| e.to_string())?;
         if let Object::Dict(root_d) = root {

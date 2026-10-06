@@ -88,7 +88,7 @@ reimplementation from the ISO specifications with different priorities:
 
 ## What's coming next
 
-- **More Matterhorn checks** (page/object level: 15-x tables, 16-x headings, 28-x annotations)
+- ~~More Matterhorn checks~~ (28-001/28-002 form-field checks added; negative-tested)
 - ~~CID subsetting~~ (done: TrueType CID fonts subset to used glyphs via glyf/loca surgery; CFF embeds stay whole-font for now)
 - ~~CJK fonts~~ (done: Noto Sans CJK JP cataloged, FontFile3/ CIDFontType0 embedding)
 - ~~Accessibility fonts~~ (done: Atkinson Hyperlegible + OpenDyslexic cataloged, veraPDF-verified)
