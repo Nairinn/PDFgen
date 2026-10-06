@@ -19,3 +19,5 @@ registry = []
 
 [lints]
 workspace = true
+
+[dev-dependencies]

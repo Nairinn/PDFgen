@@ -4,6 +4,7 @@ pub use winansi::unit_for_byte as winansi_unit_for_byte;
 
 pub mod winansi;
 pub mod cid;
+pub mod subset;
 pub mod ttc;
 
 use std::path::Path;

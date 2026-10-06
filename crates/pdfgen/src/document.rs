@@ -755,7 +755,11 @@ impl Document {
         let ftouni = doc.alloc();
 
         // Font file: CFF/OTF embeds as FontFile3 (Subtype /OpenType, no
-        // Length1); TrueType as FontFile2 with Length1.
+        // Length1); TrueType subsets to the used glyphs (plus composite
+        // components) and embeds as FontFile2. Subsetting returns an
+        // old->new GID remap; CIDs in the content stream stay OLD gids
+        // and a CIDToGIDMap stream translates them to the new ones.
+        let mut cid_to_gid: Option<Vec<u8>> = None;
         if f.is_cff {
             doc.set_stream(
                 ffile,
@@ -765,11 +769,27 @@ impl Document {
                 ),
             );
         } else {
+            let used_gids: Vec<u16> = used.iter().map(|&(_, g)| g).collect();
+            let mut program = f.raw.clone();
+            if let Some((sub, remap)) = pdfgen_font::subset::subset_true_type(&f.raw, &used_gids)
+            {
+                // CID -> new GID table: 2 bytes per CID up to the largest
+                // used old gid (sparse entries default to glyph 0).
+                let max_old = used_gids.iter().copied().max().unwrap_or(0) as usize;
+                let mut map = vec![0u8; (max_old + 1) * 2];
+                for &(_, g) in used {
+                    let new_gid = remap[g as usize];
+                    let off = g as usize * 2;
+                    map[off..off + 2].copy_from_slice(&new_gid.to_be_bytes());
+                }
+                cid_to_gid = Some(map);
+                program = sub;
+            }
             doc.set_stream(
                 ffile,
                 Stream::new(
-                    Dict::new().with("Length1", f.raw.len() as i64),
-                    f.raw.clone(),
+                    Dict::new().with("Length1", program.len() as i64),
+                    program,
                 ),
             );
         }
@@ -877,7 +897,25 @@ impl Document {
             ),
         );
         cid_font.set("FontDescriptor", fdesc);
-        cid_font.set("CIDToGIDMap", "Identity");
+        // CIDToGIDMap: the stream name when the font was subset (CIDs are
+        // old gids, the map translates to the subset's new gids);
+        // otherwise /Identity since CID == GID.
+        match cid_to_gid {
+            Some(map) => {
+                let cmap_ref = doc.alloc();
+                doc.set_stream(
+                    cmap_ref,
+                    Stream::new(
+                        Dict::new().with("Filter", "FlateDecode"),
+                        flate_compress(&map),
+                    ),
+                );
+                cid_font.set("CIDToGIDMap", cmap_ref);
+            }
+            None => {
+                cid_font.set("CIDToGIDMap", "Identity");
+            }
+        }
         // W: [ gid w gid w ... ] pairs (per-glyph widths in glyph units).
         cid_font.set("W", Object::Array(warray));
         doc.set(desc, Object::Dict(cid_font));
