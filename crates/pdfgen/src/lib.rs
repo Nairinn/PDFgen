@@ -33,6 +33,7 @@ mod retag;
 mod stream;
 mod structure;
 mod tounicode;
+pub mod wrap;
 
 pub use document::Document;
 pub use extract::{extract_text, PageText};

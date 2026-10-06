@@ -83,7 +83,9 @@ impl<'a> Flow<'a> {
         }
     }
 
-    /// Wrap text to `max_w` with the given font metrics.
+    /// Wrap text to `max_w` with real font metrics: the shared O(n)
+    /// wrapper measures each word once (WinAnsi bytes, with a per-glyph
+    /// fallback for anything WinAnsi cannot encode).
     fn wrap_to(
         &self,
         text: &str,
@@ -97,28 +99,31 @@ impl<'a> Flow<'a> {
             // rather than panic.
             return Err(FontError::MissingGlyph('?', 0));
         };
-        let mut lines = Vec::new();
-        let mut cur = String::new();
-        for word in text.split(' ') {
-            let candidate = if cur.is_empty() {
-                word.to_string()
-            } else {
-                format!("{cur} {word}")
-            };
-            if cur.is_empty() || f.text_width_pt(&candidate, size)? <= max_w {
-                cur = candidate;
-            } else {
-                lines.push(std::mem::take(&mut cur));
-                cur = word.to_string();
+        let f: &pdfgen_font::LoadedFont = f;
+        let scale = f64::from(f.units_per_em);
+        Ok(crate::wrap::wrap(text, max_w, |word| {
+            // Measure with the real encoding: WinAnsi bytes when the
+            // word encodes, per-glyph advances otherwise.
+            match pdfgen_font::winansi::encode(word) {
+                Ok(bytes) => bytes
+                    .iter()
+                    .filter_map(|&b| f.width_for_byte(b))
+                    .map(|w| f64::from(w) / scale * size)
+                    .sum(),
+                Err(_) => {
+                    // CID measurement: per-char cmap advances.
+                    let mut total = 0.0f64;
+                    for ch in word.chars() {
+                        if let Some(g) = f.glyph_index(ch) {
+                            if let Some(w) = f.glyph_width_units(g) {
+                                total += w as f64 / scale * size;
+                            }
+                        }
+                    }
+                    total
+                }
             }
-        }
-        if !cur.is_empty() {
-            lines.push(cur);
-        }
-        if lines.is_empty() {
-            lines.push(String::new());
-        }
-        Ok(lines)
+        }))
     }
 
     fn wrap(&self, text: &str, font: usize, size: f64) -> Result<Vec<String>, FontError> {
