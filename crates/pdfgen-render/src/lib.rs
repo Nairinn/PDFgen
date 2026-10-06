@@ -494,9 +494,13 @@ fn run_ops(
         }
         let b = content[i];
 
-        // String literal: (...) — find the operator after it.
+        // String literal: (...) — find the operator after it. Uses the
+        // shared PDF string decoder (octal escapes, \n\r\t, nesting).
         if b == b'(' {
-            let (bytes, next) = read_string(content, i);
+            let Some((bytes, next)) = pdfgen_parse::read_literal(content, i) else {
+                i += 1;
+                continue;
+            };
             i = next;
             // Skip whitespace, then read the operator word.
             while i < content.len() && content[i].is_ascii_whitespace() {
@@ -510,6 +514,77 @@ fn run_ops(
             if op == b"Tj" || op == b"'" || op == b"\"" {
                 show_text(&mut g, &bytes, bmp, scale, page_h, fonts);
             }
+            g.nums.clear();
+            continue;
+        }
+
+        // Hex string: <4A6F> — same operator handling as literals.
+        if b == b'<' && content.get(i + 1) != Some(&b'<') {
+            let Some((bytes, next)) = pdfgen_parse::read_hex(content, i) else {
+                i += 1;
+                continue;
+            };
+            i = next;
+            while i < content.len() && content[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            let ws = i;
+            while i < content.len() && content[i].is_ascii_alphabetic() {
+                i += 1;
+            }
+            let op = &content[ws..i];
+            if op == b"Tj" || op == b"'" || op == b"\"" {
+                show_text(&mut g, &bytes, bmp, scale, page_h, fonts);
+            }
+            g.nums.clear();
+            continue;
+        }
+
+        // TJ array: [ (A) -120 (B) 40 (C) ] TJ — concatenate the string
+        // parts; the numbers are kerning gaps we currently ignore.
+        if b == b'[' {
+            let Some(close_rel) = content[i..].iter().position(|&c| c == b']') else {
+                // Unbalanced array: skip the byte.
+                i += 1;
+                continue;
+            };
+            let close = i + close_rel;
+            let mut joined: Vec<u8> = Vec::new();
+            let mut k = i + 1;
+            while k < close {
+                match content[k] {
+                    b'(' => {
+                        if let Some((bytes, next)) = pdfgen_parse::read_literal(content, k) {
+                            joined.extend_from_slice(&bytes);
+                            k = next;
+                            continue;
+                        }
+                        k += 1;
+                    }
+                    b'<' if content.get(k + 1) != Some(&b'<') => {
+                        if let Some((bytes, next)) = pdfgen_parse::read_hex(content, k) {
+                            joined.extend_from_slice(&bytes);
+                            k = next;
+                            continue;
+                        }
+                        k += 1;
+                    }
+                    _ => k += 1,
+                }
+            }
+            // Operator after ].
+            let mut m = close + 1;
+            while m < content.len() && content[m].is_ascii_whitespace() {
+                m += 1;
+            }
+            let ws = m;
+            while m < content.len() && content[m].is_ascii_alphabetic() {
+                m += 1;
+            }
+            if &content[ws..m] == b"TJ" {
+                show_text(&mut g, &joined, bmp, scale, page_h, fonts);
+            }
+            i = m;
             g.nums.clear();
             continue;
         }
@@ -670,45 +745,6 @@ fn run_ops(
         i += 1;
     }
     Ok(())
-}
-
-/// Read a (…)-string starting at `i` (content[i] == b'('). Returns the
-/// unescaped bytes and the index just past the closing paren.
-fn read_string(content: &[u8], i: usize) -> (Vec<u8>, usize) {
-    let mut j = i + 1;
-    let mut depth = 1;
-    let mut bytes = Vec::new();
-    while j < content.len() {
-        match content[j] {
-            b'\\' => {
-                if j + 1 < content.len() {
-                    bytes.push(content[j + 1]);
-                    j += 2;
-                    continue;
-                }
-                j += 1;
-            }
-            b'(' => {
-                depth += 1;
-                bytes.push(content[j]);
-                j += 1;
-            }
-            b')' => {
-                depth -= 1;
-                if depth == 0 {
-                    j += 1;
-                    break;
-                }
-                bytes.push(content[j]);
-                j += 1;
-            }
-            c => {
-                bytes.push(c);
-                j += 1;
-            }
-        }
-    }
-    (bytes, j)
 }
 
 fn show_text(

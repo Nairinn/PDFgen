@@ -10,9 +10,11 @@
 //! (pdfgen-core), so read-modify-write is a single data flow.
 
 mod lexer;
+mod pdf_string;
 mod reader;
 
 pub use lexer::{Lexer, Token};
+pub use pdf_string::{read_hex, read_literal};
 pub use reader::{PdfReader, RepairInfo};
 
 use thiserror::Error;
