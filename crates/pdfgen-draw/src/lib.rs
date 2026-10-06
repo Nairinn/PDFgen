@@ -32,15 +32,17 @@ pub enum Sheet {
 }
 
 impl Sheet {
-    /// Landscape size in points (72 pt = 1 in).
+    /// Landscape size in points (ASME Y14.1: A=8.5x11, B=11x17, C=17x22,
+    /// D=22x34, E=34x44, F=28x40 inches; width x height).
     pub fn points(self) -> (f64, f64) {
+        const IN: f64 = 72.0;
         match self {
-            Sheet::A => (612.0, 396.0),
-            Sheet::B => (792.0, 612.0),
-            Sheet::C => (1224.0, 792.0),
-            Sheet::D => (1584.0, 1224.0),
-            Sheet::E => (2448.0, 1584.0),
-            Sheet::F => (2448.0, 2880.0),
+            Sheet::A => (11.0 * IN, 8.5 * IN),
+            Sheet::B => (17.0 * IN, 11.0 * IN),
+            Sheet::C => (22.0 * IN, 17.0 * IN),
+            Sheet::D => (34.0 * IN, 22.0 * IN),
+            Sheet::E => (44.0 * IN, 34.0 * IN),
+            Sheet::F => (40.0 * IN, 28.0 * IN),
         }
     }
 }
