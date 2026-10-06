@@ -33,8 +33,9 @@ pub struct PdfReader {
     trailer: Dict,
     /// Repair details, if a repair pass ran.
     pub repair: RepairInfo,
-    /// Cache of already-resolved top-level objects.
-    cache: HashMap<u32, Object>,
+    /// Cache of already-resolved top-level objects (shared, so `get`
+    /// clones once instead of three times).
+    cache: HashMap<u32, std::rc::Rc<Object>>,
     /// Object-stream contents cache: stream id -> its /N decoded objects.
     objstm_cache: HashMap<u32, Vec<Object>>,
     /// Objects currently being resolved (cycle protection).
@@ -455,16 +456,24 @@ impl PdfReader {
 
     /// Resolve an object by number (lazily; cached).
     pub fn get(&mut self, id: u32) -> Result<Object, ParseError> {
+        let shared = self.get_shared(id)?;
+        Ok((*shared).clone())
+    }
+
+    /// Resolve an object and return the SHARED cached value (no deep
+    /// clone; hot loops such as the renderer should use this).
+    pub fn get_shared(&mut self, id: u32) -> Result<std::rc::Rc<Object>, ParseError> {
         if let Some(cached) = self.cache.get(&id) {
             return Ok(cached.clone());
         }
         if self.resolving.contains(&id) {
-            return Ok(Object::Null); // cycle guard
+            return Ok(std::rc::Rc::new(Object::Null)); // cycle guard
         }
         match self.xref.get(&id).copied() {
             Some(Entry::InUse(_)) => {}
             Some(Entry::Compressed { stream, index }) => {
-                return self.get_from_object_stream(stream, index);
+                let obj = self.get_from_object_stream(stream, index)?;
+                return Ok(std::rc::Rc::new(obj));
             }
             _ => return Err(ParseError::ObjectNotFound(id)),
         }
@@ -476,8 +485,9 @@ impl PdfReader {
         let result = self.parse_object_at(id, offset);
         self.resolving.pop();
         let obj = result?;
-        self.cache.insert(id, obj.clone());
-        Ok(obj)
+        let rc = std::rc::Rc::new(obj);
+        self.cache.insert(id, rc.clone());
+        Ok(rc)
     }
 
     /// Resolve an object compressed inside an object stream (PDF 1.5+).
