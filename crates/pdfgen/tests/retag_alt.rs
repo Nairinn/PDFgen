@@ -9,7 +9,7 @@ fn out(name: &str) -> String {
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../tests/output/untagged.pdf"
+    "/../../tests/output/untagged_alt.pdf"
 );
 
 /// Rebuild the shared untagged fixture if it is missing.

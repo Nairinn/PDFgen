@@ -28,7 +28,7 @@ fn outline_links_siblings_not_flat_chain() {
     assert_eq!(report.status, Status::Compliant);
 
     let data = std::fs::read(&path).unwrap();
-    let txt = String::from_utf8_lossy(&data);
+    let _ = data;
 
     // Extract every outline item object: (title, keys).
     // Simpler: verify the flat-chain bug is gone: "Chapter Two" (the last
