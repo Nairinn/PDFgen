@@ -86,6 +86,17 @@ reimplementation from the ISO specifications with different priorities:
 | Bindings | Python (PyO3, abi3 ≥ 3.9, `PdfUaWarning` on non-compliant saves), Kotlin/Java (UniFFI + JNA, Java 11+), and Java 22+ (`java.lang.foreign` FFM, no JNI/JNA) — all generate veraPDF-valid PDFs |
 | CID fonts | Text WinAnsi can't encode flows through Type0 Identity-H composite fonts automatically (Myanmar, Korean, Greek, CJK); TTC collections sliced to standalone programs |
 
+## Optional CJK fonts
+
+The two Noto Sans CJK JP faces (16 MB each) are **not committed** — clone
+size stays small. Fetch them when needed:
+
+```bash
+bash scripts/fetch-cjk-fonts.sh
+```
+
+CI fetches them automatically; the CJK test skips when they are absent.
+
 ## Fonts in packaged installs
 
 The bundled font files (OFL) live in `fonts/vendor/` at the repo root — outside any crate directory, so **crate packages never ship the fonts** (crates.io caps packages at 10 MB; the CJK faces alone are 16 MB each). Resolution order at runtime:

@@ -18,6 +18,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Fetch optional CJK fonts
+        run: bash scripts/fetch-cjk-fonts.sh
+
       - name: Build (excluding Python extension)
         run: cargo build --workspace --exclude pdfgen-py
 

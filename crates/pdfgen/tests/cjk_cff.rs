@@ -9,6 +9,16 @@ fn out(name: &str) -> String {
 
 #[test]
 fn cjk_cff_font_passes() {
+    // The 16 MB CJK faces are an optional download (scripts/fetch-cjk-fonts.sh);
+    // skip on machines that have not fetched them.
+    let jp_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fonts/vendor/noto/NotoSansCJKjp-Regular.otf"
+    );
+    if !std::path::Path::new(jp_path).exists() {
+        eprintln!("skipping: CJK fonts not fetched (run scripts/fetch-cjk-fonts.sh)");
+        return;
+    }
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("CJK font test").lang("ja");
 
