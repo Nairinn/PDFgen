@@ -57,6 +57,10 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry { family: "Noto Sans Arabic", style: "Bold", file: "vendor/noto/NotoSansArabic-Bold.ttf" },
     CatalogEntry { family: "Noto Sans CJK JP", style: "Regular", file: "vendor/noto/NotoSansCJKjp-Regular.otf" },
     CatalogEntry { family: "Noto Sans CJK JP", style: "Bold", file: "vendor/noto/NotoSansCJKjp-Bold.otf" },
+    CatalogEntry { family: "Atkinson Hyperlegible", style: "Regular", file: "vendor/accessibility/AtkinsonHyperlegible-Regular.ttf" },
+    CatalogEntry { family: "Atkinson Hyperlegible", style: "Bold", file: "vendor/accessibility/AtkinsonHyperlegible-Bold.ttf" },
+    CatalogEntry { family: "OpenDyslexic", style: "Regular", file: "vendor/accessibility/OpenDyslexic-Regular.otf" },
+    CatalogEntry { family: "OpenDyslexic", style: "Bold", file: "vendor/accessibility/OpenDyslexic-Bold.otf" },
 ];
 
 /// Standard-14 name → look-alike family (PDF/UA needs embedded fonts).

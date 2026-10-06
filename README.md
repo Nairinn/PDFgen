@@ -91,7 +91,7 @@ reimplementation from the ISO specifications with different priorities:
 - **More Matterhorn checks** (page/object level: 15-x tables, 16-x headings, 28-x annotations)
 - **CID subsetting** (shrink embedded fonts to used glyphs)
 - ~~CJK fonts~~ (done: Noto Sans CJK JP cataloged, FontFile3/ CIDFontType0 embedding)
-- **Accessibility fonts** (OpenDyslexic, Atkinson Hyperlegible) in the catalog
+- ~~Accessibility fonts~~ (done: Atkinson Hyperlegible + OpenDyslexic cataloged, veraPDF-verified)
 - ~~Rendering~~ (done: `pdfgen render` / `pdfgen print`, embedded-font glyph rasterizer)
 - Maven Central, PyPI and crates.io publishing
 - Full plan with milestones: [`docs/PLAN.md`](docs/PLAN.md)
