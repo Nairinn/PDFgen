@@ -754,14 +754,25 @@ impl Document {
         let ffile = doc.alloc(); // FontFile2
         let ftouni = doc.alloc();
 
-        // Font file (full embed; subsetting comes later).
-        doc.set_stream(
-            ffile,
-            Stream::new(
-                Dict::new().with("Length1", f.raw.len() as i64),
-                f.raw.clone(),
-            ),
-        );
+        // Font file: CFF/OTF embeds as FontFile3 (Subtype /OpenType, no
+        // Length1); TrueType as FontFile2 with Length1.
+        if f.is_cff {
+            doc.set_stream(
+                ffile,
+                Stream::new(
+                    Dict::new().with("Subtype", "OpenType"),
+                    f.raw.clone(),
+                ),
+            );
+        } else {
+            doc.set_stream(
+                ffile,
+                Stream::new(
+                    Dict::new().with("Length1", f.raw.len() as i64),
+                    f.raw.clone(),
+                ),
+            );
+        }
 
         // CIDToGIDMap: CIDs are glyph IDs directly (Identity-H), so the
         // standard /Identity name applies — no stream needed. A stream
@@ -816,7 +827,12 @@ impl Document {
         fd.set("Descent", to_thousandths(f64::from(f.descent)));
         fd.set("CapHeight", to_thousandths(f64::from(f.cap_height)));
         fd.set("StemV", 80);
-        fd.set("FontFile2", ffile);
+        // FontFile3 (OpenType/CFF) or FontFile2 (TrueType).
+        if f.is_cff {
+            fd.set("FontFile3", ffile);
+        } else {
+            fd.set("FontFile2", ffile);
+        }
         doc.set(fdesc, Object::Dict(fd));
 
         // Descendant CIDFontType2.
@@ -846,7 +862,10 @@ impl Document {
         }
         let mut cid_font = Dict::new();
         cid_font.set("Type", "Font");
-        cid_font.set("Subtype", "CIDFontType2");
+        cid_font.set(
+            "Subtype",
+            if f.is_cff { "CIDFontType0" } else { "CIDFontType2" },
+        );
         cid_font.set("BaseFont", Object::Name(Name::new(f.postscript_name.clone())));
         cid_font.set(
             "CIDSystemInfo",

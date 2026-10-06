@@ -56,6 +56,10 @@ pub struct LoadedFont {
     /// Advance width (glyph units) for every WinAnsi byte 0..=255,
     /// or `None` when the byte has no mapping.
     pub win_ansi_widths: [Option<u16>; 256],
+    /// True when the sfnt carries CFF outlines (OTF) rather than glyf.
+    /// Such fonts embed as `/FontFile3` with `/Subtype /OpenType` and a
+    /// `CIDFontType0` descendant instead of `FontFile2`/`CIDFontType2`.
+    pub is_cff: bool,
 }
 
 impl LoadedFont {
@@ -132,6 +136,11 @@ impl LoadedFont {
         }
 
         Ok(LoadedFont {
+            is_cff: {
+                // sfnt table directory: CFF outlines mean no glyf table.
+                let num = u16::from_be_bytes([raw[4], raw[5]]) as usize;
+                (0..num).any(|t| &raw[12 + t * 16..12 + t * 16 + 4] == b"CFF ")
+            },
             raw,
             units_per_em,
             postscript_name,

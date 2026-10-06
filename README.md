@@ -90,7 +90,7 @@ reimplementation from the ISO specifications with different priorities:
 
 - **More Matterhorn checks** (page/object level: 15-x tables, 16-x headings, 28-x annotations)
 - **CID subsetting** (shrink embedded fonts to used glyphs)
-- **CJK fonts** (CFF/OTF embedding via FontFile3 for Noto Sans CJK)
+- ~~CJK fonts~~ (done: Noto Sans CJK JP cataloged, FontFile3/ CIDFontType0 embedding)
 - **Accessibility fonts** (OpenDyslexic, Atkinson Hyperlegible) in the catalog
 - ~~Rendering~~ (done: `pdfgen render` / `pdfgen print`, embedded-font glyph rasterizer)
 - Maven Central, PyPI and crates.io publishing
