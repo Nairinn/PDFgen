@@ -30,6 +30,11 @@ pub struct Document {
     pub page_size: (f64, f64),
     /// Bookmark entries collected from headings: (level, text, page).
     pub(crate) bookmarks: Vec<(u8, String, usize)>,
+    /// Flow y-cursor (baseline of the next line) carried across flow()
+    /// calls so consecutive flows continue on the same page.
+    pub(crate) flow_y: Option<f64>,
+    /// Index of the page the flow cursor is on.
+    pub(crate) flow_page: usize,
     /// Fonts that needed CID (Type0) encoding: font index -> used
     /// (char, glyph id) pairs.
     pub(crate) cid_fonts:
@@ -53,6 +58,8 @@ impl Document {
             images: Vec::new(),
             page_size: (612.0, 792.0),
             bookmarks: Vec::new(),
+            flow_y: None,
+            flow_page: 0,
             cid_fonts: Default::default(),
             want_outline: true,
             fields: Vec::new(),
@@ -83,8 +90,7 @@ impl Document {
     /// Append an empty page sized `w` x `h` and return its index. Used by
     /// the engineering drawing kit to start a custom-sized sheet.
     pub fn add_draw_page(&mut self, w: f64, h: f64) -> usize {
-        self.page_size = (w, h);
-        self.pages.push(crate::page::PageData::default());
+        self.pages.push(crate::page::PageData::explicit(w, h));
         self.pages.len() - 1
     }
 
@@ -151,16 +157,21 @@ impl Document {
     /// Begin an explicitly placed page; content is placed via the returned
     /// builder. For flowing text use [`Document::flow`] instead.
     pub fn add_page(&mut self, w: f64, h: f64) -> crate::page::Page<'_> {
-        self.page_size = (w, h);
-        self.pages.push(PageData::default());
+        self.pages.push(crate::page::PageData::explicit(w, h));
         crate::page::Page::new(self, self.pages.len() - 1, w, h)
     }
 
-    /// Start flowing content. The flow wraps text to the page width and
-    /// starts new pages automatically as needed.
+    /// Start (or resume) flowing content. The flow wraps text to the page
+    /// width and starts new pages automatically as needed. Consecutive
+    /// flow() calls continue on the same page; a page is only created
+    /// when the document has none yet.
     pub fn flow(&mut self) -> crate::flow::Flow<'_> {
-        self.pages.push(PageData::default());
-        self.page_size = (612.0, 792.0);
+        // Resume only when the last page belongs to the flow engine;
+        // explicit builder pages are never resumed by flows.
+        let resume = self.pages.last().is_some_and(|p| p.from_flow);
+        if !resume {
+            self.pages.push(crate::page::PageData::letter());
+        }
         crate::flow::Flow::new(self)
     }
 
@@ -568,8 +579,9 @@ impl Document {
         doc.set(struct_root, Object::Dict(str_root));
 
         // --- Page objects -----------------------------------------------
-        let (pw, ph) = self.page_size;
+        // Each page carries its own size (explicit pages can differ).
         for pi in 0..n_pages {
+            let (pw, ph) = self.pages[pi].size;
             let mut res = Dict::new();
             if !font_res.is_empty() {
                 res.set("Font", Object::Dict(font_res.clone()));

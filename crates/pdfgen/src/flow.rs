@@ -21,24 +21,25 @@ pub struct Flow<'a> {
 }
 
 impl<'a> Flow<'a> {
-    /// Start (or resume) flow on the document's pages.
+    /// Start (or resume) flow on the document's pages. The cursor comes
+    /// from the document when a previous flow left one, so consecutive
+    /// flows continue where the last ended.
     pub(crate) fn new(doc: &'a mut crate::document::Document) -> Self {
-        let (w, h) = doc.page_size;
-        let margin = 72.0;
-        if doc.pages.is_empty() {
-            doc.pages.push(Default::default());
-        }
         // Defaults are accessible: if no font was ever loaded, resolve
         // "Liberation Sans Regular" now so bare documents just work.
         if doc.fonts.is_empty() {
             let _ = doc.font("Liberation Sans", "Regular");
         }
         let page_idx = doc.pages.len() - 1;
-        let y = if doc.pages[page_idx].nodes.is_empty() {
-            h - margin
+        let (w, h) = doc.pages[page_idx].size;
+        let margin = 72.0;
+        // Resume from the persisted cursor when it points at this page;
+        // otherwise start at the top (fresh page).
+        let (resume_page, resume_y) = (doc.flow_page, doc.flow_y);
+        let y = if resume_page == page_idx {
+            resume_y.unwrap_or(h - margin)
         } else {
-            // Resume below placed content.
-            h - margin - 24.0
+            h - margin
         };
         Flow {
             doc,
@@ -50,8 +51,20 @@ impl<'a> Flow<'a> {
         }
     }
 
+    /// Persist the cursor so the next flow() call resumes here. Called
+    /// at the end of every public placement method.
+    pub(crate) fn sync_cursor(&mut self) {
+        self.doc.flow_y = Some(self.y);
+        self.doc.flow_page = self.page_idx;
+    }
+
     fn new_page(&mut self) {
-        self.doc.pages.push(Default::default());
+        let size = self.doc.page_size;
+        self.doc.pages.push(crate::page::PageData {
+            size,
+            from_flow: true,
+            ..Default::default()
+        });
         self.page_idx = self.doc.pages.len() - 1;
         self.y = self.height - self.margin;
     }
@@ -179,6 +192,7 @@ impl<'a> Flow<'a> {
             Node::leaf(format!("H{level}"), text.to_string(), 0, size)
                 .with_pieces(vec![(self.page_idx, mcid)]),
         );
+        self.sync_cursor();
         Ok(())
     }
 
@@ -212,6 +226,7 @@ impl<'a> Flow<'a> {
         self.doc.pages[self.page_idx]
             .nodes
             .push(Node::leaf("P", text.to_string(), font, size).with_pieces(pieces));
+        self.sync_cursor();
         Ok(())
     }
 
@@ -235,6 +250,7 @@ impl<'a> Flow<'a> {
                 ]));
         }
         self.doc.pages[self.page_idx].nodes.push(list);
+        self.sync_cursor();
         Ok(())
     }
 
@@ -335,6 +351,7 @@ impl<'a> Flow<'a> {
         }
 
         self.doc.pages[self.page_idx].nodes.push(table);
+        self.sync_cursor();
         Ok(())
     }
 
@@ -355,6 +372,7 @@ impl<'a> Flow<'a> {
             fig.alt = Some(alt.to_string());
         }
         self.doc.pages[self.page_idx].nodes.push(fig);
+        self.sync_cursor();
         Ok(())
     }
 
@@ -366,6 +384,7 @@ impl<'a> Flow<'a> {
         pd.content
             .text("F0", 9.0, self.margin, self.height - 40.0, &encoded);
         pd.content.end_artifact();
+        self.sync_cursor();
         Ok(())
     }
 
@@ -412,6 +431,7 @@ impl<'a> Flow<'a> {
             Node::leaf("Caption", label.to_string(), 0, 11.0)
                 .with_pieces(vec![(self.page_idx, mcid)]),
         );
+        self.sync_cursor();
         Ok(())
     }
 
@@ -422,10 +442,10 @@ impl<'a> Flow<'a> {
         pd.content.begin_artifact("Footer");
         pd.content.text("F0", 9.0, self.margin, 36.0, &encoded);
         pd.content.end_artifact();
+        self.sync_cursor();
         Ok(())
     }
 }
-
 
 #[allow(unused_imports)]
 use ImageKind as _FlowImageKind;

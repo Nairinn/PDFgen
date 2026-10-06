@@ -10,6 +10,34 @@ pub(crate) struct PageData {
     pub content: pdfgen_canvas::Content,
     /// Structure nodes placed on this page (top-level; may be groups).
     pub nodes: Vec<Node>,
+    /// This page's size in points (width, height). Defaults to Letter
+    /// (612x792) so flows and simple documents never need to set it,
+    /// but explicit pages can each carry their own geometry.
+    pub size: (f64, f64),
+    /// True when the page was created by the flow engine (flow() may
+    /// resume on it); explicit add_page/add_draw_page pages are not
+    /// resumed by flows.
+    pub(crate) from_flow: bool,
+}
+
+impl PageData {
+    /// Letter portrait, the PDFgen default.
+    pub(crate) fn letter() -> Self {
+        PageData {
+            size: (612.0, 792.0),
+            from_flow: true,
+            ..Default::default()
+        }
+    }
+
+    /// A page started by an explicit builder (add_page / add_draw_page).
+    pub(crate) fn explicit(w: f64, h: f64) -> Self {
+        PageData {
+            size: (w, h),
+            from_flow: false,
+            ..Default::default()
+        }
+    }
 }
 
 /// Builder for one explicitly placed page. Each call places exactly one
