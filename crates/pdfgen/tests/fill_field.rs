@@ -26,10 +26,7 @@ fn fill_text_field_appends_incremental_update() {
     assert_eq!(report.status, Status::Compliant);
 
     let before = std::fs::read(&path).unwrap();
-    let before_eofs = before
-        .windows(5)
-        .filter(|w| w == b"%%EOF")
-        .count();
+    let before_eofs = before.windows(5).filter(|w| w == b"%%EOF").count();
 
     // Fill the field (the operation under test).
     pdfgen::fill_text_field(&path, "fullname", "Naing Lynn Kyaw").unwrap();
@@ -42,10 +39,7 @@ fn fill_text_field_appends_incremental_update() {
         "the incremental section must be appended"
     );
     assert_eq!(&after[..before.len()], &before[..], "original bytes intact");
-    let after_eofs = after
-        .windows(5)
-        .filter(|w| w == b"%%EOF")
-        .count();
+    let after_eofs = after.windows(5).filter(|w| w == b"%%EOF").count();
     assert_eq!(after_eofs, before_eofs + 1, "exactly one new %%EOF");
 
     // 2. The file still parses and the field holds the value.

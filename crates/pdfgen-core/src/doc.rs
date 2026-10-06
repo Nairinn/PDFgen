@@ -132,4 +132,3 @@ fn check_no_nested_stream(obj: &Object, container: u32) -> Result<(), CoreError>
     }
     Ok(())
 }
-

@@ -325,7 +325,7 @@ fn revision_meta(prefix: &[u8]) -> Option<(String, String, String)> {
     };
     let get_str = |key: &str| -> String {
         match dict.get(key) {
-            Some(Object::String(s)) => String::from_utf8_lossy(&s.0).into_owned(),
+            Some(Object::String(s)) => pdfgen_core::decode_text_bytes(&s.0),
             _ => String::new(),
         }
     };

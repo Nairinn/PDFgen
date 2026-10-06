@@ -40,11 +40,46 @@ impl Name {
 pub struct PdfString(pub Vec<u8>);
 
 impl PdfString {
-    /// Create a string from UTF-8 text encoded as PDFDocEncoding-compatible
-    /// ASCII (all bytes 0x20..=0x7e pass through; other code points are
-    /// escaped octally by the serializer).
+    /// Create a PDF text string from UTF-8 text. Pure ASCII (the
+    /// PDFDocEncoding-compatible subset) passes through as-is; anything
+    /// else encodes as UTF-16BE with a BOM (FE FF), which the PDF spec
+    /// requires for text strings that leave PDFDocEncoding.
     pub fn text(s: &str) -> Self {
-        PdfString(s.as_bytes().to_vec())
+        if s.is_ascii() {
+            PdfString(s.as_bytes().to_vec())
+        } else {
+            let mut bytes = Vec::with_capacity(s.len() * 2 + 2);
+            bytes.extend_from_slice(&[0xFE, 0xFF]);
+            let mut buf = [0u16; 2];
+            for ch in s.chars() {
+                for unit in ch.encode_utf16(&mut buf) {
+                    bytes.extend_from_slice(&unit.to_be_bytes());
+                }
+            }
+            PdfString(bytes)
+        }
+    }
+
+    /// Decode a PDF text string to Rust text: UTF-16BE after a BOM, or
+    /// PDFDocEncoding (treated as Latin-1) otherwise.
+    pub fn decode(&self) -> String {
+        decode_text_bytes(&self.0)
+    }
+}
+
+/// Decode PDF text-string bytes (BOM-marked UTF-16BE or PDFDocEncoding).
+pub fn decode_text_bytes(bytes: &[u8]) -> String {
+    if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
+        let units: Vec<u16> = bytes[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .collect();
+        char::decode_utf16(units)
+            .map(|r| r.unwrap_or('\u{fffd}'))
+            .collect()
+    } else {
+        // PDFDocEncoding is Latin-1-like for the printable range.
+        bytes.iter().map(|&b| b as char).collect()
     }
 }
 

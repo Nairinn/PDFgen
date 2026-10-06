@@ -70,23 +70,6 @@ pub(crate) fn emit_acroform(doc: &mut pdfgen_core::Document, field_refs: &[Ref])
     af
 }
 
-/// Decode a PDF text string: UTF-16BE with a BOM when it starts FE FF,
-/// PDFDocEncoding (treat as Latin-1) otherwise.
-fn decode_pdf_text_string(bytes: &[u8]) -> String {
-    if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
-        // UTF-16BE after the BOM.
-        let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_be_bytes([c[0], c[1]]))
-            .collect();
-        char::decode_utf16(units)
-            .map(|r| r.unwrap_or('\u{fffd}'))
-            .collect()
-    } else {
-        bytes.iter().map(|&b| b as char).collect()
-    }
-}
-
 /// Find the field object whose /T matches `name`, walking Kids
 /// hierarchies. Returns its object id.
 fn find_field(
@@ -104,7 +87,7 @@ fn find_field(
                 let matches = fd
                     .get("T")
                     .and_then(|t| match t {
-                        Object::String(s) => Some(decode_pdf_text_string(&s.0) == name),
+                        Object::String(s) => Some(s.decode() == name),
                         _ => None,
                     })
                     .unwrap_or(false);
@@ -181,7 +164,10 @@ pub fn fill_text_field(
     let Some(Object::Ref(root)) = reader.trailer().get("Root").cloned() else {
         return Err("trailer has no /Root".into());
     };
-    let mut trailer = format!("<< /Size {size} /Prev {prev_xref} /Root {} {} R", root.id, root.gen);
+    let mut trailer = format!(
+        "<< /Size {size} /Prev {prev_xref} /Root {} {} R",
+        root.id, root.gen
+    );
     if let Some(Object::Array(ids)) = reader.trailer().get("ID").cloned() {
         let parts: Vec<String> = ids
             .iter()
@@ -216,9 +202,7 @@ fn hex(bytes: &[u8]) -> String {
 
 /// Byte offset of the last `startxref` value in the file.
 fn last_startxref(data: &[u8]) -> Option<u64> {
-    let idx = data
-        .windows(9)
-        .rposition(|w| w == b"startxref")?;
+    let idx = data.windows(9).rposition(|w| w == b"startxref")?;
     let rest = &data[idx + 9..];
     let s = std::str::from_utf8(rest).ok()?;
     let num: String = s

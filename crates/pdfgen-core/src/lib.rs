@@ -17,7 +17,7 @@ mod serialize;
 
 pub use doc::Document;
 pub use error::CoreError;
-pub use object::{Dict, Name, Object, PdfString, Real, Ref, Stream};
+pub use object::{decode_text_bytes, Dict, Name, Object, PdfString, Real, Ref, Stream};
 pub use serialize::fmt_real;
 /// Re-exported for the streaming writer and advanced users.
 pub use serialize::{write_object, write_stream};
