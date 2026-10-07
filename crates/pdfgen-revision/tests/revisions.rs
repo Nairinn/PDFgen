@@ -32,7 +32,7 @@ fn commit_history_diff_revert() {
         flow.paragraph("Revision one body text.").unwrap();
     }
     let report = doc.save(&path).unwrap();
-    assert!(report.status == pdfgen::Status::Compliant);
+    assert_eq!(report.status, pdfgen::Status::Compliant);
     let original = std::fs::read(&path).unwrap();
 
     // --- Commit 2 and 3.

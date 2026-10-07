@@ -39,7 +39,9 @@ fn shaped_arabic_renders_joined_forms() {
     .expect("renders");
     let dark = bmp
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|p| p[0] < 128 && p[1] < 128 && p[2] < 128)
         .count();
     assert!(dark > 300, "shaped Arabic should leave ink, got {dark}");
@@ -74,7 +76,9 @@ fn shaped_myanmar_attaches_marks() {
     let bmp = render_page(&doc_path, 0, RenderOptions::default()).expect("renders");
     let dark = bmp
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|p| p[0] < 128 && p[1] < 128 && p[2] < 128)
         .count();
     assert!(dark > 200, "shaped Myanmar should leave ink, got {dark}");

@@ -66,27 +66,28 @@ jobs:
           curl -fsSL -o /tmp/verapdf-installer.zip \
             "https://downloads.verapdf.org/rel/verapdf-installer.zip"
           unzip -q /tmp/verapdf-installer.zip -d /tmp/verapdf-dl
+          # Panel FQNs and pack names must match the installer's own
+          # recorded auto-install XML exactly, or izpack fails silently.
           cat > /tmp/verapdf-dl/auto-install.xml <<'XML'
-          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
           <AutomatedInstallation langpack="eng">
-            <com.izforge.izpack.panels.HTMLHelloPanel id="hello"/>
-            <com.izforge.izpack.panels.LicencePanel id="license"/>
-            <com.izforge.izpack.panels.TargetPanel id="target">
-              <installpath>tools/verapdf</installpath>
-            </com.izforge.izpack.panels.TargetPanel>
-            <com.izforge.izpack.panels.PacksPanel id="packs">
-              <pack index="0" name="veraPDF GUI" selected="true"/>
-              <pack index="1" name="Mac/*nix Scripts" selected="true"/>
-              <pack index="2" name="Validation model" selected="true"/>
-              <pack index="3" name="Documentation" selected="true"/>
-              <pack index="4" name="Sample Plugins" selected="false"/>
-            </com.izforge.izpack.panels.PacksPanel>
-            <com.izforge.izpack.panels.InstallPanel id="install"/>
-            <com.izforge.izpack.panels.FinishPanel id="finish"/>
+          <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+          <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
+          <installpath>/home/runner/work/PDFgen/PDFgen/tools/verapdf</installpath>
+          </com.izforge.izpack.panels.target.TargetPanel>
+          <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">
+          <pack index="0" name="veraPDF GUI" selected="true"/>
+          <pack index="1" name="veraPDF Mac and *nix Scripts" selected="true"/>
+          <pack index="2" name="veraPDF Validation model" selected="true"/>
+          <pack index="3" name="veraPDF Documentation" selected="true"/>
+          <pack index="4" name="veraPDF Sample Plugins" selected="false"/>
+          </com.izforge.izpack.panels.packs.PacksPanel>
+          <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+          <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>
           </AutomatedInstallation>
           XML
           JAR=$(find /tmp/verapdf-dl -name 'verapdf-izpack-installer-*.jar' | head -1)
           java -jar "$JAR" /tmp/verapdf-dl/auto-install.xml
+          tools/verapdf/verapdf --version
 
       - name: Validate every generated PDF (fail on any failed check)
         run: bash scripts/verapdf-gate.sh

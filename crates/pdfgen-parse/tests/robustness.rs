@@ -104,5 +104,5 @@ fn garbage_bytes_never_panic() {
     let path = out("robust_base.pdf");
     std::fs::write(&path, base_pdf()).unwrap();
     let mut r = PdfReader::open(&path).unwrap();
-    assert!(r.pages().unwrap().len() == 1);
+    assert_eq!(r.pages().unwrap().len(), 1);
 }

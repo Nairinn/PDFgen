@@ -56,7 +56,9 @@ fn octal_escaped_cid_text_renders() {
     let bmp = render_page(&path, 0, RenderOptions::default()).expect("renders");
     let dark = bmp
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|p| p[0] < 128 && p[1] < 128 && p[2] < 128)
         .count();
     // With broken decoding this previously collapsed to far fewer glyphs.

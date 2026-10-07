@@ -46,7 +46,9 @@ fn renders_text_and_geometry() {
     // Count dark pixels — text should produce plenty.
     let dark = bmp
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|p| p[0] < 128 && p[1] < 128 && p[2] < 128)
         .count();
     assert!(dark > 500, "expected ink, got {dark} dark pixels");
@@ -55,7 +57,9 @@ fn renders_text_and_geometry() {
     // content starting at the top.
     let top_dark = bmp
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .enumerate()
         .filter(|(i, p)| {
             let y = i / (bmp.width as usize * 4);
@@ -113,7 +117,9 @@ fn renders_cid_text() {
     let bmp = render_page(&path, 0, RenderOptions::default()).expect("renders CID page");
     let dark = bmp
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|p| p[0] < 128 && p[1] < 128 && p[2] < 128)
         .count();
     assert!(dark > 100, "CID glyphs should leave ink, got {dark}");
