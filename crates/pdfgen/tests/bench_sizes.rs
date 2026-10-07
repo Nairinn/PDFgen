@@ -19,6 +19,7 @@ fn report_sizes_and_timings() {
             StreamEvent::Begin {
                 tag: if i % 5 == 0 { "H1" } else { "P" }.into(),
                 alt: None,
+                attrs: None,
             },
             StreamEvent::Text {
                 text: format!(

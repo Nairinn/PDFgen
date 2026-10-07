@@ -329,11 +329,11 @@ fn subset_impl(
     // post v3.0: fixed 32-byte header, no glyph-name data.
     {
         let mut post: Vec<u8> = Vec::with_capacity(32);
-        post.extend_from_slice(&0x00030000u32.to_be_bytes()); // version
-        post.extend_from_slice(&0x00000000u32.to_be_bytes()); // italicAngle
+        post.extend_from_slice(&0x0003_0000_u32.to_be_bytes()); // version
+        post.extend_from_slice(&0x0000_0000_u32.to_be_bytes()); // italicAngle
         post.extend_from_slice(&[0, 0]); // underlinePosition
         post.extend_from_slice(&[0, 0]); // underlineThickness
-        post.extend_from_slice(&0x00000000u32.to_be_bytes()); // isFixedPitch
+        post.extend_from_slice(&0x0000_0000_u32.to_be_bytes()); // isFixedPitch
         post.extend_from_slice(&[0; 16]); // memType42..magicNumber
         out_tables.push((b"post", post));
     }

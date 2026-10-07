@@ -45,6 +45,7 @@ fn ensure_streamed() {
         batch.push(pdfgen::StreamEvent::Begin {
             tag: if is_h { "H1" } else { "P" }.into(),
             alt: None,
+            attrs: None,
         });
         batch.push(pdfgen::StreamEvent::Text {
             text: if is_h {

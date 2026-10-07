@@ -60,14 +60,26 @@ pub fn html_file_to_pdf(
     html_to_pdf(&html, out_path, title, lang)
 }
 
-/// Convert an HTML string to a tagged PDF at `out_path`.
+/// Convert an HTML string to a tagged PDF at `out_path` (PDF/UA-1).
 pub fn html_to_pdf(
     html: &str,
     out_path: &str,
     title: &str,
     lang: &str,
 ) -> Result<pdfgen_profile::SaveReport, HtmlError> {
-    let mut w = StreamWriter::create(out_path, Profile::PdfUa1, title, lang)?;
+    html_to_pdf_profiled(html, out_path, Profile::PdfUa1, title, lang)
+}
+
+/// Convert an HTML string to a tagged PDF at `out_path`, with an
+/// explicit accessibility profile (UA-1 or UA-2).
+pub fn html_to_pdf_profiled(
+    html: &str,
+    out_path: &str,
+    profile: Profile,
+    title: &str,
+    lang: &str,
+) -> Result<pdfgen_profile::SaveReport, HtmlError> {
+    let mut w = StreamWriter::create(out_path, profile, title, lang)?;
 
     let mut batch: Vec<StreamEvent> = Vec::with_capacity(64);
     // Text accumulated for the currently open block.
@@ -122,29 +134,42 @@ pub fn html_to_pdf(
                         batch.push(StreamEvent::Begin {
                             tag: block_tag(&name).unwrap(),
                             alt: None,
+                            attrs: None,
                         });
                         text.clear();
                     }
                     "li" => {
                         text.clear();
                     }
-                    "ul" | "ol" => {
+                    "ul" => {
+                        in_list = true;
+                        // UA-2 (ISO 14289-2 8.2.5.25): L carries ListNumbering.
+                        batch.push(StreamEvent::Begin {
+                            tag: "L".into(),
+                            alt: None,
+                            attrs: Some(vec![("ListNumbering".into(), "Disc".into())]),
+                        });
+                    }
+                    "ol" => {
                         in_list = true;
                         batch.push(StreamEvent::Begin {
                             tag: "L".into(),
                             alt: None,
+                            attrs: Some(vec![("ListNumbering".into(), "Decimal".into())]),
                         });
                     }
                     "table" => {
                         batch.push(StreamEvent::Begin {
                             tag: "Table".into(),
                             alt: None,
+                            attrs: None,
                         });
                     }
                     "tr" => {
                         batch.push(StreamEvent::Begin {
                             tag: "TR".into(),
                             alt: None,
+                            attrs: None,
                         });
                     }
                     "br" => {
@@ -160,6 +185,7 @@ pub fn html_to_pdf(
                             batch.push(StreamEvent::Begin {
                                 tag: "Figure".into(),
                                 alt: if alt.is_empty() { None } else { Some(alt) },
+                                attrs: None,
                             });
                             batch.push(StreamEvent::Image {
                                 path: src,
@@ -252,10 +278,12 @@ fn flush_list_item(batch: &mut Vec<StreamEvent>, text: &mut String, in_list: boo
     batch.push(StreamEvent::Begin {
         tag: "LI".into(),
         alt: None,
+        attrs: None,
     });
     batch.push(StreamEvent::Begin {
         tag: "Lbl".into(),
         alt: None,
+        attrs: None,
     });
     batch.push(StreamEvent::Text {
         text: "\u{2022}".into(),
@@ -266,6 +294,7 @@ fn flush_list_item(batch: &mut Vec<StreamEvent>, text: &mut String, in_list: boo
     batch.push(StreamEvent::Begin {
         tag: "LBody".into(),
         alt: None,
+        attrs: None,
     });
     let cleaned = normalize_ws(text);
     if !cleaned.is_empty() {

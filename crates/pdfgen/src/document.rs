@@ -435,11 +435,23 @@ impl Document {
             if let Some(alt) = &node.alt {
                 e.set("Alt", PdfString::text(alt));
             }
+            let mut a_entries: Vec<Object> = Vec::new();
             if !node.scope.is_empty() {
                 let mut a = Dict::new();
                 a.set("O", "Table");
                 a.set("Scope", node.scope.as_str());
-                e.set("A", Object::Array(vec![Object::Dict(a)]));
+                a_entries.push(Object::Dict(a));
+            }
+            if !node.attrs.is_empty() {
+                let mut a = Dict::new();
+                a.set("O", "List");
+                for (k, v) in &node.attrs {
+                    a.set(k.as_str(), v.as_str());
+                }
+                a_entries.push(Object::Dict(a));
+            }
+            if !a_entries.is_empty() {
+                e.set("A", Object::Array(a_entries));
             }
             for &(pgi, mcid) in &node.pieces {
                 leaf_map.push((pgi, mcid, r));
@@ -1039,7 +1051,7 @@ impl Document {
         let widths: Vec<Object> = (0u8..=255)
             .map(|b| match f.width_for_byte(b) {
                 Some(w) => Object::Int((f64::from(w) * 1000.0 / scale).round() as i64),
-                None => Object::Int((f64::from(notdef_units) * 1000.0 / scale).round() as i64),
+                None => Object::Int((notdef_units as f64 * 1000.0 / scale).round() as i64),
             })
             .collect();
         let to_thousandths = |v: f64| Object::Real(Real((v * 1000.0 / scale).round()));

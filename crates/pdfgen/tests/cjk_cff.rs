@@ -19,39 +19,44 @@ fn cjk_cff_font_passes() {
         eprintln!("skipping: CJK fonts not fetched (run scripts/fetch-cjk-fonts.sh)");
         return;
     }
-    let mut doc = Document::new(Profile::PdfUa1);
-    doc.title("CJK font test").lang("ja");
+    for (profile, name) in [
+        (Profile::PdfUa1, "cjk_cff_ua1"),
+        (Profile::PdfUa2, "cjk_cff_ua2"),
+    ] {
+        let mut doc = Document::new(profile);
+        doc.title("CJK font test").lang("ja");
 
-    let latin = doc.font("Noto Sans", "Regular").expect("latin");
-    let jp = doc.font("Noto Sans CJK JP", "Regular").expect("cjk");
+        let latin = doc.font("Noto Sans", "Regular").expect("latin");
+        let jp = doc.font("Noto Sans CJK JP", "Regular").expect("cjk");
 
-    {
-        let mut flow = doc.flow();
-        flow.heading(1, "CJK Embedding Test").unwrap();
-        // "こんにちは、PDF" (konnichiwa, PDF)
-        flow.paragraph_in(
-            jp,
-            12.0,
-            "\u{3053}\u{3093}\u{306B}\u{3061}\u{306F}\u{3001}PDF",
-        )
-        .unwrap();
-        // Kanji: "日本語の埋め込みテスト" (embedded Japanese test)
-        flow.paragraph_in(
+        {
+            let mut flow = doc.flow();
+            flow.heading(1, "CJK Embedding Test").unwrap();
+            // "こんにちは、PDF" (konnichiwa, PDF)
+            flow.paragraph_in(
+                jp,
+                12.0,
+                "\u{3053}\u{3093}\u{306B}\u{3061}\u{306F}\u{3001}PDF",
+            )
+            .unwrap();
+            // Kanji: "日本語の埋め込みテスト" (embedded Japanese test)
+            flow.paragraph_in(
             jp,
             12.0,
             "\u{65E5}\u{672C}\u{8A9E}\u{306E}\u{57CB}\u{3081}\u{8FBC}\u{307F}\u{30C6}\u{30B9}\u{30C8}",
         )
         .unwrap();
-        flow.paragraph_in(latin, 11.0, "CFF outlines embed as FontFile3 (OpenType).")
-            .unwrap();
-    }
+            flow.paragraph_in(latin, 11.0, "CFF outlines embed as FontFile3 (OpenType).")
+                .unwrap();
+        }
 
-    let path = out("cjk_cff_ua1.pdf");
-    let report = doc.save(&path).unwrap();
-    assert_eq!(
-        report.status,
-        Status::Compliant,
-        "violations: {:#?}",
-        report.violations
-    );
+        let path = out(&format!("{name}.pdf"));
+        let report = doc.save(&path).unwrap();
+        assert_eq!(
+            report.status,
+            Status::Compliant,
+            "{name} violations: {:#?}",
+            report.violations
+        );
+    }
 }

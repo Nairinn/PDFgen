@@ -85,3 +85,36 @@ fn asme_drawing_sheet_is_compliant() {
         report.violations
     );
 }
+
+#[test]
+fn asme_drawing_sheet_is_compliant_ua2() {
+    if !std::path::Path::new(ARIAL).exists() {
+        eprintln!("skipping: {ARIAL} not found");
+        return;
+    }
+    let mut doc = Document::new(Profile::PdfUa2);
+    doc.title("BRACKET, MOUNTING - Drawing").lang("en-US");
+    doc.load_font(ARIAL).unwrap();
+
+    let mut d = Drawing::new(&mut doc, Sheet::A);
+    d.title_block(&[
+        TitleField {
+            label: "TITLE",
+            value: "BRACKET, MOUNTING".into(),
+        },
+        TitleField {
+            label: "DWG NO",
+            value: "A-1234-B".into(),
+        },
+    ]);
+    d.part_rect(150.0, 120.0, 120.0, 60.0);
+    d.finish_as_figure("Mounting bracket drawing, UA-2 build.");
+    let path = out("drawing_ua2.pdf");
+    let report = doc.save(&path).unwrap();
+    assert_eq!(
+        report.status,
+        Status::Compliant,
+        "violations: {:#?}",
+        report.violations
+    );
+}

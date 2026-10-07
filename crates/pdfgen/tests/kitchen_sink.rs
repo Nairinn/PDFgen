@@ -1,5 +1,6 @@
 //! Kitchen-sink test: lists, tables, figures, header/footer artifacts in
-//! one document. veraPDF is the acceptance bar.
+//! one document. veraPDF is the acceptance bar. Built in BOTH profiles
+//! (UA-1 and UA-2) per the cleanup spec's Definition of Done.
 
 use pdfgen::{Document, Image, Profile, Status};
 
@@ -9,15 +10,8 @@ const RED_BOX: &str = concat!(
     "/../../tests/fixtures/red_box.png"
 );
 
-#[test]
-fn lists_tables_figures_artifacts() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
-        return;
-    }
-    let out_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/output");
-
-    let mut doc = Document::new(Profile::PdfUa1);
+fn build(profile: Profile) -> Document {
+    let mut doc = Document::new(profile);
     doc.title("Kitchen sink: lists, tables, figures")
         .lang("en-US");
     doc.load_font(ARIAL).unwrap();
@@ -58,13 +52,29 @@ fn lists_tables_figures_artifacts() {
         .unwrap();
     flow.footer("Page furniture — footer").unwrap();
     drop(flow);
+    doc
+}
 
-    let path = format!("{out_dir}/kitchensink_ua1.pdf");
-    let report = doc.save(&path).unwrap();
-    assert_eq!(
-        report.status,
-        Status::Compliant,
-        "violations: {:#?}",
-        report.violations
-    );
+#[test]
+fn lists_tables_figures_artifacts() {
+    if !std::path::Path::new(ARIAL).exists() {
+        eprintln!("skipping: {ARIAL} not found");
+        return;
+    }
+    let out_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/output");
+
+    for (profile, name) in [
+        (Profile::PdfUa1, "kitchensink_ua1"),
+        (Profile::PdfUa2, "kitchensink_ua2"),
+    ] {
+        let mut doc = build(profile);
+        let path = format!("{out_dir}/{name}.pdf");
+        let report = doc.save(&path).unwrap();
+        assert_eq!(
+            report.status,
+            Status::Compliant,
+            "{name} violations: {:#?}",
+            report.violations
+        );
+    }
 }

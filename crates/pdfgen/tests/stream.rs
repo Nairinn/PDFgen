@@ -17,6 +17,7 @@ fn stream_large_document() {
         batch.push(StreamEvent::Begin {
             tag: if s % 25 == 0 { "H1".into() } else { "P".into() },
             alt: None,
+            attrs: None,
         });
         batch.push(StreamEvent::Text {
             text: format!(

@@ -22,6 +22,8 @@ pub struct Node {
     pub alt: Option<String>,
     /// Table cell scope: `Column`, `Row`, or `Both` (PDF/UA 15-003).
     pub scope: String,
+    /// Extra structure attributes written into /A, e.g. ListNumbering.
+    pub attrs: Vec<(String, String)>,
     /// Index of the font in the document's font list (leaves only).
     pub font: usize,
     /// Font size in points (leaves only).
@@ -40,6 +42,7 @@ impl Node {
             artifact: false,
             alt: None,
             scope: String::new(),
+            attrs: Vec::new(),
             font,
             size,
             text,
@@ -55,6 +58,7 @@ impl Node {
             artifact: false,
             alt: None,
             scope: String::new(),
+            attrs: Vec::new(),
             font: 0,
             size: 0.0,
             text: String::new(),

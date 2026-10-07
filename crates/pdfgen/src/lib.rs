@@ -39,7 +39,7 @@ pub use document::Document;
 pub use extract::{extract_text, PageText};
 pub use flow::Flow;
 pub use form::fill_text_field;
-pub use html::{html_file_to_pdf, html_to_pdf, HtmlError};
+pub use html::{html_file_to_pdf, html_to_pdf, html_to_pdf_profiled, HtmlError};
 pub use image::{Image, ImageError, ImageKind};
 pub use page::Page;
 pub use pdfgen_font::{FontError, LoadedFont};

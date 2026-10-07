@@ -25,6 +25,9 @@ pub enum StreamEvent {
         tag: String,
         /// Alt text (figures), if any.
         alt: Option<String>,
+        /// Extra structure attributes for /A, e.g. ListNumbering
+        /// (UA-2 ISO 14289-2 8.2.5.25). None for most elements.
+        attrs: Option<Vec<(String, String)>>,
     },
     /// A chunk of text inside the current element. Chunks are large and
     /// pre-split by the caller; the writer wraps them to the page.
@@ -134,6 +137,8 @@ pub struct StreamWriter {
 struct OpenElem {
     tag: String,
     alt: Option<String>,
+    /// Extra /A structure attributes, e.g. ListNumbering.
+    attrs: Vec<(String, String)>,
     pieces: Vec<(usize, u32)>,
     /// Completed child element indexes (into the elems tree).
     children: Vec<u32>,
@@ -145,6 +150,8 @@ struct OpenElem {
 struct ElemRecord {
     tag: String,
     alt: Option<String>,
+    /// Extra /A structure attributes, e.g. ListNumbering.
+    attrs: Vec<(String, String)>,
     pieces: Vec<(usize, u32)>,
     children: Vec<u32>,
     /// Table cell scope ("Column" for TH), if any.
@@ -211,7 +218,7 @@ impl StreamWriter {
 
     fn one(&mut self, ev: StreamEvent) -> Result<(), StreamError> {
         match ev {
-            StreamEvent::Begin { tag, alt } => {
+            StreamEvent::Begin { tag, alt, attrs } => {
                 // TH cells get Scope=Column automatically (PDF/UA 15-003).
                 let scope = if tag == "TH" {
                     Some("Column".to_string())
@@ -220,6 +227,7 @@ impl StreamWriter {
                 };
                 self.open.push(OpenElem {
                     tag,
+                    attrs: attrs.unwrap_or_default(),
                     alt,
                     pieces: Vec::new(),
                     children: Vec::new(),
@@ -232,6 +240,7 @@ impl StreamWriter {
                     self.open.push(OpenElem {
                         tag: "P".into(),
                         alt: None,
+                        attrs: Vec::new(),
                         pieces: Vec::new(),
                         children: Vec::new(),
                         scope: None,
@@ -286,6 +295,7 @@ impl StreamWriter {
                     self.open.push(OpenElem {
                         tag: "Figure".into(),
                         alt: None,
+                        attrs: Vec::new(),
                         pieces: vec![piece],
                         children: Vec::new(),
                         scope: None,
@@ -323,6 +333,7 @@ impl StreamWriter {
         self.elems.push(ElemRecord {
             tag: elem.tag,
             alt: elem.alt,
+            attrs: elem.attrs,
             pieces: elem.pieces,
             children: elem.children,
             scope: elem.scope,
@@ -683,13 +694,25 @@ impl StreamWriter {
                 if let Some(alt) = &rec.alt {
                     e.set("Alt", PdfString::text(alt));
                 }
-                // Table-cell Scope attribute (PDF/UA 15-003): an /A
-                // attribute array owned by this element.
+                // Structure attributes (PDF/UA 15-003 Scope,
+                // 8.2.5.25 ListNumbering): an /A attribute array.
+                let mut a_entries: Vec<Object> = Vec::new();
                 if let Some(scope) = &rec.scope {
                     let mut a = Dict::new();
                     a.set("O", "Table");
                     a.set("Scope", scope.as_str());
-                    e.set("A", Object::Array(vec![Object::Dict(a)]));
+                    a_entries.push(Object::Dict(a));
+                }
+                if !rec.attrs.is_empty() {
+                    let mut a = Dict::new();
+                    a.set("O", "List");
+                    for (k, v) in &rec.attrs {
+                        a.set(k.as_str(), v.as_str());
+                    }
+                    a_entries.push(Object::Dict(a));
+                }
+                if !a_entries.is_empty() {
+                    e.set("A", Object::Array(a_entries));
                 }
                 Object::Dict(e)
             })

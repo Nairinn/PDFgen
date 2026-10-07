@@ -1,7 +1,6 @@
 //! HTML-to-PDF end-to-end: structural HTML in, compliant tagged PDF out.
 
-use pdfgen::html_to_pdf;
-use pdfgen::Status;
+use pdfgen::{html_to_pdf, html_to_pdf_profiled, Profile, Status};
 
 #[test]
 fn html_document_to_compliant_pdf() {
@@ -12,15 +11,17 @@ fn html_document_to_compliant_pdf() {
     );
 
     let html = std::fs::read_to_string(fixture).expect("fixture html");
-    let path = format!("{out_dir}/html_ua1.pdf");
-    let report = html_to_pdf(&html, &path, "HTML Source Document", "en-US").expect("convert");
-
-    assert_eq!(
-        report.status,
-        Status::Compliant,
-        "violations: {:#?}",
-        report.violations
-    );
+    for (profile, name) in [(Profile::PdfUa1, "html_ua1"), (Profile::PdfUa2, "html_ua2")] {
+        let path = format!("{out_dir}/{name}.pdf");
+        let report = html_to_pdf_profiled(&html, &path, profile, "HTML Source Document", "en-US")
+            .expect("convert");
+        assert_eq!(
+            report.status,
+            Status::Compliant,
+            "{name} violations: {:#?}",
+            report.violations
+        );
+    }
 }
 
 #[test]

@@ -35,6 +35,27 @@ fn forms_create_fill_and_stay_compliant() {
         report.violations
     );
 
+    // --- 1b. UA-2 twin: the same form must also pass the UA-2 profile
+    // (the cleanup spec's Definition of Done covers forms in both).
+    let mut doc2 = Document::new(Profile::PdfUa2);
+    doc2.title("Service Request Form").lang("en-US");
+    doc2.load_font(ARIAL).unwrap();
+    let mut flow2 = doc2.flow();
+    flow2.heading(1, "Service Request Form").unwrap();
+    flow2
+        .paragraph("Fill in the fields below; screen readers announce each label.")
+        .unwrap();
+    flow2.text_field("Full name", "fullname").unwrap();
+    flow2.text_field("Email address", "email").unwrap();
+    drop(flow2);
+    let report2 = doc2.save(&format!("{out_dir}/form_ua2.pdf")).unwrap();
+    assert_eq!(
+        report2.status,
+        Status::Compliant,
+        "ua2 violations: {:#?}",
+        report2.violations
+    );
+
     // The file has an AcroForm with two /TU-annotated fields.
     let bytes = std::fs::read(&path).unwrap();
     assert!(

@@ -253,6 +253,8 @@ impl<'a> Flow<'a> {
     /// Tagged bullet list: `L > LI > (Lbl, LBody)`.
     pub fn bullet_list(&mut self, items: &[&str]) -> Result<(), FontError> {
         let mut list = Node::group("L");
+        // UA-2 (ISO 14289-2 8.2.5.25): L must carry /ListNumbering.
+        list.attrs.push(("ListNumbering".into(), "Disc".into()));
         for item in items {
             self.ensure_space(11.0 * LH);
             let (lbl_mcid, y1) =
@@ -495,10 +497,24 @@ impl<'a> Flow<'a> {
         });
 
         self.y = y_box - 8.0;
-        self.doc.pages[self.page_idx].nodes.push(
+        // UA-2 (ISO 32005 / 14289-2 8.2.5.27): a Caption must be the
+        // first or last child of its parent, so wrap it in a Form
+        // group. UA-1 (7.18.4) instead wants Form to hold exactly one
+        // widget-identifying child, which needs the OBJR work; keep
+        // the bare root-level Caption there until that lands.
+        let node = if self.doc.profile == pdfgen_profile::Profile::PdfUa2 {
+            Node::group("Form").with_children(vec![Node::leaf(
+                "Caption",
+                label.to_string(),
+                0,
+                11.0,
+            )
+            .with_pieces(vec![(self.page_idx, mcid)])])
+        } else {
             Node::leaf("Caption", label.to_string(), 0, 11.0)
-                .with_pieces(vec![(self.page_idx, mcid)]),
-        );
+                .with_pieces(vec![(self.page_idx, mcid)])
+        };
+        self.doc.pages[self.page_idx].nodes.push(node);
         self.sync_cursor();
         Ok(())
     }

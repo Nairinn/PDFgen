@@ -14,12 +14,21 @@ const RED_BOX: &str = concat!(
 
 #[test]
 fn image_then_text_no_duplicates_across_pages() {
+    for (profile, name) in [
+        (Profile::PdfUa1, "stream_images_regression"),
+        (Profile::PdfUa2, "stream_images_ua2"),
+    ] {
+        run_stream_images(profile, name);
+    }
+}
+
+fn run_stream_images(profile: Profile, name: &str) {
     if !std::path::Path::new(RED_BOX).exists() {
         eprintln!("skipping: fixture missing");
         return;
     }
-    let path = out("stream_images_regression.pdf");
-    let mut w = StreamWriter::create(&path, Profile::PdfUa1, "Stream images", "en-US").unwrap();
+    let path = out(&format!("{name}.pdf"));
+    let mut w = StreamWriter::create(&path, profile, "Stream images", "en-US").unwrap();
 
     // Page 1: a figure, then a paragraph after it (the paragraph must NOT
     // nest inside the Figure's marked content).
@@ -27,6 +36,7 @@ fn image_then_text_no_duplicates_across_pages() {
         StreamEvent::Begin {
             tag: "Figure".into(),
             alt: Some("A red box".into()),
+            attrs: None,
         },
         StreamEvent::Image {
             path: RED_BOX.into(),
@@ -37,6 +47,7 @@ fn image_then_text_no_duplicates_across_pages() {
         StreamEvent::Begin {
             tag: "P".into(),
             alt: None,
+            attrs: None,
         },
         StreamEvent::Text {
             text: "Paragraph after the figure, still on page one.".into(),
@@ -54,6 +65,7 @@ fn image_then_text_no_duplicates_across_pages() {
             StreamEvent::Begin {
                 tag: "P".into(),
                 alt: None,
+                attrs: None,
             },
             StreamEvent::Text {
                 text,
