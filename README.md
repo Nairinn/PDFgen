@@ -67,6 +67,12 @@ different priorities:
 - **Read and retag existing PDFs.** Open any file — even untagged ones —
   tag it, and save it fully compliant.
 - **Rust, Python and Kotlin** from one core (Java works via the same JNA jar).
+- **Complex scripts shaped correctly.** HarfBuzz shaping and Unicode bidi run
+  on every non-Latin text path — Arabic, Myanmar, Thai render the way they
+  should, not as disconnected cmap lookups.
+- **The verification is reproducible.** CI downloads veraPDF and validates
+  every generated fixture against PDF/UA-1 and PDF/UA-2, failing on any
+  check — "verified by veraPDF" is a build status, not a claim.
 
 ## What's done — verified by veraPDF 1.30.2, not self-graded
 
@@ -88,7 +94,7 @@ different priorities:
 | Retag | Import any PDF, extract text, auto/manual tagging, save compliant |
 | Reports | Machine checks with Matterhorn IDs + human-review checklist on every save |
 | Bindings | Python (PyO3, abi3 ≥ 3.9, `PdfUaWarning` on non-compliant saves), Kotlin/Java (UniFFI + JNA, Java 11+), and Java 22+ (`java.lang.foreign` FFM, no JNI/JNA) — all generate veraPDF-valid PDFs |
-| CID fonts | Text WinAnsi can't encode flows through Type0 Identity-H composite fonts automatically (Myanmar, Korean, Greek, CJK); TTC collections sliced to standalone programs. **Shaping caveat:** glyphs are placed in logical order without an OpenType shaping engine or bidi handling — Arabic renders as unjoined left-to-right letters and Myanmar/Thai stack marks incorrectly. Text extraction and ToUnicode stay correct; visual correctness for complex scripts is on the roadmap (rustybuzz + unicode-bidi). veraPDF passes these files because validators check structure, not glyph visual order |
+| CID fonts + shaping | Text WinAnsi can't encode flows through Type0 Identity-H composite fonts automatically, shaped with HarfBuzz (rustybuzz) + Unicode bidi: Arabic joins and runs right-to-left, Myanmar marks and medials reorder, kerning applies. TTC collections slice to standalone programs; tests assert contextual forms differ from isolated cmap glyphs and rasterized output leaves real ink |
 
 ## Optional CJK fonts
 
@@ -151,6 +157,18 @@ bindings/          kotlin (UniFFI/JNA), java (FFM), python (PyO3 wheel)
 tests/output/      generated PDFs (gitignored) — all veraPDF-validated
 tools/verapdf/     local veraPDF install used as the external checker
 ```
+
+## Publishing
+
+Releases go to crates.io in dependency order (the internal crates must
+land before the ones that use them):
+
+    ./scripts/publish.sh            # all 12 crates, ordered
+    ./scripts/publish.sh --dry-run  # pack order check
+
+The Python wheel builds with maturin (see `bindings/python/`); Java/Kotlin
+consume the JNA jar or the Java 22+ FFM cdylib. Publishing credentials
+are required: `cargo login` for crates.io and `twine` for PyPI.
 
 ## Development
 

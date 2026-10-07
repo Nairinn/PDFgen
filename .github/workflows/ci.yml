@@ -64,7 +64,7 @@ jobs:
         run: |
           mkdir -p tools/verapdf
           curl -fsSL -o /tmp/verapdf-installer.zip \
-            "http://downloads.verapdf.org/rel/verapdf-installer.zip"
+            "https://downloads.verapdf.org/rel/verapdf-installer.zip"
           unzip -q /tmp/verapdf-installer.zip -d /tmp/verapdf-dl
           cat > /tmp/verapdf-dl/auto-install.xml <<'XML'
           <?xml version="1.0" encoding="UTF-8" standalone="no"?>
