@@ -313,15 +313,30 @@ fn subset_impl(
     let fmt: i16 = i16::from(!can_short_loca);
     new_head[50..52].copy_from_slice(&fmt.to_be_bytes());
 
-    // Keep other tables verbatim (OS/2, name, post, GDEF? GSUB may
-    // reference glyphs — drop layout tables to stay safe and small).
-    let keep_tags: &[&[u8; 4]] = &[
-        b"OS/2", b"name", b"post", b"cvt ", b"fpgm", b"prep", b"gasp",
-    ];
+    // Keep other tables verbatim (OS/2, name, GDEF? GSUB may reference
+    // glyphs — drop layout tables to stay safe and small).
+    // NOTE: `post` is deliberately NOT copied: a v2 post table embeds
+    // numberOfGlyphs and a glyph-name index sized to the ORIGINAL
+    // glyph count; after subsetting both are wrong and validators that
+    // trust post over maxp (veraPDF) misparse the whole program.
+    // Rewriting a version-3 post (no glyph names) is the safe minimal
+    // replacement.
+    let keep_tags: &[&[u8; 4]] = &[b"OS/2", b"name", b"cvt ", b"fpgm", b"prep", b"gasp"];
     let mut out_tables: Vec<(&[u8; 4], Vec<u8>)> = vec![(b"head", new_head)];
     out_tables.push((b"hhea", new_hhea));
     out_tables.push((b"maxp", new_maxp));
     out_tables.push((b"hmtx", new_hmtx));
+    // post v3.0: fixed 32-byte header, no glyph-name data.
+    {
+        let mut post: Vec<u8> = Vec::with_capacity(32);
+        post.extend_from_slice(&0x00030000u32.to_be_bytes()); // version
+        post.extend_from_slice(&0x00000000u32.to_be_bytes()); // italicAngle
+        post.extend_from_slice(&[0, 0]); // underlinePosition
+        post.extend_from_slice(&[0, 0]); // underlineThickness
+        post.extend_from_slice(&0x00000000u32.to_be_bytes()); // isFixedPitch
+        post.extend_from_slice(&[0; 16]); // memType42..magicNumber
+        out_tables.push((b"post", post));
+    }
     if let Some(cm) = new_cmap.clone() {
         out_tables.push((b"cmap", cm));
     }

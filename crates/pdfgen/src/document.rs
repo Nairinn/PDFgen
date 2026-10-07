@@ -1031,10 +1031,15 @@ impl Document {
         let scale = f64::from(f.units_per_em);
         // /Widths must be in 1000-unit text space, consistent with the
         // embedded font program (veraPDF UA-2 8.4.5.6 checks this).
+        // Bytes the font has no glyph for still render (as .notdef in the
+        // embedded program), so their Widths entry must match .notdef's
+        // advance — otherwise validators flag dict-vs-program width
+        // mismatches (ISO 14289-1 7.21.4.1).
+        let notdef_units = f.glyph_width_units(0).unwrap_or(0);
         let widths: Vec<Object> = (0u8..=255)
             .map(|b| match f.width_for_byte(b) {
                 Some(w) => Object::Int((f64::from(w) * 1000.0 / scale).round() as i64),
-                None => Object::Int(0),
+                None => Object::Int((f64::from(notdef_units) * 1000.0 / scale).round() as i64),
             })
             .collect();
         let to_thousandths = |v: f64| Object::Real(Real((v * 1000.0 / scale).round()));

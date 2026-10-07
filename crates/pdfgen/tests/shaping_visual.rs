@@ -18,7 +18,6 @@ fn shaped_arabic_renders_joined_forms() {
     let f = doc.font(ar, "Regular").expect("arabic");
     {
         let mut flow = doc.flow();
-        flow.heading(1, "Shaping regression").unwrap();
         flow.paragraph_in(f, 16.0, "\u{0645}\u{0631}\u{062D}\u{0628}\u{0627}")
             .unwrap();
     }
