@@ -24,7 +24,7 @@ fn xml_escape(s: &str) -> String {
 /// The packet always carries the PDF/UA identifier when the document is
 /// compliant; when it is not, `claim_ua` is false and the packet instead
 /// records the document's accessibility status without claiming conformance.
-#[must_use] 
+#[must_use]
 pub fn build(meta: &Metadata, ua_part: u32, claim_ua: bool) -> Vec<u8> {
     let mut rdf = String::new();
 

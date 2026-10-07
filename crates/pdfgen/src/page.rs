@@ -106,6 +106,13 @@ impl<'a> Page<'a> {
         size: f64,
     ) -> Result<(), FontError> {
         let encoded = pdfgen_font::winansi::encode(text)?;
+        // Record byte usage so save() subsets this font correctly.
+        {
+            let slot = self.doc.winansi_used.entry(font).or_insert([false; 256]);
+            for &b in &encoded {
+                slot[usize::from(b)] = true;
+            }
+        }
         let x = self.margin;
         let y = self.next_baseline(size);
         let pd = &mut self.doc.pages[self.idx];
@@ -119,7 +126,7 @@ impl<'a> Page<'a> {
     }
 
     /// Remaining vertical space to the bottom margin.
-    #[must_use] 
+    #[must_use]
     pub fn remaining(&self) -> f64 {
         self.y - self.margin
     }

@@ -162,13 +162,13 @@ impl LoadedFont {
     }
 
     /// Width of a WinAnsi-encoded byte in glyph units, if mapped.
-    #[must_use] 
+    #[must_use]
     pub fn width_for_byte(&self, byte: u8) -> Option<u16> {
         self.win_ansi_widths[usize::from(byte)]
     }
 
     /// Width of a byte in points at the given font size.
-    #[must_use] 
+    #[must_use]
     pub fn byte_width_pt(&self, byte: u8, size: f64) -> Option<f64> {
         self.width_for_byte(byte)
             .map(|w| f64::from(w) * size / f64::from(self.units_per_em))
@@ -205,17 +205,16 @@ impl LoadedFont {
     }
 
     /// True when the font's license flags restrict embedding.
-    #[must_use] 
+    #[must_use]
     pub fn embedding_restricted(&self) -> bool {
         matches!(
             self.permissions,
-            Some(ttf_parser::Permissions::Restricted |
-ttf_parser::Permissions::PreviewAndPrint)
+            Some(ttf_parser::Permissions::Restricted | ttf_parser::Permissions::PreviewAndPrint)
         )
     }
 
     /// Glyph ID for a Unicode character, for CID (Type0) encoding.
-    #[must_use] 
+    #[must_use]
     pub fn glyph_index(&self, ch: char) -> Option<u16> {
         let face = ttf_parser::Face::parse(&self.raw, 0).ok()?;
         face.glyph_index(ch).map(|g| g.0)
@@ -229,7 +228,7 @@ ttf_parser::Permissions::PreviewAndPrint)
     }
 
     /// Flag bits for `/Flags` in the font descriptor.
-    #[must_use] 
+    #[must_use]
     pub fn descriptor_flags(&self) -> i64 {
         // 32 = non-symbolic.
         32

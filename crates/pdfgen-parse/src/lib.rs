@@ -18,7 +18,7 @@ pub use pdf_string::{read_hex, read_literal};
 
 /// zlib-inflate bytes (FlateDecode without predictors). Returns None on
 /// invalid streams.
-#[must_use] 
+#[must_use]
 pub fn inflate(data: &[u8]) -> Option<Vec<u8>> {
     use flate2::read::ZlibDecoder;
     use std::io::Read as _;

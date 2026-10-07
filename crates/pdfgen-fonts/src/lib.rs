@@ -212,7 +212,7 @@ const STANDARD_14: &[(&str, &str, &str)] = &[
 ];
 
 /// Resolve a standard-14 / common name to its look-alike family.
-#[must_use] 
+#[must_use]
 #[allow(clippy::too_many_lines)]
 pub fn standard14_family(name: &str) -> Option<(&'static str, &'static str)> {
     STANDARD_14
@@ -255,7 +255,7 @@ pub struct FontRegistry {
 
 impl FontRegistry {
     /// Debug/testing accessor: the scanned system font map, if any.
-    #[must_use] 
+    #[must_use]
     pub fn system_scan(&self) -> &HashMap<String, HashMap<String, PathBuf>> {
         static EMPTY: std::sync::OnceLock<HashMap<String, HashMap<String, PathBuf>>> =
             std::sync::OnceLock::new();
@@ -265,7 +265,7 @@ impl FontRegistry {
     }
 
     /// New empty registry (no system scan yet).
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

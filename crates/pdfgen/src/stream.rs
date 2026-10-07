@@ -279,7 +279,9 @@ impl StreamWriter {
                 // The figure piece belongs to the open element (or its own
                 // top-level element when none is open) for the ParentTree.
                 let piece = (page, mcid);
-                if let Some(elem) = self.open.last_mut() { elem.pieces.push(piece) } else {
+                if let Some(elem) = self.open.last_mut() {
+                    elem.pieces.push(piece)
+                } else {
                     // Standalone figure: make it a top-level element.
                     self.open.push(OpenElem {
                         tag: "Figure".into(),

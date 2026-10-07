@@ -50,7 +50,7 @@ pub struct Document {
 
 impl Document {
     /// New document targeting a profile.
-    #[must_use] 
+    #[must_use]
     pub fn new(profile: Profile) -> Self {
         Document {
             profile,
@@ -138,9 +138,7 @@ impl Document {
     /// substitution in the save report.
     pub fn font(&mut self, family: &str, style: &str) -> Result<usize, Box<dyn std::error::Error>> {
         let (f, resolved) = self.registry.load(family, style)?;
-        if resolved.substituted
-            && !resolved.family.eq_ignore_ascii_case(family)
-        {
+        if resolved.substituted && !resolved.family.eq_ignore_ascii_case(family) {
             self.substitutions
                 .push((family.to_string(), resolved.family.clone()));
         }
@@ -243,13 +241,7 @@ impl Document {
     /// Compute machine-check violations for the current state.
     fn violations(&self) -> Vec<Violation> {
         let mut v = Vec::new();
-        if self
-            .meta
-            .title
-            .as_deref()
-            .map_or("", str::trim)
-            .is_empty()
-        {
+        if self.meta.title.as_deref().map_or("", str::trim).is_empty() {
             v.push(pdfgen_profile::rules::violation(
                 pdfgen_profile::rules::MISSING_TITLE,
             ));
@@ -418,7 +410,7 @@ impl Document {
         // Recursive emit: allocate refs for children depth-first while
         // building the parent dict, keeping node<->ref pairs in lockstep.
         #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
-    fn emit(
+        fn emit(
             doc: &mut pdfgen_core::Document,
             node: &Node,
             r: Ref,

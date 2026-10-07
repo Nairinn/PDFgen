@@ -13,7 +13,7 @@ pub struct Ref {
 
 impl Ref {
     /// Create a reference with generation 0.
-    #[must_use] 
+    #[must_use]
     pub const fn new(id: u32) -> Self {
         Ref { id, gen: 0 }
     }
@@ -45,7 +45,7 @@ impl PdfString {
     /// PDFDocEncoding-compatible subset) passes through as-is; anything
     /// else encodes as UTF-16BE with a BOM (FE FF), which the PDF spec
     /// requires for text strings that leave PDFDocEncoding.
-    #[must_use] 
+    #[must_use]
     pub fn text(s: &str) -> Self {
         if s.is_ascii() {
             PdfString(s.as_bytes().to_vec())
@@ -64,14 +64,14 @@ impl PdfString {
 
     /// Decode a PDF text string to Rust text: UTF-16BE after a BOM, or
     /// PDFDocEncoding (treated as Latin-1) otherwise.
-    #[must_use] 
+    #[must_use]
     pub fn decode(&self) -> String {
         decode_text_bytes(&self.0)
     }
 }
 
 /// Decode PDF text-string bytes (BOM-marked UTF-16BE or PDFDocEncoding).
-#[must_use] 
+#[must_use]
 pub fn decode_text_bytes(bytes: &[u8]) -> String {
     if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
         let units: Vec<u16> = bytes[2..]
@@ -163,7 +163,7 @@ pub struct Stream {
 
 impl Stream {
     /// Create a stream with the given extra dictionary entries.
-    #[must_use] 
+    #[must_use]
     pub fn new(dict: Dict, data: Vec<u8>) -> Self {
         Stream { dict, data }
     }
@@ -176,7 +176,7 @@ pub struct Dict(pub Vec<(Name, Object)>);
 
 impl Dict {
     /// New empty dictionary.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Dict(Vec::new())
     }
@@ -201,25 +201,25 @@ impl Dict {
     }
 
     /// Look up a key.
-    #[must_use] 
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&Object> {
         self.0.iter().find(|(k, _)| k.0 == key).map(|(_, v)| v)
     }
 
     /// Check membership.
-    #[must_use] 
+    #[must_use]
     pub fn has(&self, key: &str) -> bool {
         self.get(key).is_some()
     }
 
     /// Number of entries.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
     /// True when empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

@@ -324,7 +324,17 @@ impl PdfReader {
         if index.is_empty() {
             index = vec![(0, size)];
         }
-        let row: usize = w.iter().sum();
+        // Checked row width: hostile /W entries (huge widths) must not
+        // overflow usize in the sum or the pos+row test below.
+        let mut row: usize = 0;
+        for width in &w {
+            row = row.checked_add(*width).unwrap_or(usize::MAX);
+        }
+        if row > bytes.len().max(16) {
+            // A row wider than the whole stream cannot yield entries.
+            self.rebuild_known();
+            return Ok(());
+        }
         let mut pos = 0usize;
         for (first, count) in index {
             for i in 0..count {
@@ -433,14 +443,14 @@ impl PdfReader {
     }
 
     /// All object numbers known to the reader (sorted).
-    #[must_use] 
+    #[must_use]
     pub fn object_ids(&self) -> &[u32] {
         &self.known
     }
 
     /// Known object offsets: (id, byte offset) for every in-use entry.
     /// Used by the revision crate to re-emit xref tables.
-    #[must_use] 
+    #[must_use]
     pub fn object_offsets(&self) -> Vec<(u32, u64)> {
         let mut out: Vec<(u32, u64)> = self
             .xref
@@ -641,15 +651,22 @@ impl PdfReader {
                 // Trust /Length when present: binary streams may contain
                 // the bytes "endstream" inside their data.
                 let mut body_start = lx.pos();
-                if data.get(body_start) == Some(&b'\r')
-                    && data.get(body_start + 1) == Some(&b'\n')
+                if data.get(body_start) == Some(&b'\r') && data.get(body_start + 1) == Some(&b'\n')
                 {
                     body_start += 2;
                 } else if data.get(body_start) == Some(&b'\n') {
                     body_start += 1;
                 }
                 let end = match dict.get("Length") {
-                    Some(Object::Int(l)) if (body_start + *l as usize) <= data.len() => {
+                    // Checked: a hostile /Length near i64::MAX must not
+                    // overflow usize on the add.
+                    Some(Object::Int(l))
+                        if *l >= 0
+                            && usize::try_from(*l).is_ok()
+                            && body_start
+                                .checked_add(*l as usize)
+                                .is_some_and(|e| e <= data.len()) =>
+                    {
                         let e = body_start + *l as usize;
                         // Sanity: endstream must follow (after EOL).
                         let mut probe = e;
@@ -685,7 +702,7 @@ impl PdfReader {
     }
 
     /// The trailer dictionary (catalog `/Root`, `/Info`, `/ID`, …).
-    #[must_use] 
+    #[must_use]
     pub fn trailer(&self) -> &Dict {
         &self.trailer
     }
@@ -779,12 +796,14 @@ fn parse_value(data: &[u8], lx: &mut Lexer<'_>) -> Result<Option<Object>, ParseE
     match lx.next_token()? {
         Some(Token::Int(a)) => {
             let save = lx.pos();
-            if let Some(Token::Int(_gen)) = lx.next_token()? { if let Some(Token::RefKeyword) = lx.next_token()? {
-                Ok(Some(Object::Ref(Ref::new(u32::try_from(a).unwrap_or(0)))))
+            if let Some(Token::Int(_gen)) = lx.next_token()? {
+                if let Some(Token::RefKeyword) = lx.next_token()? {
+                    Ok(Some(Object::Ref(Ref::new(u32::try_from(a).unwrap_or(0)))))
+                } else {
+                    lx.seek(save);
+                    Ok(Some(Object::Int(a)))
+                }
             } else {
-                lx.seek(save);
-                Ok(Some(Object::Int(a)))
-            } } else {
                 lx.seek(save);
                 Ok(Some(Object::Int(a)))
             }

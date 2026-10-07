@@ -34,7 +34,7 @@ pub enum PdfVersion {
 
 impl PdfVersion {
     /// Header string written after `%PDF-`, e.g. `1.7`.
-    #[must_use] 
+    #[must_use]
     pub fn header(self) -> &'static str {
         match self {
             PdfVersion::V1_7 => "1.7",

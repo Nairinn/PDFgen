@@ -11,7 +11,7 @@ type Tables = std::collections::BTreeMap<[u8; 4], Vec<u8>>;
 
 /// Build a subset font containing `used` glyphs (GIDs) plus gid 0.
 /// Returns the new sfnt bytes and the old->new GID mapping.
-#[must_use] 
+#[must_use]
 #[allow(clippy::too_many_lines)]
 pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)> {
     subset_impl(data, used, None)
@@ -21,7 +21,7 @@ pub fn subset_true_type(data: &[u8], used: &[u16]) -> Option<(Vec<u8>, Vec<u16>)
 /// so the glyph for WinAnsi byte b sits at new GID b (and the cmap maps
 /// b -> b). This keeps the font dictionary's FirstChar/LastChar/Widths
 /// and the embedded program consistent, which validators check.
-#[must_use] 
+#[must_use]
 pub fn subset_winansi(
     data: &[u8],
     byte_to_gid: &[Option<u16>; 256],

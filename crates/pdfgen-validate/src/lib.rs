@@ -35,7 +35,7 @@ pub struct Report {
 
 impl Report {
     /// True when no machine failures were found.
-    #[must_use] 
+    #[must_use]
     pub fn is_clean(&self) -> bool {
         self.findings.is_empty()
     }

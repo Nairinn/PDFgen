@@ -38,16 +38,20 @@ let report = w.finish()?;                          // pages already on disk
 
 ## Why
 
-iText is AGPL (or very expensive). PDFBox is Apache-2.0 but Java-only and its
-accessibility support is partial. Neither makes accessible output easy, and
-neither treats a PDF as a versioned document. PDFgen is a clean-room
-reimplementation from the ISO specifications with different priorities:
+iText is AGPL (or very expensive); PDFBox is Apache-2.0 but Java-only.
+PDFgen is a clean-room reimplementation from the ISO specifications with
+different priorities:
 
+- **MIT licensed, no copyleft.** Use it in any product, closed or open.
 - **Accessibility guides you, it never blocks you.** Every save writes the
   file and returns a report. If the document isn't compliant yet you get a
   plain note — `⚠ not PDF/UA compliant yet: 2 issues (13-004 Figure has no
   alt text, …)` — with Matterhorn IDs and fixes. The file simply carries no
   conformance claim until it actually passes.
+- **Revisions live in the file.** Commit, list history, diff and revert
+  without an external VCS — the PDF is the repository.
+- **An engineering-drawing kit.** ASME Y14.1 sheets, tagged title-block
+  tables and dimensions, with the revision block wired to file history.
 - **Both PDF/UA-1 and PDF/UA-2**, end to end, validated against veraPDF.
 - **Streaming, like iText: flat memory at any scale.** Completed pages are
   flushed to the output file the moment they close — content streams
@@ -84,7 +88,7 @@ reimplementation from the ISO specifications with different priorities:
 | Retag | Import any PDF, extract text, auto/manual tagging, save compliant |
 | Reports | Machine checks with Matterhorn IDs + human-review checklist on every save |
 | Bindings | Python (PyO3, abi3 ≥ 3.9, `PdfUaWarning` on non-compliant saves), Kotlin/Java (UniFFI + JNA, Java 11+), and Java 22+ (`java.lang.foreign` FFM, no JNI/JNA) — all generate veraPDF-valid PDFs |
-| CID fonts | Text WinAnsi can't encode flows through Type0 Identity-H composite fonts automatically (Myanmar, Korean, Greek, CJK); TTC collections sliced to standalone programs |
+| CID fonts | Text WinAnsi can't encode flows through Type0 Identity-H composite fonts automatically (Myanmar, Korean, Greek, CJK); TTC collections sliced to standalone programs. **Shaping caveat:** glyphs are placed in logical order without an OpenType shaping engine or bidi handling — Arabic renders as unjoined left-to-right letters and Myanmar/Thai stack marks incorrectly. Text extraction and ToUnicode stay correct; visual correctness for complex scripts is on the roadmap (rustybuzz + unicode-bidi). veraPDF passes these files because validators check structure, not glyph visual order |
 
 ## Optional CJK fonts
 
@@ -116,6 +120,8 @@ So a `cargo add pdfgen`-style install degrades gracefully: documents still build
 - ~~CJK fonts~~ (done: Noto Sans CJK JP cataloged, FontFile3/ CIDFontType0 embedding)
 - ~~Accessibility fonts~~ (done: Atkinson Hyperlegible + OpenDyslexic cataloged, veraPDF-verified)
 - ~~Rendering~~ (done: `pdfgen render` / `pdfgen print`, embedded-font glyph rasterizer)
+- **Complex-script shaping** (rustybuzz + unicode-bidi) so Arabic, Myanmar and Thai render visually correct, not just structurally valid
+- CFF subsetting (shrink the whole-program CJK embeds)
 - Maven Central, PyPI and crates.io publishing
 - Full plan with milestones: [`docs/PLAN.md`](docs/PLAN.md)
 

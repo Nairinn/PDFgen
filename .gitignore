@@ -30,3 +30,10 @@ bindings/*/build/
 *.class
 bindings/java/classes/
 fonts/vendor/noto/NotoSansCJKjp-*.otf
+
+# cargo-fuzz artifacts
+fuzz/target/
+fuzz/artifacts/
+fuzz/corpus/crashes/
+fuzz/corpus/oom/
+fuzz/corpus/timeouts/

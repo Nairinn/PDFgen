@@ -1,0 +1,27 @@
+[package]
+name = "pdfgen-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pdfgen-parse = { path = "../crates/pdfgen-parse" }
+pdfgen-font = { path = "../crates/pdfgen-font" }
+
+[[bin]]
+name = "pdf_reader"
+path = "fuzz_targets/pdf_reader.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "font_loader"
+path = "fuzz_targets/font_loader.rs"
+test = false
+doc = false
+bench = false

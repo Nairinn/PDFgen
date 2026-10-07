@@ -71,7 +71,7 @@ pub struct PdfDocument {
 
 impl PdfDocument {
     /// New document targeting a profile.
-    #[must_use] 
+    #[must_use]
     pub fn new(profile: TargetProfile) -> Self {
         PdfDocument {
             inner: Arc::new(std::sync::Mutex::new(Document::new(profile.into()))),

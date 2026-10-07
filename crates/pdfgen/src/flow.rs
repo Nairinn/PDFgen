@@ -104,11 +104,13 @@ impl<'a> Flow<'a> {
         Ok(crate::wrap::wrap(text, max_w, |word| {
             // Measure with the real encoding: WinAnsi bytes when the
             // word encodes, per-glyph advances otherwise.
-            if let Ok(bytes) = pdfgen_font::winansi::encode(word) { bytes
-            .iter()
-            .filter_map(|&b| f.width_for_byte(b))
-            .map(|w| f64::from(w) / scale * size)
-            .sum() } else {
+            if let Ok(bytes) = pdfgen_font::winansi::encode(word) {
+                bytes
+                    .iter()
+                    .filter_map(|&b| f.width_for_byte(b))
+                    .map(|w| f64::from(w) / scale * size)
+                    .sum()
+            } else {
                 // CID measurement: per-char cmap advances.
                 let mut total = 0.0f64;
                 for ch in word.chars() {
@@ -176,7 +178,7 @@ impl<'a> Flow<'a> {
     }
 
     /// Vertical space remaining on the current page.
-    #[must_use] 
+    #[must_use]
     pub fn remaining(&self) -> f64 {
         self.y - self.margin
     }
@@ -350,7 +352,10 @@ impl<'a> Flow<'a> {
             let mut x = self.margin;
             let mut y_top = self.y;
             for (ci, lines) in wrapped.iter().enumerate() {
-                let cell_text = row.get(ci).map(std::string::ToString::to_string).unwrap_or_default();
+                let cell_text = row
+                    .get(ci)
+                    .map(std::string::ToString::to_string)
+                    .unwrap_or_default();
                 let pd = &mut self.doc.pages[self.page_idx];
                 let mcid = pd.content.begin_tag("TD");
                 let mut y = self.y;

@@ -69,13 +69,13 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     /// New lexer at byte 0.
-    #[must_use] 
+    #[must_use]
     pub fn new(data: &'a [u8]) -> Self {
         Lexer { data, pos: 0 }
     }
 
     /// Current byte offset.
-    #[must_use] 
+    #[must_use]
     pub fn pos(&self) -> usize {
         self.pos
     }
@@ -334,7 +334,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Read a stream's raw bytes given the byte range of the body.
-    #[must_use] 
+    #[must_use]
     pub fn stream_body(&self, range: Range<usize>) -> &[u8] {
         &self.data[range]
     }

@@ -3,7 +3,7 @@
 use crate::FontError;
 
 /// Unicode scalar for a WinAnsi byte, if one is assigned.
-#[must_use] 
+#[must_use]
 pub fn unit_for_byte(b: u8) -> Option<u16> {
     match b {
         0x20..=0x7e => Some(u16::from(b)),

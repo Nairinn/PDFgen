@@ -34,7 +34,7 @@ pub enum Sheet {
 impl Sheet {
     /// Landscape size in points (ASME Y14.1: A=8.5x11, B=11x17, C=17x22,
     /// D=22x34, E=34x44, F=28x40 inches; width x height).
-    #[must_use] 
+    #[must_use]
     pub fn points(self) -> (f64, f64) {
         const IN: f64 = 72.0;
         match self {
@@ -65,7 +65,7 @@ pub enum IsoSheet {
 
 impl IsoSheet {
     /// Landscape size in points.
-    #[must_use] 
+    #[must_use]
     pub fn points(self) -> (f64, f64) {
         let mm = |w: f64, h: f64| (w * 72.0 / 25.4, h * 72.0 / 25.4);
         match self {
@@ -78,7 +78,7 @@ impl IsoSheet {
     }
 
     /// Size designation as text ("A4").
-    #[must_use] 
+    #[must_use]
     pub fn letter(self) -> &'static str {
         match self {
             IsoSheet::A4 => "A4",

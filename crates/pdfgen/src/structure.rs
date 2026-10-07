@@ -62,28 +62,28 @@ impl Node {
     }
 
     /// Attach marked-content pieces (leaves).
-    #[must_use] 
+    #[must_use]
     pub fn with_pieces(mut self, pieces: Vec<(usize, u32)>) -> Self {
         self.pieces = pieces;
         self
     }
 
     /// Attach children (group nodes).
-    #[must_use] 
+    #[must_use]
     pub fn with_children(mut self, children: Vec<Node>) -> Self {
         self.children = children;
         self
     }
 
     /// Set the table-cell Scope attribute.
-    #[must_use] 
+    #[must_use]
     pub fn with_scope(mut self, scope: &str) -> Self {
         self.scope = scope.to_string();
         self
     }
 
     /// Attach alt text (figures).
-    #[must_use] 
+    #[must_use]
     pub fn with_alt(mut self, alt: Option<String>) -> Self {
         self.alt = alt;
         self
