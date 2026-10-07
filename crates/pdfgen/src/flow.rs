@@ -140,7 +140,7 @@ impl<'a> Flow<'a> {
         size: f64,
         lines: &[String],
         x: f64,
-    ) -> Result<(u32, f64), FontError> {
+    ) -> (u32, f64) {
         let lh = size * LH;
         let pd = &mut self.doc.pages[self.page_idx];
         let mcid = pd.content.begin_tag(tag);
@@ -176,7 +176,7 @@ impl<'a> Flow<'a> {
             y -= lh;
         }
         pd.content.end_tag();
-        Ok((mcid, y))
+        (mcid, y)
     }
 
     /// Vertical space remaining on the current page.
@@ -199,7 +199,7 @@ impl<'a> Flow<'a> {
         let lines = self.wrap(text, 0, size)?;
         let needed = size * LH * lines.len() as f64 + 11.0 * LH;
         self.ensure_space(needed);
-        let (mcid, y) = self.draw_lines(&format!("H{level}"), 0, size, &lines, self.margin)?;
+        let (mcid, y) = self.draw_lines(&format!("H{level}"), 0, size, &lines, self.margin);
         self.y = y;
         // Bookmark entry for the outline (built at save); the mcid lets
         // UA-2 saves point at the heading's structure element.
@@ -233,7 +233,7 @@ impl<'a> Flow<'a> {
             }
             let take = fit.min(lines.len() - i);
             let chunk: Vec<String> = lines[i..i + take].to_vec();
-            let (mcid, y) = self.draw_lines("P", font, size, &chunk, self.margin)?;
+            let (mcid, y) = self.draw_lines("P", font, size, &chunk, self.margin);
             self.y = y;
             pieces.push((self.page_idx, mcid));
             i += take;
@@ -256,9 +256,9 @@ impl<'a> Flow<'a> {
         for item in items {
             self.ensure_space(11.0 * LH);
             let (lbl_mcid, y1) =
-                self.draw_lines("Lbl", 0, 11.0, &["\u{2022}".to_string()], self.margin)?;
+                self.draw_lines("Lbl", 0, 11.0, &["\u{2022}".to_string()], self.margin);
             let lines = self.wrap_to(item, 0, 11.0, self.width - 2.0 * self.margin - 14.0)?;
-            let (body_mcid, y2) = self.draw_lines("LBody", 0, 11.0, &lines, self.margin + 14.0)?;
+            let (body_mcid, y2) = self.draw_lines("LBody", 0, 11.0, &lines, self.margin + 14.0);
             self.y = y1.min(y2);
             list.children.push(Node::group("LI").with_children(vec![
                     Node::leaf("Lbl", "\u{2022}".into(), 0, 11.0)
@@ -425,7 +425,7 @@ impl<'a> Flow<'a> {
             }
             let take = fit.min(lines.len() - i);
             let chunk: Vec<String> = lines[i..i + take].to_vec();
-            let (mcid, y) = self.draw_lines("Figure", 0, 11.0, &chunk, self.margin)?;
+            let (mcid, y) = self.draw_lines("Figure", 0, 11.0, &chunk, self.margin);
             self.y = y;
             pieces.push((self.page_idx, mcid));
             i += take;

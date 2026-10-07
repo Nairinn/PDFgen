@@ -644,7 +644,15 @@ fn run_ops(
                     if g.nums.len() >= 2 {
                         let y2 = g.nums.pop().unwrap_or(0.0);
                         let x2 = g.nums.pop().unwrap_or(0.0);
-                        draw_line(bmp, scale, page_h, g.path_x, g.path_y, x2, y2, g.fill);
+                        draw_line(
+                            bmp,
+                            &Transform { scale, page_h },
+                            g.path_x,
+                            g.path_y,
+                            x2,
+                            y2,
+                            g.fill,
+                        );
                         g.path_x = x2;
                         g.path_y = y2;
                     }
@@ -656,7 +664,16 @@ fn run_ops(
                         let w4 = g.nums.pop().unwrap_or(0.0);
                         let y4 = g.nums.pop().unwrap_or(0.0);
                         let x4 = g.nums.pop().unwrap_or(0.0);
-                        draw_rect(bmp, scale, page_h, x4, y4, w4, h4, g.fill, g.last_fill);
+                        draw_rect(
+                            bmp,
+                            &Transform { scale, page_h },
+                            x4,
+                            y4,
+                            w4,
+                            h4,
+                            g.fill,
+                            g.last_fill,
+                        );
                         g.path_x = x4;
                         g.path_y = y4;
                     }
@@ -948,10 +965,17 @@ impl ttf_parser::OutlineBuilder for OutlineSink {
     }
 }
 
-fn draw_rect(
-    bmp: &mut Bitmap,
+/// Page transform the drawing helpers share (cuts their arg count).
+struct Transform {
     scale: f64,
     page_h: f64,
+}
+
+// 8 plain geometry/color flags are the clearest signature here.
+#[allow(clippy::too_many_arguments)]
+fn draw_rect(
+    bmp: &mut Bitmap,
+    t: &Transform,
     x: f64,
     y: f64,
     w: f64,
@@ -959,6 +983,7 @@ fn draw_rect(
     fill: (u8, u8, u8),
     filled: bool,
 ) {
+    let (scale, page_h) = (t.scale, t.page_h);
     let px = (x * scale) as i64;
     let py = ((page_h - y - h) * scale) as i64;
     let pw = ((w * scale).ceil() as i64).max(1);
@@ -981,16 +1006,19 @@ fn draw_rect(
     }
 }
 
+// 8 plain coordinates/colors are the clearest signature for a line
+// draw; bundling two points into a struct saves nothing.
+#[allow(clippy::too_many_arguments)]
 fn draw_line(
     bmp: &mut Bitmap,
-    scale: f64,
-    page_h: f64,
+    t: &Transform,
     x1: f64,
     y1: f64,
     x2: f64,
     y2: f64,
     fill: (u8, u8, u8),
 ) {
+    let (scale, page_h) = (t.scale, t.page_h);
     let ax = (x1 * scale) as i64;
     let ay = ((page_h - y1) * scale) as i64;
     let bx = (x2 * scale) as i64;

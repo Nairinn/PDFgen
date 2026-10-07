@@ -132,8 +132,8 @@ impl<'a> Drawing<'a> {
     /// (10 mm trimming margin + inner content frame) and, on sheets larger
     /// than A4, the centring-marks cross pattern.
     pub fn new_iso(doc: &'a mut Document, sheet: IsoSheet) -> Self {
-        let (w, h) = sheet.points();
-        let page = doc.add_draw_page(w, h);
+        let (width, height) = sheet.points();
+        let page = doc.add_draw_page(width, height);
         // ISO 5457: 10 mm trimming margin, 5 mm inner frame gap for A4,
         // 10 mm for larger sheets.
         let trim = 10.0 * 72.0 / 25.4;
@@ -145,8 +145,8 @@ impl<'a> Drawing<'a> {
             / 25.4;
         let d = Drawing {
             doc,
-            w,
-            h,
+            w: width,
+            h: height,
             border: trim,
             page,
         };

@@ -328,7 +328,7 @@ impl PdfReader {
         // overflow usize in the sum or the pos+row test below.
         let mut row: usize = 0;
         for width in &w {
-            row = row.checked_add(*width).unwrap_or(usize::MAX);
+            row = row.saturating_add(*width);
         }
         if row > bytes.len().max(16) {
             // A row wider than the whole stream cannot yield entries.

@@ -133,8 +133,7 @@ pub fn commit(path: impl AsRef<Path>, message: &str, author: &str) -> Result<Com
     let mut xref = String::with_capacity(new_size as usize * 20 + 32);
     xref.push_str(&format!("xref\n0 {new_size}\n"));
     xref.push_str("0000000000 65535 f \n");
-    let mut map: std::collections::HashMap<u32, u64> =
-        std::collections::HashMap::from_iter(offsets.iter().copied());
+    let mut map: std::collections::HashMap<u32, u64> = offsets.iter().copied().collect();
     map.insert(record_num, record_off);
     for id in 1..new_size {
         match map.get(&id) {

@@ -645,8 +645,8 @@ impl Document {
                 }
                 parent_of[i] = parent;
                 last_at_level[lvl] = Some(i);
-                for l in (lvl + 1)..7 {
-                    last_at_level[l] = None;
+                for slot in last_at_level.iter_mut().skip(lvl + 1) {
+                    *slot = None;
                 }
             }
 
@@ -661,7 +661,7 @@ impl Document {
                 }
             }
 
-            for (i, &(_level, ref title, page, _mcid)) in self.bookmarks.iter().enumerate() {
+            for (i, &(_level, ref title, page, mcid)) in self.bookmarks.iter().enumerate() {
                 let mut item = Dict::new();
                 item.set("Title", PdfString::text(title));
                 item.set(
@@ -677,7 +677,7 @@ impl Document {
                     // heading's own struct element.
                     let elem_ref = leaf_map
                         .iter()
-                        .find(|&&(lp, lm, _r)| lp == page && lm == _mcid)
+                        .find(|&&(lp, lm, _)| lp == page && lm == mcid)
                         .map(|&(_, _, r)| r);
                     if let Some(r) = elem_ref {
                         // veraPDF/PDF 2.0: a dict destination is a

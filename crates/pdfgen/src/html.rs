@@ -300,9 +300,7 @@ fn extract_attr(tag_rest: &str, attr: &str) -> Option<String> {
     let needle = format!("{attr}=");
     let pos = lower.find(&needle)?;
     let after = &tag_rest[pos + needle.len()..];
-    let Some(quote) = after.chars().next() else {
-        return None;
-    };
+    let quote = after.chars().next()?;
     if quote != '"' && quote != '\'' {
         return None;
     }

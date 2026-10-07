@@ -19,6 +19,7 @@ pub struct ShapedGlyph {
 /// Shape `text` with the font. Returns the glyph sequence in VISUAL
 /// order (RTL runs already reversed); reordering is applied per
 /// Unicode bidi rules.
+#[must_use]
 pub fn shape(f: &LoadedFont, text: &str) -> Vec<ShapedGlyph> {
     let Some(face) = rustybuzz::Face::from_slice(&f.raw, 0) else {
         // Unparseable program: fall back to raw cmap ordering.

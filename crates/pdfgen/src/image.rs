@@ -103,7 +103,9 @@ impl Image {
                 }
                 out
             }
-            other => return Err(ImageError::Unsupported(format!("png color type {other:?}"))),
+            png::ColorType::Indexed => {
+                return Err(ImageError::Unsupported("indexed png not supported".into()))
+            }
         };
         Ok(Image {
             w,
