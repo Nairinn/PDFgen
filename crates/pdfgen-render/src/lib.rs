@@ -158,7 +158,7 @@ pub fn render_page_reader(
     let height = (ph * scale).round().max(1.0) as u32;
     let mut bmp = Bitmap::new(width, height);
     if opts.white_background {
-        for px in bmp.rgba.chunks_exact_mut(4) {
+        for px in bmp.rgba.as_chunks_mut::<4>().0 {
             px.copy_from_slice(&[255, 255, 255, 255]);
         }
     }
@@ -756,7 +756,9 @@ fn show_text(
     // Decode the byte stream to glyph IDs.
     let gids: Vec<u16> = if rf.cid {
         bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|p| {
                 let cid = u16::from_be_bytes([p[0], p[1]]);
                 match &rf.cid_to_gid {

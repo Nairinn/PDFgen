@@ -85,7 +85,7 @@ jobs:
             <com.izforge.izpack.panels.FinishPanel id="finish"/>
           </AutomatedInstallation>
           XML
-          JAR=$(ls /tmp/verapdf-dl/verapdf-izpack-installer-*.jar | head -1)
+          JAR=$(find /tmp/verapdf-dl -name 'verapdf-izpack-installer-*.jar' | head -1)
           java -jar "$JAR" /tmp/verapdf-dl/auto-install.xml
 
       - name: Validate every generated PDF (fail on any failed check)
