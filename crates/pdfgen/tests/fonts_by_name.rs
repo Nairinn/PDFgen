@@ -1,5 +1,8 @@
-//! Fonts-by-name: generate a document using the registry (system Arial +
-//! catalog Liberation + a substitution) and validate compliance.
+//! Fonts-by-name: generate a document using the registry (embedded
+//! Liberation, catalog Liberation Serif + a substitution) and validate
+//! compliance. System-font resolution is exercised by pdfgen-fonts'
+//! own probe tests; here every input is vendored, so the test runs
+//! on any OS.
 
 use pdfgen::{Document, Profile, Status};
 
@@ -10,8 +13,13 @@ fn fonts_by_name_end_to_end() {
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Fonts by name").lang("en-US");
 
-    // System font by name (real Arial from /System/Library/Fonts/...).
-    let arial = doc.font("Arial", "Bold").expect("system Arial resolves");
+    // Embedded font by path (Liberation Sans, vendored with the repo).
+    let sans = doc
+        .load_font(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+        ))
+        .expect("vendored Liberation Sans loads");
     // Built-in catalog by name.
     let lib = doc
         .font("Liberation Serif", "Regular")
@@ -21,7 +29,7 @@ fn fonts_by_name_end_to_end() {
     let _ = helv;
 
     let mut flow = doc.flow();
-    flow.paragraph_in(arial, 14.0, "This line uses system Arial Bold.")
+    flow.paragraph_in(sans, 14.0, "This line uses embedded Liberation Sans.")
         .unwrap();
     flow.paragraph_in(
         lib,

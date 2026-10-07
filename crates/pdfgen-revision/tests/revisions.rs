@@ -5,7 +5,10 @@
 use pdfgen::{Document, Profile};
 use pdfgen_revision::{commit, diff, history, revert, DiffKind};
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 
 fn tmp(name: &str) -> String {
     format!("{}/../../tests/output/{name}", env!("CARGO_MANIFEST_DIR"))
@@ -13,8 +16,8 @@ fn tmp(name: &str) -> String {
 
 #[test]
 fn commit_history_diff_revert() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found");
         return;
     }
     let path = tmp("versioned.pdf");
@@ -22,7 +25,7 @@ fn commit_history_diff_revert() {
     // --- Revision 1: the original save.
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Versioned Document").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
     {
         let mut flow = doc.flow();
         flow.heading(1, "Versioned Document").unwrap();

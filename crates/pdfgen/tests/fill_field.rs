@@ -7,18 +7,21 @@ fn out(name: &str) -> String {
     format!("{}/../../tests/output/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 
 #[test]
 fn fill_text_field_appends_incremental_update() {
-    if !std::path::Path::new(ARIAL).exists() {
+    if !std::path::Path::new(FONT).exists() {
         eprintln!("skipping: no Arial on this machine");
         return;
     }
     // Build a fresh form document.
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Fill test").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
     doc.flow().text_field("Full name", "fullname").unwrap();
 
     let path = out("fill_field.pdf");

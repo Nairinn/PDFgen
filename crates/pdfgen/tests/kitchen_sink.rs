@@ -4,7 +4,10 @@
 
 use pdfgen::{Document, Image, Profile, Status};
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 const RED_BOX: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/fixtures/red_box.png"
@@ -14,7 +17,7 @@ fn build(profile: Profile) -> Document {
     let mut doc = Document::new(profile);
     doc.title("Kitchen sink: lists, tables, figures")
         .lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
 
     let img = Image::load(RED_BOX).expect("png loads");
 
@@ -57,8 +60,8 @@ fn build(profile: Profile) -> Document {
 
 #[test]
 fn lists_tables_figures_artifacts() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found");
         return;
     }
     let out_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/output");

@@ -4,7 +4,10 @@
 use pdfgen::{Document, Profile, Status};
 use pdfgen_draw::{Drawing, Sheet, TitleField};
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 
 fn out(name: &str) -> String {
     format!("{}/../../tests/output/{name}", env!("CARGO_MANIFEST_DIR"))
@@ -12,8 +15,8 @@ fn out(name: &str) -> String {
 
 #[test]
 fn asme_drawing_sheet_is_compliant() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found");
         return;
     }
     // A versioned file whose history feeds the revision block.
@@ -22,7 +25,7 @@ fn asme_drawing_sheet_is_compliant() {
         // Generate it: 1 save + 2 commits.
         let mut doc = Document::new(Profile::PdfUa1);
         doc.title("Part Under Revision").lang("en-US");
-        doc.load_font(ARIAL).unwrap();
+        doc.load_font(FONT).unwrap();
         {
             let mut flow = doc.flow();
             flow.heading(1, "Part Under Revision").unwrap();
@@ -36,7 +39,7 @@ fn asme_drawing_sheet_is_compliant() {
     // --- The drawing.
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("BRACKET, MOUNTING - Drawing").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
 
     let mut d = Drawing::new(&mut doc, Sheet::A);
 
@@ -88,13 +91,13 @@ fn asme_drawing_sheet_is_compliant() {
 
 #[test]
 fn asme_drawing_sheet_is_compliant_ua2() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found");
         return;
     }
     let mut doc = Document::new(Profile::PdfUa2);
     doc.title("BRACKET, MOUNTING - Drawing").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
 
     let mut d = Drawing::new(&mut doc, Sheet::A);
     d.title_block(&[

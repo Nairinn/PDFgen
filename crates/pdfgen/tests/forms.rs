@@ -3,12 +3,15 @@
 
 use pdfgen::{fill_text_field, Document, Profile, Status};
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 
 #[test]
 fn forms_create_fill_and_stay_compliant() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found");
         return;
     }
     let out_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/output");
@@ -16,7 +19,7 @@ fn forms_create_fill_and_stay_compliant() {
     // --- 1. Create a document with a labeled text field.
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Service Request Form").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
 
     let mut flow = doc.flow();
     flow.heading(1, "Service Request Form").unwrap();
@@ -39,7 +42,7 @@ fn forms_create_fill_and_stay_compliant() {
     // (the cleanup spec's Definition of Done covers forms in both).
     let mut doc2 = Document::new(Profile::PdfUa2);
     doc2.title("Service Request Form").lang("en-US");
-    doc2.load_font(ARIAL).unwrap();
+    doc2.load_font(FONT).unwrap();
     let mut flow2 = doc2.flow();
     flow2.heading(1, "Service Request Form").unwrap();
     flow2

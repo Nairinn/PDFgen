@@ -10,14 +10,17 @@ fn out(name: &str) -> String {
 
 #[test]
 fn renders_text_and_geometry() {
-    const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
-    if !std::path::Path::new(ARIAL).exists() {
+    const FONT: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+    );
+    if !std::path::Path::new(FONT).exists() {
         eprintln!("skipping: no Arial on this machine");
         return;
     }
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Render test").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
     {
         let mut flow = doc.flow();
         flow.heading(1, "Ink on the page").unwrap();
@@ -73,7 +76,10 @@ fn renders_text_and_geometry() {
 
 #[test]
 fn renders_cid_text() {
-    const MM: &str = "/System/Library/Fonts/Supplemental/Myanmar MN.ttc";
+    const MM: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fonts/vendor/noto/NotoSansMyanmar-Regular.ttf"
+    );
     if !std::path::Path::new(MM).exists() {
         eprintln!("skipping: no Myanmar font");
         return;
@@ -84,7 +90,14 @@ fn renders_cid_text() {
     if !std::path::Path::new(&path).exists() {
         let mut doc = Document::new(Profile::PdfUa1);
         doc.title("CID render test").lang("en-US");
-        let myanmar = doc.load_font(MM).expect("Myanmar MN");
+        // Latin first: the heading uses the default font and Noto Sans
+        // Myanmar has no Latin glyphs.
+        doc.load_font(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+        ))
+        .expect("Liberation Sans");
+        let myanmar = doc.load_font(MM).expect("Noto Sans Myanmar");
         {
             let mut flow = doc.flow();
             flow.heading(1, "CID Render Test").unwrap();

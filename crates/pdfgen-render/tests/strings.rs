@@ -12,7 +12,10 @@ fn out(name: &str) -> String {
 /// /F1 is an Identity-H font whose codes are 2-byte GIDs.
 #[test]
 fn octal_escaped_cid_text_renders() {
-    const MM: &str = "/System/Library/Fonts/Supplemental/Myanmar MN.ttc";
+    const MM: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fonts/vendor/noto/NotoSansMyanmar-Regular.ttf"
+    );
     if !std::path::Path::new(MM).exists() {
         eprintln!("skipping: no Myanmar font on this machine");
         return;
@@ -21,6 +24,13 @@ fn octal_escaped_cid_text_renders() {
     // Generate via the writer (octal-escaped CID bytes come naturally).
     let mut doc = pdfgen::Document::new(pdfgen::Profile::PdfUa1);
     doc.title("Octal render").lang("en-US");
+    // Latin font first: the default font draws the heading, and Noto
+    // Sans Myanmar has no Latin glyphs.
+    doc.load_font(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+    ))
+    .unwrap();
     let f = doc.load_font(MM).unwrap();
     {
         let mut flow = doc.flow();

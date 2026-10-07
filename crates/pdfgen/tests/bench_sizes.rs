@@ -40,7 +40,10 @@ fn report_sizes_and_timings() {
     println!("500-page stream: {stream_size} bytes in {stream_time:?}");
 
     // --- 50-page CJK flow document ---
-    let jp = "/Users/nainglynn/Documents/GitHub/PDFgen/fonts/vendor/noto/NotoSansCJKjp-Regular.otf";
+    let jp = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fonts/vendor/noto/NotoSansCJKjp-Regular.otf"
+    );
     let t1 = Instant::now();
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("CJK bench").lang("ja");

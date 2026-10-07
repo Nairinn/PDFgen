@@ -4,7 +4,10 @@
 use pdfgen::{Document, Profile, Status};
 use pdfgen_draw::{Drawing, IsoSheet, TitleField};
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 
 fn out(name: &str) -> String {
     format!("{}/../../tests/output/{name}", env!("CARGO_MANIFEST_DIR"))
@@ -12,13 +15,13 @@ fn out(name: &str) -> String {
 
 #[test]
 fn iso_sheet_is_compliant() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found");
         return;
     }
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("FLANGE COVER - ISO Drawing").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
 
     // A3 landscape with the ISO 5457 frame and centring marks.
     let mut d = Drawing::new_iso(&mut doc, IsoSheet::A3);

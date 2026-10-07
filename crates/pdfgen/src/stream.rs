@@ -1046,16 +1046,13 @@ fn emit_image_xobject(
     w.write_object(id, &Object::Stream(stream))
 }
 
-/// Locate the default font file for streaming documents.
+/// Locate the default font file for streaming documents. The vendored
+/// Liberation Sans ships with the repo, so any checkout has it.
 fn default_font_path() -> Result<String, StreamError> {
     let dir = env!("CARGO_MANIFEST_DIR").to_string() + "/../../fonts";
     let p = format!("{dir}/vendor/liberation/LiberationSans-Regular.ttf");
     if std::path::Path::new(&p).exists() {
         return Ok(p);
-    }
-    let alt = "/System/Library/Fonts/Supplemental/Arial.ttf";
-    if std::path::Path::new(alt).exists() {
-        return Ok(alt.into());
     }
     Err(StreamError::Font("no default font available".into()))
 }

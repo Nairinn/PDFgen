@@ -8,7 +8,10 @@ fn out(name: &str) -> String {
     format!("{}/../../tests/output/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 
 /// Build a simple tagged "hello" PDF if it is not already there.
 fn ensure_hello() {
@@ -16,13 +19,13 @@ fn ensure_hello() {
     if std::path::Path::new(&path).exists() {
         return;
     }
-    if !std::path::Path::new(ARIAL).exists() {
+    if !std::path::Path::new(FONT).exists() {
         eprintln!("skipping: no Arial on this machine");
         return;
     }
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Hello").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
     {
         let mut flow = doc.flow();
         flow.heading(1, "Hello, tagged world!").unwrap();

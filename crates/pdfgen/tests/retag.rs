@@ -4,7 +4,10 @@
 use pdfgen::{Profile, Status, TagSession};
 use pdfgen_core::{Dict, Object, PdfVersion, Stream};
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -29,7 +32,7 @@ fn untagged_fixture() {
     w.set_stream(contents, Stream::new(Dict::new(), text.as_bytes().to_vec()));
 
     // A real embedded font so the file is not garbage.
-    let loaded = pdfgen::LoadedFont::load(ARIAL).expect("arial loads");
+    let loaded = pdfgen::LoadedFont::load(FONT).expect("arial loads");
     let fdesc = w.alloc();
     let ffile = w.alloc();
     w.set_stream(
@@ -112,7 +115,7 @@ fn untagged_fixture() {
 
 #[test]
 fn retag_untagged_pdf() {
-    if !std::path::Path::new(ARIAL).exists() {
+    if !std::path::Path::new(FONT).exists() {
         eprintln!("skipping: no Arial on this machine");
         return;
     }

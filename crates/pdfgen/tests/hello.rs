@@ -3,12 +3,15 @@
 
 use pdfgen::{Document, Object, Profile, Status};
 
-const ARIAL: &str = "/System/Library/Fonts/Supplemental/Arial.ttf";
+const FONT: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fonts/vendor/liberation/LiberationSans-Regular.ttf"
+);
 
 #[test]
 fn hello_ua1_and_ua2() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found (run on macOS or set PDFGEN_TEST_FONT)");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found (run on macOS or set PDFGEN_TEST_FONT)");
         return;
     }
     let out_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/output");
@@ -20,7 +23,7 @@ fn hello_ua1_and_ua2() {
     ] {
         let mut doc = Document::new(profile);
         doc.title("Hello, tagged world").lang("en-US");
-        doc.load_font(ARIAL).unwrap();
+        doc.load_font(FONT).unwrap();
 
         let mut flow = doc.flow();
         flow.heading(1, "Hello, tagged world!").unwrap();
@@ -49,15 +52,15 @@ fn hello_ua1_and_ua2() {
 
 #[test]
 fn flow_wraps_and_breaks_pages() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found");
         return;
     }
     let out_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/output");
 
     let mut doc = Document::new(Profile::PdfUa1);
     doc.title("Multi-page flow test").lang("en-US");
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
 
     let mut flow = doc.flow();
     flow.heading(1, "Chapter 1: Flow").unwrap();
@@ -99,14 +102,14 @@ fn flow_wraps_and_breaks_pages() {
 
 #[test]
 fn missing_title_and_lang_report_but_still_save() {
-    if !std::path::Path::new(ARIAL).exists() {
-        eprintln!("skipping: {ARIAL} not found");
+    if !std::path::Path::new(FONT).exists() {
+        eprintln!("skipping: {FONT} not found");
         return;
     }
     let out_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/output");
     let mut doc = Document::new(Profile::PdfUa1);
     // No title, no lang — must still save, with a note.
-    doc.load_font(ARIAL).unwrap();
+    doc.load_font(FONT).unwrap();
     let mut flow = doc.flow();
     flow.paragraph("Untitled document.").unwrap();
     drop(flow);
