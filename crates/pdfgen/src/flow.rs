@@ -154,20 +154,22 @@ impl<'a> Flow<'a> {
                 }
                 pd.content.text(&format!("F{font}"), size, x, y, &encoded);
             } else {
-                // CID path: WinAnsi cannot encode this text. Map chars
-                // to glyph IDs; record them so save() emits a Type0
-                // font with CID widths and a matching ToUnicode. CID
-                // text uses the separate F<idx>cid resource so the
-                // simple (WinAnsi) font stays valid for other lines.
+                // CID path: WinAnsi cannot encode this text. SHAPE it
+                // (HarfBuzz via rustybuzz) so complex scripts come out
+                // correct: Arabic joins and runs RTL, Myanmar marks
+                // reorder, kerning applies. The shaped (gid, cluster)
+                // pairs are recorded so save() emits a Type0 font with
+                // CID widths and a matching ToUnicode. CID text uses
+                // the separate F<idx>cid resource.
                 let f = &self.doc.fonts[font];
-                let (cids, chars) = pdfgen_font::cid::encode(line, f)?;
+                let shaped = pdfgen_font::shape::shape(f, line);
                 let used = self.doc.cid_fonts.entry(font).or_default();
-                for (c, g) in chars.iter().zip(&cids) {
-                    used.insert((*c, *g));
+                for g in &shaped {
+                    used.insert((g.cluster, g.gid));
                 }
-                let mut bytes = Vec::with_capacity(cids.len() * 2);
-                for cid in cids {
-                    bytes.extend_from_slice(&cid.to_be_bytes());
+                let mut bytes = Vec::with_capacity(shaped.len() * 2);
+                for g in &shaped {
+                    bytes.extend_from_slice(&g.gid.to_be_bytes());
                 }
                 pd.content.text(&format!("F{font}cid"), size, x, y, &bytes);
             }

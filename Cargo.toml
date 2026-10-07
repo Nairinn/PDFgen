@@ -40,6 +40,8 @@ pdfgen-validate = { path = "crates/pdfgen-validate", version = "0.1.0" }
 pdfgen-revision = { path = "crates/pdfgen-revision", version = "0.1.0" }
 pdfgen-draw = { path = "crates/pdfgen-draw", version = "0.1.0" }
 ttf-parser = "0.25"
+rustybuzz = "0.20"
+unicode-bidi = "0.3"
 
 [workspace.lints.rust]
 unsafe_code = "warn"

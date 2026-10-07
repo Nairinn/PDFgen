@@ -10,6 +10,8 @@ rust-version.workspace = true
 [dependencies]
 pdfgen-core = { workspace = true }
 ttf-parser = { workspace = true }
+rustybuzz = { workspace = true }
+unicode-bidi = { workspace = true }
 thiserror = "2"
 
 [features]

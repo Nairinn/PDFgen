@@ -18,5 +18,10 @@ flate2 = "1"
 png = "0.17"
 thiserror = "2"
 
+[dev-dependencies]
+pdfgen-render = { path = "../pdfgen-render" }
+pdfgen-parse = { workspace = true }
+flate2 = "1"
+
 [lints]
 workspace = true

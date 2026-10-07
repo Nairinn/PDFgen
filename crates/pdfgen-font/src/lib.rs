@@ -7,6 +7,7 @@ pub use winansi::unit_for_byte as winansi_unit_for_byte;
 
 pub mod cid;
 pub mod sfnt;
+pub mod shape;
 pub mod subset;
 pub mod ttc;
 pub mod winansi;
