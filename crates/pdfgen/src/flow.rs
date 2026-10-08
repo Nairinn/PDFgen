@@ -163,7 +163,7 @@ impl<'a> Flow<'a> {
                 // span carries the LOGICAL string so extraction and
                 // screen readers see the real text.
                 let f = &self.doc.fonts[font];
-                let shaped = pdfgen_font::shape::shape(f, line);
+                let shaped = pdfgen_font::shape::shape_mixed(f, line);
                 let used = self.doc.cid_fonts.entry(font).or_default();
                 for g in &shaped.glyphs {
                     let ch = line

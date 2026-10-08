@@ -83,6 +83,75 @@ impl ShapedRun {
 /// runs reversed by HarfBuzz); each carries its logical cluster start.
 #[must_use]
 pub fn shape(f: &LoadedFont, text: &str) -> ShapedRun {
+    shape_inner(f, text, None)
+}
+
+/// Shape a line that mixes directions: split into bidi runs by
+/// embedding level (unicode-bidi), shape each run with its own
+/// direction, then order the runs visually per the paragraph level
+/// (low-to-high levels read left-to-right; an odd top level reverses
+/// the run order). Line breaking must happen on LOGICAL text before
+/// this; runs never span line boundaries.
+#[must_use]
+pub fn shape_mixed(f: &LoadedFont, text: &str) -> ShapedRun {
+    use unicode_bidi::BidiInfo;
+    let bidi = BidiInfo::new(text, None);
+    let Some(para) = bidi.paragraphs.first() else {
+        return shape_inner(f, text, None);
+    };
+    let levels = bidi.levels;
+    // Runs: maximal spans of equal embedding level.
+    let mut runs: Vec<(usize, usize)> = Vec::new(); // (start, end) byte ranges
+    {
+        let mut start = 0usize;
+        for i in 1..=text.len() {
+            let new_level = if i == text.len() {
+                None
+            } else {
+                Some(
+                    levels[para.range.clone()]
+                        .get(i - para.range.start)
+                        .copied(),
+                )
+            };
+            let cur = levels[para.range.clone()]
+                .get(start - para.range.start)
+                .copied();
+            if i == text.len() || new_level != Some(cur) {
+                runs.push((start, i));
+                start = i;
+            }
+        }
+    }
+    let para_rtl = para.level.is_rtl();
+    let mut out_glyphs = Vec::new();
+    // Visual order: for LTR paragraphs, runs left-to-right; for RTL
+    // paragraphs, right-to-left.
+    let order: Vec<usize> = if para_rtl {
+        (0..runs.len()).rev().collect()
+    } else {
+        (0..runs.len()).collect()
+    };
+    for ri in order {
+        let (s, e) = runs[ri];
+        let run_text = &text[s..e];
+        let rtl = levels[para.range.clone()]
+            .get(s - para.range.start)
+            .is_some_and(unicode_bidi::Level::is_rtl);
+        let run = shape_inner(f, run_text, Some(rtl));
+        for g in run.glyphs {
+            out_glyphs.push(ShapedGlyph {
+                gid: g.gid,
+                cluster: g.cluster + s as u32,
+            });
+        }
+    }
+    ShapedRun { glyphs: out_glyphs }
+}
+
+/// Core shaping with an explicit direction override (None = guess from
+/// the text's bidi paragraph level, as before).
+fn shape_inner(f: &LoadedFont, text: &str, dir: Option<bool>) -> ShapedRun {
     let Some(face) = rustybuzz::Face::from_slice(&f.raw, 0) else {
         // Unparseable program: fall back to raw cmap ordering.
         return ShapedRun {
@@ -99,9 +168,8 @@ pub fn shape(f: &LoadedFont, text: &str) -> ShapedRun {
     };
     let mut buffer = rustybuzz::UnicodeBuffer::new();
     buffer.push_str(text);
-    // Paragraph direction from bidi: HarfBuzz shapes the LOGICAL string
-    // and emits glyphs in visual order for RTL runs.
-    if is_rtl(text) {
+    let rtl = dir.unwrap_or_else(|| is_rtl(text));
+    if rtl {
         buffer.set_direction(rustybuzz::Direction::RightToLeft);
     }
     let glyph_buffer = rustybuzz::shape(&face, &[], buffer);
