@@ -20,4 +20,3 @@ render_hex_base.pdf | renderer probe: hex CID rasterizing
 validate_k_forms.pdf | validator probe: K arrays/THead/Annots, no real content streams
 html_relative_src.pdf | duplicate of html_fidelity with only the image differing
 save_twice_2.pdf | byte-identical twin of save_twice_1, same content
-java_ffm.pdf.probe.pdf | report probe, second minimal document
