@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Fidelity fixture</title>
+  <style>body { color: red; }</style>
+  <script>var ignored = "script contents must not appear";</script>
+</head>
+<body>
+  <!-- a comment that must not appear either -->
+  <h1>Fidelity fixture</h1>
+  <p>Bare text follows in a div, plus entities: caf&#233; and &#x2014; dash.</p>
+  <div>Implied paragraph text inside a div.</div>
+  Loose body text with no wrapper at all.
+  <p>A paragraph with a<br>forced line break and an unquoted attr below.</p>
+  <img src=img/red_box.png alt="Red box &#169; test" data-alt="must-not-match">
+  <ol>
+    <li>First ordered item</li>
+    <li>Second ordered item</li>
+  </ol>
+  <p>Trailing paragraph.</p>
+</body>
+</html>

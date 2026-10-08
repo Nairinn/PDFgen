@@ -40,65 +40,70 @@ pub struct TagSession {
 }
 
 /// Extract text from a content stream: BT..ET blocks, Tj/TJ strings.
+/// WinAnsi byte to Unicode (the 0x80-0x9F range differs from Latin-1).
+const WINANSI_HIGH: [char; 32] = [
+    '\u{20AC}', '\u{FFFD}', '\u{201A}', '\u{0192}', '\u{201E}', '\u{2026}', '\u{2020}', '\u{2021}',
+    '\u{02C6}', '\u{2030}', '\u{0160}', '\u{2039}', '\u{0152}', '\u{FFFD}', '\u{017D}', '\u{FFFD}',
+    '\u{FFFD}', '\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}', '\u{2022}', '\u{2013}', '\u{2014}',
+    '\u{02DC}', '\u{2122}', '\u{0161}', '\u{203A}', '\u{0153}', '\u{FFFD}', '\u{017E}', '\u{0178}',
+];
+
+/// Decode WinAnsi bytes to text for extraction.
+fn winansi_to_string(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len());
+    for &b in bytes {
+        match b {
+            0x20..=0x7E => out.push(char::from(b)),
+            0x80..=0x9F => out.push(WINANSI_HIGH[usize::from(b) - 0x80]),
+            0xA0..=0xFF => out.push(char::from_u32(u32::from(b)).unwrap_or('\u{FFFD}')),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Extract text-showing runs from a content stream using the shared
+/// pdfgen-parse string decoders (octal escapes, hex strings, nesting).
 pub(crate) fn extract_text_runs(content: &[u8]) -> Vec<String> {
-    let text = String::from_utf8_lossy(content);
     let mut runs = Vec::new();
-    let mut rest = &text[..];
-    while let Some(start) = rest.find("BT") {
-        let Some(end_rel) = rest[start..].find("ET") else {
-            break;
-        };
-        let block = &rest[start + 2..start + end_rel];
-        // Simple approach: find every ( ... ) Tj and the array form.
-        let bytes = block.as_bytes();
-        let mut i = 0;
-        let mut current = String::new();
-        while i < bytes.len() {
-            match bytes[i] {
-                b'(' => {
-                    // Literal string until unescaped ')'.
-                    let mut j = i + 1;
-                    let mut s = String::new();
-                    while j < bytes.len() {
-                        match bytes[j] {
-                            b'\\' => {
-                                j += 1;
-                                if j < bytes.len() {
-                                    s.push(bytes[j] as char);
-                                }
-                            }
-                            b')' => break,
-                            c if (0x20..=0x7e).contains(&c) => s.push(c as char),
-                            _ => {
-                                // Non-ASCII: lossy push.
-                                s.push(bytes[j] as char);
-                            }
-                        }
-                        j += 1;
-                    }
-                    current.push_str(&s);
-                    i = j + 1;
+    let mut i = 0usize;
+    let mut current = String::new();
+    while i < content.len() {
+        match content[i] {
+            b'(' => {
+                if let Some((bytes, next)) = pdfgen_parse::read_literal(content, i) {
+                    current.push_str(&winansi_to_string(&bytes));
+                    i = next;
+                } else {
+                    i += 1;
                 }
-                b'T' if i + 1 < bytes.len() && bytes[i + 1] == b'j' => {
-                    // Tj terminates a text-show op; flush.
-                    if !current.trim().is_empty() {
-                        runs.push(std::mem::take(&mut current));
-                    }
-                    i += 2;
-                }
-                b'T' if i + 1 < bytes.len() && bytes[i + 1] == b'J' => {
-                    if !current.trim().is_empty() {
-                        runs.push(std::mem::take(&mut current));
-                    }
-                    i += 2;
-                }
-                _ => i += 1,
             }
+            b'<' if content.get(i + 1) == Some(&b'<') => {
+                // <</MCID ...>> marked-content dict: not a hex string.
+                i += 1;
+            }
+            b'<' if content.get(i + 1).is_some_and(u8::is_ascii_hexdigit) => {
+                if let Some((bytes, next)) = pdfgen_parse::read_hex(content, i) {
+                    current.push_str(&winansi_to_string(&bytes));
+                    i = next;
+                } else {
+                    i += 1;
+                }
+            }
+            b'T' if content.get(i + 1) == Some(&b'j') || content.get(i + 1) == Some(&b'J') => {
+                // A text-show operator ends the current run.
+                if current.trim().is_empty() {
+                    current.clear();
+                } else {
+                    runs.push(std::mem::take(&mut current));
+                }
+                i += 2;
+            }
+            _ => i += 1,
         }
-        if !current.trim().is_empty() {
-            runs.push(current);
-        }
-        rest = &rest[start + end_rel + 2..];
+    }
+    if !current.trim().is_empty() {
+        runs.push(current);
     }
     runs
 }

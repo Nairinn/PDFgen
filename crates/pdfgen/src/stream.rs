@@ -361,7 +361,9 @@ impl StreamWriter {
         let lh = size * LH;
         let max_w = PAGE.0 - 2.0 * MARGIN;
 
-        // --- O(n) wrap: one width measurement per word, packed greedily. ---
+        // --- O(n) wrap: one width measurement per word, packed greedily.
+        // Hard line breaks (\n, from <br> in the HTML converter) split
+        // lines explicitly before wrapping. ---
         let scale = f64::from(f.units_per_em);
         let mut lines: Vec<String> = Vec::new();
         {
@@ -370,7 +372,28 @@ impl StreamWriter {
             let space_w = f.byte_width_pt(b' ', size).unwrap_or(size * 0.25);
             let mut pending_space = false;
             let mut word_start: Option<usize> = None;
-            for (i, _ch) in text.char_indices() {
+            for (i, ch) in text.char_indices() {
+                if ch == '\n' {
+                    if let Some(ws) = word_start.take() {
+                        let w = word_width_pt(f, &text[ws..i], size, scale);
+                        pack_word(
+                            &mut lines,
+                            &mut cur,
+                            &mut cur_w,
+                            &mut pending_space,
+                            space_w,
+                            w,
+                            max_w,
+                            &text[ws..i],
+                        );
+                    }
+                    // Hard break: the current line ends here, even if
+                    // empty (an explicit <br> can produce one).
+                    lines.push(std::mem::take(&mut cur));
+                    cur_w = 0.0;
+                    pending_space = false;
+                    continue;
+                }
                 let is_space = text.as_bytes().get(i) == Some(&b' ');
                 if is_space {
                     if let Some(ws) = word_start.take() {
