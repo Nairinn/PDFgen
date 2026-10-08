@@ -60,11 +60,13 @@ jobs:
       - name: Generate every tests/output fixture
         run: cargo test --workspace --exclude pdfgen-py
 
-      - name: Install veraPDF
+      - name: Install veraPDF (pinned to 1.30.2)
         run: |
           mkdir -p tools/verapdf
+          # Pinned, not "latest": the README cites 1.30.2 and the gate
+          # must validate against the same version every run.
           curl -fsSL -o /tmp/verapdf-installer.zip \
-            "https://downloads.verapdf.org/rel/verapdf-installer.zip"
+            "https://software.verapdf.org/releases/1.30/verapdf-greenfield-1.30.2-installer.zip"
           unzip -q /tmp/verapdf-installer.zip -d /tmp/verapdf-dl
           # Panel FQNs and pack names must match the installer's own
           # recorded auto-install XML exactly, or izpack fails silently.
@@ -87,6 +89,9 @@ jobs:
           XML
           JAR=$(find /tmp/verapdf-dl -name 'verapdf-izpack-installer-*.jar' | head -1)
           java -jar "$JAR" /tmp/verapdf-dl/auto-install.xml
+          # Hard version gate: the pinned download must be exactly 1.30.2.
+          tools/verapdf/verapdf --version | head -1 | grep -qx 'veraPDF 1.30.2' \
+            || { echo "veraPDF version mismatch (expected 1.30.2)" >&2; exit 1; }
           tools/verapdf/verapdf --version
 
       - name: Validate every generated PDF (fail on any failed check)

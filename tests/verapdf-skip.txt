@@ -1,0 +1,23 @@
+# Files in tests/output/ that the veraPDF gate does NOT validate.
+# One filename per line, then `|` and a one-line reason.
+# The gate fails if a listed file is missing (stale entry).
+#
+# All of these assert behavior veraPDF is not the judge of: deliberate
+# non-compliance (the never-blocks report), parser round-trips on broken
+# input, renderer probes, or retag inputs.
+hello_noncompliant.pdf | asserts the never-blocks save report, claims no UA conformance by design
+headerless_table.pdf | negative fixture: fires 15-001 by design
+unnamed_field.pdf | validate probe: missing /TU must be flagged, not compliant
+untagged.pdf | retag input: untagged document before TagSession runs
+untagged_alt.pdf | retag input: alt-text regression source
+robust_base.pdf | parser fixture: minimal hand-built file
+objstm_fixture.pdf | parser fixture: object-stream round-trip
+predictor_fixture.pdf | parser fixture: xref predictor round-trip
+render_hex_tj.pdf | renderer probe: hex string + TJ array decoding
+render_source.pdf | renderer probe: octal-escape CID decoding
+render_octal.pdf | renderer probe: octal-escape CID rasterizing
+render_hex_base.pdf | renderer probe: hex CID rasterizing
+validate_k_forms.pdf | validator probe: K arrays/THead/Annots, no real content streams
+html_relative_src.pdf | duplicate of html_fidelity with only the image differing
+save_twice_2.pdf | byte-identical twin of save_twice_1, same content
+java_ffm.pdf.probe.pdf | report probe, second minimal document
