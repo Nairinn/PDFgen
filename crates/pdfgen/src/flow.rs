@@ -256,18 +256,37 @@ impl<'a> Flow<'a> {
         // UA-2 (ISO 14289-2 8.2.5.25): L must carry /ListNumbering.
         list.attrs.push(("ListNumbering".into(), "Disc".into()));
         for item in items {
-            self.ensure_space(11.0 * LH);
+            // Wrap FIRST so the reserved height covers every line of the
+            // item (one-line reservation ran long items off the page).
+            let lines = self.wrap_to(item, 0, 11.0, self.width - 2.0 * self.margin - 14.0)?;
+            let lh = 11.0 * LH;
+            let mut pieces: Vec<(usize, u32)> = Vec::new();
+            // The bullet travels with the first line of its item.
             let (lbl_mcid, y1) =
                 self.draw_lines("Lbl", 0, 11.0, &["\u{2022}".to_string()], self.margin);
-            let lines = self.wrap_to(item, 0, 11.0, self.width - 2.0 * self.margin - 14.0)?;
-            let (body_mcid, y2) = self.draw_lines("LBody", 0, 11.0, &lines, self.margin + 14.0);
-            self.y = y1.min(y2);
+            pieces.push((self.page_idx, lbl_mcid));
+            self.y = y1;
+            let mut i = 0usize;
+            while i < lines.len() {
+                let fit = (((self.y - self.margin) / lh).floor().max(0.0)) as usize;
+                if fit == 0 {
+                    self.new_page();
+                    continue;
+                }
+                let take = fit.min(lines.len() - i);
+                let chunk: Vec<String> = lines[i..i + take].to_vec();
+                let (body_mcid, y2) = self.draw_lines("LBody", 0, 11.0, &chunk, self.margin + 14.0);
+                pieces.push((self.page_idx, body_mcid));
+                self.y = y2;
+                i += take;
+                if i < lines.len() {
+                    self.new_page();
+                }
+            }
             list.children.push(Node::group("LI").with_children(vec![
-                    Node::leaf("Lbl", "\u{2022}".into(), 0, 11.0)
-                        .with_pieces(vec![(self.page_idx, lbl_mcid)]),
-                    Node::leaf("LBody", item.to_string(), 0, 11.0)
-                        .with_pieces(vec![(self.page_idx, body_mcid)]),
-                ]));
+                Node::leaf("Lbl", "\u{2022}".into(), 0, 11.0).with_pieces(vec![pieces[0]]),
+                Node::leaf("LBody", item.to_string(), 0, 11.0).with_pieces(pieces[1..].to_vec()),
+            ]));
         }
         self.doc.pages[self.page_idx].nodes.push(list);
         self.sync_cursor();
@@ -297,21 +316,22 @@ impl<'a> Flow<'a> {
 
         let mut table = Node::group("Table");
 
-        // --- header row (TH cells)
-        let row_h = 11.0 * LH;
+        // --- header row (TH cells). The row height covers the WRAPPED
+        // header cells (a one-line reservation overflowed wrapping
+        // headers onto the first body row).
+        let header_lines: Vec<Vec<String>> = header
+            .iter()
+            .enumerate()
+            .map(|(ci, cell)| {
+                let w = col_w[ci.min(col_w.len() - 1)];
+                self.wrap_to(cell, 0, 11.0, w - 2.0 * PAD)
+            })
+            .collect::<Result<_, _>>()?;
+        let row_h = 11.0 * LH * header_lines.iter().map(Vec::len).max().unwrap_or(1) as f64;
         self.ensure_space(row_h);
         let mut hrow = Node::group("TR");
         let mut x = self.margin;
         {
-            // Pre-wrap all header cells before borrowing the page data.
-            let header_lines: Vec<Vec<String>> = header
-                .iter()
-                .enumerate()
-                .map(|(ci, cell)| {
-                    let w = col_w[ci.min(col_w.len() - 1)];
-                    self.wrap_to(cell, 0, 11.0, w - 2.0 * PAD)
-                })
-                .collect::<Result<_, _>>()?;
             let pd = &mut self.doc.pages[self.page_idx];
             for (ci, (cell, lines)) in header.iter().zip(header_lines.iter()).enumerate() {
                 let w = col_w[ci.min(col_w.len() - 1)];
@@ -351,7 +371,14 @@ impl<'a> Flow<'a> {
                 })
                 .collect::<Result<_, _>>()?;
             let row_h = 11.0 * LH * wrapped.iter().map(Vec::len).max().unwrap_or(1) as f64;
-            self.ensure_space(row_h);
+            // A row taller than the usable page can never fit; keep it on
+            // ONE page (top-aligned) instead of looping on page breaks.
+            let usable = self.height - 2.0 * self.margin;
+            if row_h > usable {
+                self.ensure_space(usable);
+            } else {
+                self.ensure_space(row_h);
+            }
             let mut tr = Node::group("TR");
             let mut x = self.margin;
             let mut y_top = self.y;
@@ -393,7 +420,15 @@ impl<'a> Flow<'a> {
     // --------------------------------------------------------- figures
 
     /// Tagged figure: image with alt text (empty alt = decorative).
+    /// Figures wider or taller than the content box are scaled down,
+    /// preserving aspect ratio.
     pub fn figure(&mut self, image: &Image, alt: &str, w: f64, h: f64) -> Result<(), FontError> {
+        // Clamp to the content box, aspect preserved.
+        let max_w = self.width - 2.0 * self.margin;
+        let max_h = self.height - 2.0 * self.margin;
+        let scale = (max_w / w).min(max_h / h).min(1.0);
+        let (w, h) = (w * scale, h * scale);
+
         self.ensure_space(h);
         let res = self.doc.register_image(image);
         let pd = &mut self.doc.pages[self.page_idx];
