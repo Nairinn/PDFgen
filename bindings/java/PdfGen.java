@@ -39,6 +39,8 @@ public final class PdfGen implements AutoCloseable {
     private final MethodHandle mhCreate, mhDestroy, mhSetTitle, mhSetLang;
     private final MethodHandle mhFont, mhLoadFontFile, mhRegisterFont;
     private final MethodHandle mhHeading, mhParagraph, mhParagraphIn;
+    private final MethodHandle mhBulletList, mhTable, mhFigure;
+    private final MethodHandle mhPageHeader, mhPageFooter;
     private final MethodHandle mhSave, mhFree, mhFreeReport;
     private final MethodHandle mhReportField, mhReportCompliant;
     private final Arena arena;
@@ -59,6 +61,12 @@ public final class PdfGen implements AutoCloseable {
         mhHeading = down("pdfgen_heading", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_BYTE, ADDRESS));
         mhParagraph = down("pdfgen_paragraph", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS));
         mhParagraphIn = down("pdfgen_paragraph_in", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT, JAVA_DOUBLE, ADDRESS));
+        mhBulletList = down("pdfgen_bullet_list", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, JAVA_INT));
+        // rows: *const *const *const c_char -> ADDRESS of the row-pointer array
+        mhTable = down("pdfgen_table", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT));
+        mhFigure = down("pdfgen_figure", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_DOUBLE, JAVA_DOUBLE));
+        mhPageHeader = down("pdfgen_page_header", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS));
+        mhPageFooter = down("pdfgen_page_footer", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS));
         mhSave = down("pdfgen_save", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
         mhFree = down("pdfgen_free", FunctionDescriptor.ofVoid(ADDRESS));
         mhFreeReport = down("pdfgen_free_report", FunctionDescriptor.ofVoid(ADDRESS));
@@ -163,6 +171,56 @@ public final class PdfGen implements AutoCloseable {
 
         public Document paragraphIn(int font, double size, String text) {
             try { check((MemorySegment) mhParagraphIn.invoke(handle, font, size, cstr(text))); return this; }
+            catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        public Document bulletList(List<String> items) {
+            try (Arena a = Arena.ofConfined()) {
+                MemorySegment arr = ((java.lang.foreign.SegmentAllocator) a).allocate(ADDRESS, items.size());
+                List<MemorySegment> keep = new ArrayList<>();
+                for (int i = 0; i < items.size(); i++) {
+                    MemorySegment cs = a.allocateFrom(items.get(i));
+                    arr.set(ADDRESS, i * ADDRESS.byteSize(), cs);
+                    keep.add(cs);
+                }
+                MemorySegment err = (MemorySegment) mhBulletList.invoke(handle, arr, items.size());
+                check(err);
+                return this;
+            } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        public Document table(List<String> header, List<List<String>> rows) {
+            try (Arena a = Arena.ofConfined()) {
+                MemorySegment harr = ((java.lang.foreign.SegmentAllocator) a).allocate(ADDRESS, header.size());
+                for (int i = 0; i < header.size(); i++)
+                    harr.set(ADDRESS, i * ADDRESS.byteSize(), a.allocateFrom(header.get(i)));
+                int cols = header.size();
+                MemorySegment rarr = ((java.lang.foreign.SegmentAllocator) a).allocate(ADDRESS, rows.size());
+                for (int r = 0; r < rows.size(); r++) {
+                    List<String> row = rows.get(r);
+                    MemorySegment carr = ((java.lang.foreign.SegmentAllocator) a).allocate(ADDRESS, cols);
+                    for (int c = 0; c < cols; c++)
+                        carr.set(ADDRESS, c * ADDRESS.byteSize(), a.allocateFrom(row.get(c)));
+                    rarr.set(ADDRESS, r * ADDRESS.byteSize(), carr);
+                }
+                MemorySegment err = (MemorySegment) mhTable.invoke(handle, harr, header.size(), rarr, rows.size(), cols);
+                check(err);
+                return this;
+            } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        public Document figure(String path, String alt, double width, double height) {
+            try { check((MemorySegment) mhFigure.invoke(handle, cstr(path), cstr(alt), width, height)); return this; }
+            catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        public Document pageHeader(String text) {
+            try { check((MemorySegment) mhPageHeader.invoke(handle, cstr(text))); return this; }
+            catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        public Document pageFooter(String text) {
+            try { check((MemorySegment) mhPageFooter.invoke(handle, cstr(text))); return this; }
             catch (Throwable t) { throw new RuntimeException(t); }
         }
 

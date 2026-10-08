@@ -26,6 +26,17 @@ public class TestFfm {
                     + "wrapping across a line boundary in the flow layout, because a single "
                     + "line would not prove very much about the layout engine at all.");
 
+                // Full API parity (issue #10): list, table, figure, furniture.
+                doc.bulletList(java.util.List.of(
+                    "First bullet through FFM",
+                    "Second bullet with a little more text"));
+                doc.table(java.util.List.of("Pin", "Signal"),
+                    java.util.List.of(
+                        java.util.List.of("1", "VCC"),
+                        java.util.List.of("2", "GND")));
+                doc.pageHeader("FFM header artifact");
+                doc.pageFooter("FFM footer artifact");
+
                 doc.save(out);
             }
 

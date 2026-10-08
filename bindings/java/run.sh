@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-JAVA22=${JAVA22:-$(/usr/libexec/java_home -v 23 2>/dev/null || /usr/libexec/java_home -v 21)}
+JAVA22=${JAVA22:-$(/usr/libexec/java_home -v 23 2>/dev/null || /usr/libexec/java_home -v 22 2>/dev/null || /usr/libexec/java_home -v 21)}
 echo "using JDK: $JAVA22"
 
 echo "building libpdfgen_ffi (dylib)..."
