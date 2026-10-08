@@ -10,7 +10,6 @@ rust-version.workspace = true
 [dependencies]
 pdfgen-core = { workspace = true }
 pdfgen-parse = { workspace = true }
-pdfgen-profile = { workspace = true }
 
 [lints]
 workspace = true

@@ -19,7 +19,7 @@ count=0
 for pdf in "$OUT"/*.pdf; do
     base="$(basename "$pdf")"
     case "$base" in
-        *noncompliant*|*probe*|*headerless*|*unnamed*|fill_field*|*broken*|*truncated*|*fixture*|untagged*|robust_base*|render_hex_tj*|render_source*)
+        *noncompliant*|*probe*|*headerless*|*unnamed*|fill_field*|*broken*|*truncated*|*fixture*|untagged*|robust_base*|render_hex_tj*|render_source*|validate_k*|html_relative_src*)
             # Deliberately non-compliant, minimal, or incrementally-updated
             # fixtures: they assert behavior veraPDF is not the judge of
             # (parser round-trips, renderer probes, retag inputs).

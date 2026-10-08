@@ -3,14 +3,26 @@
 //! Runs the machine-checkable Matterhorn Protocol rules over any PDF
 //! (tagged or not) and reports violations with checkpoint IDs.
 //!
-//! This is our own checker — veraPDF is used only as a CI cross-check.
-//! Checks implemented here are the software-verifiable subset of the
-//! Matterhorn Protocol (the 87 "M" failure conditions); human-judgment
-//! conditions are returned as review items, never as failures.
+//! This is our own checker — veraPDF is the acceptance gate used in CI;
+//! this crate catches the common failures early, on any machine, without
+//! Java. Human-judgment conditions surface as review items, never as
+//! failures.
+//!
+//! Machine checks implemented (Matterhorn 1.1 checkpoint ids):
+//!   01-003 structure tree present        06-001/002/003 XMP metadata
+//!   11-001 document language             02-007 DisplayDocTitle
+//!   15-001 table header rows             15-003 TH scope
+//!   13-004 figure alt text               28-001/28-002 form fields
+//! Review prompts: 02-004 role map, 06-004 title quality, 11-007
+//! language, 13-002 alt-text quality. NOT implemented: annotations
+//! beyond AcroForm (28-003+), embedded-file, font, and color
+//! checkpoints — veraPDF covers those in CI.
+//!
+//! The rule set is PDF/UA-1; UA-2 files validate against the same
+//! machine-checkable conditions (the NS walk differs, not the rules).
 
 use pdfgen_core::Object;
 use pdfgen_parse::PdfReader;
-use pdfgen_profile::Profile;
 use std::path::Path;
 
 /// One finding: a Matterhorn failure condition hit.
@@ -140,8 +152,6 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
         });
     }
 
-    let _ = Profile::PdfUa1; // UA-2 rule set arrives with the reader's NS walk.
-
     // -- Annotation / form-field checks (Matterhorn 28-x) --
     if let Some(acro_obj) = catalog.get("AcroForm").cloned() {
         // The AcroForm entry may be a direct dict or (usual) an indirect
@@ -196,20 +206,39 @@ pub fn validate(path: impl AsRef<Path>) -> Result<Report, String> {
         }
     }
 
-    // Structure-tree walk: tables (15-x), headings (14-x), figures (13-x) --
+    // Structure-tree walk: tables (15-x), headings (14-x), figures (13-x).
+    // K may be a ref, an array of refs, or a direct dict at any level —
+    // normalize before walking (issue #9: ref-only walks silently skipped
+    // valid trees).
     if let Some(Object::Ref(root_ref)) = catalog.get("StructTreeRoot").cloned() {
         let root = reader.get(root_ref.id).map_err(|e| e.to_string())?;
         if let Object::Dict(root_d) = root {
-            if let Some(Object::Ref(k)) = root_d.get("K").cloned() {
-                let doc_elem = reader.get(k.id).map_err(|e| e.to_string())?;
-                if let Object::Dict(doc_d) = doc_elem {
-                    if let Some(Object::Array(kids)) = doc_d.get("K").cloned() {
-                        for kid in kids {
-                            if let Object::Ref(r) = kid {
-                                walk_element(&mut reader, r.id, &mut findings, &mut review)?;
-                            }
-                        }
+            let root_kids = k_children(&root_d);
+            for kid in root_kids {
+                match kid {
+                    Object::Ref(r) => {
+                        walk_element(&mut reader, r.id, &mut findings, &mut review)?;
                     }
+                    // Direct dict child: walk it in place.
+                    Object::Dict(d) => {
+                        walk_dict(&mut reader, &d, 0, &mut findings, &mut review)?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    // -- Page /Annots widget checks (Matterhorn 28-x) --
+    if let Ok(pages) = reader.pages() {
+        for page_id in pages {
+            let Ok(obj) = reader.get(page_id) else {
+                continue;
+            };
+            let Object::Dict(pd) = obj else { continue };
+            if let Some(Object::Array(annots)) = pd.get("Annots").cloned() {
+                for a in annots {
+                    check_annotation(&mut reader, &a, &mut findings);
                 }
             }
         }
@@ -261,9 +290,11 @@ fn walk_element_inner(
                 findings.push(Finding {
                     id: "15-001".into(),
                     message: "Table has no header row (TH)".into(),
-                    context: ctx,
+                    context: ctx.clone(),
                 });
             }
+            // Tables may nest via direct dicts; check_dict_rules is
+            // applied per child in the walk below.
         }
         // Checkpoint 15-003: header cells need Scope.
         "TH" => {
@@ -302,15 +333,134 @@ fn walk_element_inner(
         _ => {}
     }
 
-    // Recurse into child element refs in /K.
-    if let Some(Object::Array(kids)) = d.get("K").cloned() {
-        for kid in kids {
-            if let Object::Ref(r) = kid {
+    // Recurse into children: refs (with cycle guard) and direct dicts.
+    for kid in k_children(&d) {
+        match kid {
+            Object::Ref(r) => {
                 walk_element_inner(reader, r.id, findings, review, visited, depth + 1)?;
             }
+            Object::Dict(cd) => walk_dict(reader, &cd, depth + 1, findings, review)?,
+            _ => {}
         }
     }
     Ok(())
+}
+
+/// The child entries of a structure element's /K, normalized: an array
+/// stays, a single child becomes a one-element vec, anything else is
+/// empty. Also peels one level of THead/TBody grouping (issue #9: tables
+/// grouped per HTML row-sections lost their header detection).
+fn k_children(d: &pdfgen_core::Dict) -> Vec<Object> {
+    match d.get("K") {
+        Some(Object::Array(items)) => items.clone(),
+        Some(one @ (Object::Ref(_) | Object::Dict(_))) => vec![one.clone()],
+        _ => Vec::new(),
+    }
+}
+
+/// Walk a direct-dict structure element (no object id).
+fn walk_dict(
+    reader: &mut PdfReader,
+    d: &pdfgen_core::Dict,
+    depth: usize,
+    findings: &mut Vec<Finding>,
+    review: &mut Vec<&'static str>,
+) -> Result<(), String> {
+    const MAX_DEPTH: usize = 64;
+    if depth > MAX_DEPTH {
+        return Ok(());
+    }
+    check_dict_rules(d, findings, review);
+    for kid in k_children(d) {
+        match kid {
+            Object::Ref(r) => {
+                let mut visited = std::collections::HashSet::new();
+                walk_element_inner(reader, r.id, findings, review, &mut visited, depth + 1)?;
+            }
+            Object::Dict(cd) => walk_dict(reader, &cd, depth + 1, findings, review)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Rule checks that only need the element's own dict.
+fn check_dict_rules(
+    d: &pdfgen_core::Dict,
+    findings: &mut Vec<Finding>,
+    review: &mut Vec<&'static str>,
+) {
+    let tag = match d.get("S") {
+        Some(Object::Name(n)) => n.0.clone(),
+        _ => String::new(),
+    };
+    match tag.as_str() {
+        "TH" => {
+            let has_scope = d
+                .get("A")
+                .and_then(|a| match a {
+                    Object::Array(items) => Some(
+                        items
+                            .iter()
+                            .any(|i| matches!(i, Object::Dict(dd) if dd.get("Scope").is_some())),
+                    ),
+                    Object::Dict(dd) => Some(dd.get("Scope").is_some()),
+                    _ => None,
+                })
+                .unwrap_or(false);
+            if !has_scope {
+                findings.push(Finding {
+                    id: "15-003".into(),
+                    message: "Header cell (TH) has no Scope attribute".into(),
+                    context: "element (inline TH)".into(),
+                });
+            }
+        }
+        "Figure" => {
+            if d.get("Alt").is_none() {
+                findings.push(Finding {
+                    id: "13-004".into(),
+                    message: "Figure has no alternative text (/Alt)".into(),
+                    context: "element (inline Figure)".into(),
+                });
+            } else {
+                review.push("13-002: Confirm the alt text conveys the figure's meaning");
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Matterhorn 28-x checks for one annotation object (direct dict or ref).
+fn check_annotation(reader: &mut PdfReader, a: &Object, findings: &mut Vec<Finding>) {
+    let d: pdfgen_core::Dict = match a {
+        Object::Dict(d) => d.clone(),
+        Object::Ref(r) => match reader.get(r.id) {
+            Ok(Object::Dict(d)) => d,
+            _ => return,
+        },
+        _ => return,
+    };
+    // Widget annotations only.
+    if !matches!(d.get("Subtype"), Some(Object::Name(n)) if n.0 == "Widget") {
+        return;
+    }
+    let ctx = format!(
+        "widget annot (FT {:?})",
+        d.get("FT").map(|o| format!("{o:?}"))
+    );
+    let named = match d.get("TU") {
+        Some(Object::String(s)) => !s.0.is_empty(),
+        Some(_) => true,
+        None => false,
+    };
+    if !named {
+        findings.push(Finding {
+            id: "28-001".into(),
+            message: "Widget annotation has no accessible name (/TU)".into(),
+            context: ctx,
+        });
+    }
 }
 
 /// True when any child TR contains a TH.
@@ -319,22 +469,45 @@ fn has_header_row(reader: &mut PdfReader, table: &pdfgen_core::Dict) -> bool {
         return false;
     };
     for kid in kids {
-        if let Object::Ref(r) = kid {
-            let Ok(obj) = reader.get(r.id) else { continue };
-            let Object::Dict(tr) = obj else { continue };
-            if !matches!(tr.get("S"), Some(Object::Name(n)) if n.0 == "TR") {
-                continue;
-            }
-            if let Some(Object::Array(cells)) = tr.get("K").cloned() {
-                for c in cells {
-                    if let Object::Ref(cr) = c {
-                        let Ok(co) = reader.get(cr.id) else { continue };
-                        if let Object::Dict(cd) = co {
-                            if matches!(cd.get("S"), Some(Object::Name(n)) if n.0 == "TH") {
-                                return true;
+        let Object::Ref(r) = kid else { continue };
+        let Ok(obj) = reader.get(r.id) else { continue };
+        let Object::Dict(tr) = obj else { continue };
+        match tr.get("S").cloned() {
+            // THead/TBody row groups: recurse into their TRs.
+            Some(Object::Name(n)) if n.0 == "THead" || n.0 == "TBody" => {
+                if let Some(Object::Array(inner)) = tr.get("K").cloned() {
+                    for c in inner {
+                        if let Object::Ref(cr) = c {
+                            let Ok(co) = reader.get(cr.id) else { continue };
+                            if let Object::Dict(cd) = co {
+                                if row_has_th(reader, &cd) {
+                                    return true;
+                                }
                             }
                         }
                     }
+                }
+            }
+            Some(Object::Name(n)) if n.0 == "TR" && row_has_th(reader, &tr) => {
+                return true;
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+/// True when this TR dict contains a TH child.
+fn row_has_th(reader: &mut PdfReader, tr: &pdfgen_core::Dict) -> bool {
+    let Some(Object::Array(cells)) = tr.get("K").cloned() else {
+        return false;
+    };
+    for c in cells {
+        if let Object::Ref(cr) = c {
+            let Ok(co) = reader.get(cr.id) else { continue };
+            if let Object::Dict(cd) = co {
+                if matches!(cd.get("S"), Some(Object::Name(n)) if n.0 == "TH") {
+                    return true;
                 }
             }
         }

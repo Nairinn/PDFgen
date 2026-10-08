@@ -550,7 +550,6 @@ version = "0.1.0"
 dependencies = [
  "pdfgen-core",
  "pdfgen-parse",
- "pdfgen-profile",
 ]
 
 [[package]]
