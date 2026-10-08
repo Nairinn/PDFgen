@@ -113,10 +113,13 @@ pub struct Drawing<'a> {
 }
 
 impl<'a> Drawing<'a> {
-    /// Begin an ASME drawing sheet (Y14.1 border frame).
+    /// Begin an ASME drawing sheet (Y14.1 border frame). A default font
+    /// is loaded when the document has none, so the F0 text resources
+    /// drawing text uses always resolve.
     pub fn new(doc: &'a mut Document, sheet: Sheet) -> Self {
         let (w, h) = sheet.points();
         let page = doc.add_draw_page(w, h);
+        doc.ensure_default_font();
         let mut d = Drawing {
             doc,
             w,
@@ -134,6 +137,7 @@ impl<'a> Drawing<'a> {
     pub fn new_iso(doc: &'a mut Document, sheet: IsoSheet) -> Self {
         let (width, height) = sheet.points();
         let page = doc.add_draw_page(width, height);
+        doc.ensure_default_font();
         // ISO 5457: 10 mm trimming margin, 5 mm inner frame gap for A4,
         // 10 mm for larger sheets.
         let trim = 10.0 * 72.0 / 25.4;
@@ -243,30 +247,19 @@ impl<'a> Drawing<'a> {
         let mut table = Node::group("Table");
         let mut y = y0 + row_h / 2.0 - 3.0;
         for f in fields {
-            let label_ops = format!(
-                "BT /F0 7 Tf {} {} Td ({}) Tj ET\n",
-                x0 + 4.0,
-                y,
-                escape(f.label)
-            );
-            let value_ops = format!(
-                "BT /F0 8 Tf {} {} Td ({}) Tj ET\n",
-                x0 + 60.0,
-                y,
-                escape(&f.value)
-            );
             let th_mcid = self.doc.begin_tag(self.page, "TH");
-            self.doc.raw_ops(self.page, &label_ops);
+            self.doc.draw_text_f0(self.page, 7.0, x0 + 4.0, y, f.label);
             self.doc.end_tag(self.page);
             let td_mcid = self.doc.begin_tag(self.page, "TD");
-            self.doc.raw_ops(self.page, &value_ops);
+            self.doc
+                .draw_text_f0(self.page, 8.0, x0 + 60.0, y, &f.value);
             self.doc.end_tag(self.page);
 
             let mut tr = Node::group("TR");
             tr.children.push(
                 Node::leaf("TH", f.label.to_string(), 0, 7.0)
                     .with_pieces(vec![(self.page, th_mcid)])
-                    .with_scope("Column"),
+                    .with_scope("Row"),
             );
             tr.children.push(
                 Node::leaf("TD", f.value.clone(), 0, 8.0).with_pieces(vec![(self.page, td_mcid)]),
@@ -334,14 +327,10 @@ impl<'a> Drawing<'a> {
         }
         let mid_x = (a1x + a2x) / 2.0;
         let mid_y = (a1y + a2y) / 2.0;
-        ops.push_str(&format!(
-            "BT /F0 8 Tf {} {} Td ({}) Tj ET\n",
-            mid_x - 12.0,
-            mid_y + 2.0,
-            escape(text)
-        ));
         self.doc.begin_artifact(self.page, "");
         self.doc.raw_ops(self.page, &ops);
+        self.doc
+            .draw_text_f0(self.page, 8.0, mid_x - 12.0, mid_y + 2.0, text);
         self.doc.end_artifact(self.page);
     }
 
@@ -355,8 +344,15 @@ impl<'a> Drawing<'a> {
             Some(alt.to_string())
         };
         let mcid = self.doc.begin_tag(self.page, "Figure");
-        self.doc
-            .raw_ops(self.page, "BT /F0 0.1 Tf 0 0 Td ( ) Tj ET\n");
+        // Real (visible) sheet-reference label inside the Figure's marked
+        // content; the old version faked it with an invisible 0.1-pt run.
+        self.doc.draw_text_f0(
+            self.page,
+            7.0,
+            self.border + 12.0,
+            self.border + 6.0,
+            "SHEET FIGURE",
+        );
         self.doc.end_tag(self.page);
         fig.pieces.push((self.page, mcid));
         self.doc.push_node(self.page, fig);
@@ -396,20 +392,12 @@ impl<'a> Drawing<'a> {
         let mut table = Node::group("Table");
         let hdr_y = y0 + row_h * n as f64 + row_h / 2.0 - 3.0;
         let rev_mcid = self.doc.begin_tag(self.page, "TH");
-        self.doc.raw_ops(
-            self.page,
-            &format!("BT /F0 7 Tf {} {} Td (REV) Tj ET\n", x0 + 4.0, hdr_y),
-        );
+        self.doc
+            .draw_text_f0(self.page, 7.0, x0 + 4.0, hdr_y, "REV");
         self.doc.end_tag(self.page);
         let desc_mcid = self.doc.begin_tag(self.page, "TH");
-        self.doc.raw_ops(
-            self.page,
-            &format!(
-                "BT /F0 7 Tf {} {} Td (DESCRIPTION) Tj ET\n",
-                x0 + 30.0,
-                hdr_y
-            ),
-        );
+        self.doc
+            .draw_text_f0(self.page, 7.0, x0 + 30.0, hdr_y, "DESCRIPTION");
         self.doc.end_tag(self.page);
         let mut hdr = Node::group("TR");
         hdr.children.push(
@@ -427,26 +415,10 @@ impl<'a> Drawing<'a> {
         let mut y = y0 + row_h * (n as f64 - 1.0) + row_h / 2.0 - 3.0;
         for (rev, desc) in rows {
             let r_mcid = self.doc.begin_tag(self.page, "TD");
-            self.doc.raw_ops(
-                self.page,
-                &format!(
-                    "BT /F0 8 Tf {} {} Td ({}) Tj ET\n",
-                    x0 + 4.0,
-                    y,
-                    escape(&rev)
-                ),
-            );
+            self.doc.draw_text_f0(self.page, 8.0, x0 + 4.0, y, &rev);
             self.doc.end_tag(self.page);
             let d_mcid = self.doc.begin_tag(self.page, "TD");
-            self.doc.raw_ops(
-                self.page,
-                &format!(
-                    "BT /F0 8 Tf {} {} Td ({}) Tj ET\n",
-                    x0 + 30.0,
-                    y,
-                    escape(&desc)
-                ),
-            );
+            self.doc.draw_text_f0(self.page, 8.0, x0 + 30.0, y, &desc);
             self.doc.end_tag(self.page);
             let mut tr = Node::group("TR");
             tr.children
@@ -459,10 +431,4 @@ impl<'a> Drawing<'a> {
         self.doc.push_node(self.page, table);
         Ok(n)
     }
-}
-
-fn escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 8);
-    pdfgen_core::escape_bytes_into(&mut out, s.as_bytes());
-    out
 }

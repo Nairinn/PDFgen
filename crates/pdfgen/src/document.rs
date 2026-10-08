@@ -9,6 +9,7 @@ use pdfgen_core::{Dict, Name, Object, PdfString, Real, Ref, Stream};
 use pdfgen_font::LoadedFont;
 use pdfgen_fonts::FontRegistry;
 use pdfgen_profile::{xmp, Metadata, Profile, SaveReport, Status, Violation};
+use std::fmt::Write as _;
 
 /// A complete PDF/UA document under construction.
 pub struct Document {
@@ -90,6 +91,23 @@ impl Document {
         Ok(self.fonts.len() - 1)
     }
 
+    /// Make sure at least one font is loaded (font resource F0). Loads
+    /// the vendored Liberation Sans when the document has none. Drawing
+    /// sheets call this so their F0 text always resolves; a no-op when
+    /// fonts are already registered.
+    pub fn ensure_default_font(&mut self) {
+        if !self.fonts.is_empty() {
+            return;
+        }
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts");
+        let p = format!("{dir}/vendor/liberation/LiberationSans-Regular.ttf");
+        if std::path::Path::new(&p).exists() && self.load_font(&p).is_ok() {
+            return;
+        }
+        // Registry fallback (system or embedded look-alike).
+        let _ = self.font("Liberation Sans", "Regular");
+    }
+
     // --- Drawing-kit surface (used by pdfgen-draw) ----------------------
 
     /// Append an empty page sized `w` x `h` and return its index. Used by
@@ -124,6 +142,38 @@ impl Document {
     /// artifact, per PDF/UA).
     pub fn raw_ops(&mut self, page: usize, ops: &str) {
         self.pages[page].content.raw_ops(ops);
+    }
+
+    /// Draw one text run with font resource `F0` at `size`, encoding the
+    /// text as WinAnsi and recording the bytes used so save() embeds the
+    /// right subset. Coordinates are written with `fmt_real` (short,
+    /// spec-canonical numbers). This is the one entry point drawing-style
+    /// code should use for text — raw `BT (…) Tj ET` strings with escaped
+    /// UTF-8 neither mark usage nor format numbers canonically.
+    pub fn draw_text_f0(&mut self, page: usize, size: f64, x: f64, y: f64, text: &str) {
+        let Ok(encoded) = pdfgen_font::winansi::encode(text) else {
+            // Non-WinAnsi text in a raw drawing context: draw nothing
+            // rather than emit mojibake; callers wanting CJK should use
+            // the flow API.
+            return;
+        };
+        {
+            let slot = self.winansi_used.entry(0).or_insert([false; 256]);
+            for &b in &encoded {
+                slot[usize::from(b)] = true;
+            }
+        }
+        let mut ops = String::with_capacity(48 + encoded.len() * 2);
+        let _ = write!(
+            ops,
+            "BT /F0 {} {} {} Td (",
+            pdfgen_core::fmt_real(size),
+            pdfgen_core::fmt_real(x),
+            pdfgen_core::fmt_real(y)
+        );
+        pdfgen_core::escape_bytes_into(&mut ops, &encoded);
+        ops.push_str(") Tj ET\n");
+        self.pages[page].content.raw_ops(&ops);
     }
 
     /// Attach a completed structure node to the page.
