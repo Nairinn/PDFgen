@@ -1,8 +1,10 @@
 # PDFgen
 
-A free, MIT-licensed PDF library written in Rust from scratch — no iText, no
-PDFBox, no AGPL, no copyleft. Built to make **PDF/UA accessibility the default**
-and **PDF versioning** something you don't have to think about.
+A PDF library in Rust, MIT licensed, written from the ISO specifications.
+It exists because the established free options have drawbacks: iText is
+AGPL (or commercially licensed), and PDFBox is Java-only. PDFgen aims to
+cover the same ground with PDF/UA accessibility and in-file versioning
+built in.
 
 ```rust
 let mut doc = pdfgen::Document::new(pdfgen::Profile::PdfUa1);
@@ -22,14 +24,14 @@ flow.table(
 let report = doc.save("report.pdf")?;              // ALWAYS writes the file
 ```
 
-For massive documents, the streaming writer flushes pages to disk as they
-close — flat memory at any scale:
+For large documents, the streaming writer flushes completed pages to
+disk instead of holding the whole document in memory:
 
 ```rust
-let mut w = pdfgen::StreamWriter::create("mega.pdf", Profile::PdfUa1,
-                                         "Mega Report", "en-US")?;
+let mut w = pdfgen::StreamWriter::create("big.pdf", Profile::PdfUa1,
+                                         "Big Report", "en-US")?;
 w.push(vec![
-    StreamEvent::Begin { tag: "P".into(), alt: None },
+    StreamEvent::Begin { tag: "P".into(), alt: None, attrs: None },
     StreamEvent::Text { text: chunk_of_body_text, font: 0, size: 11.0 },
     StreamEvent::End,
 ])?;                                              // large batches
@@ -38,137 +40,53 @@ let report = w.finish()?;                          // pages already on disk
 
 ## Why
 
-iText is AGPL (or very expensive); PDFBox is Apache-2.0 but Java-only.
-PDFgen is a clean-room reimplementation from the ISO specifications with
-different priorities:
+Saving never blocks on accessibility. `save()` always writes the file and
+returns a report. If the document isn't compliant yet, the report says
+what's wrong (Matterhorn checkpoint IDs and fixes) and the file simply
+carries no PDF/UA conformance claim. You can see the output and fix the
+report at your own pace.
 
-- **MIT licensed, no copyleft.** Use it in any product, closed or open.
-- **Accessibility guides you, it never blocks you.** Every save writes the
-  file and returns a report. If the document isn't compliant yet you get a
-  plain note — `⚠ not PDF/UA compliant yet: 2 issues (13-004 Figure has no
-  alt text, …)` — with Matterhorn IDs and fixes. The file simply carries no
-  conformance claim until it actually passes.
-- **Revisions live in the file.** Commit, list history, diff and revert
-  without an external VCS — the PDF is the repository.
-- **An engineering-drawing kit.** ASME Y14.1 sheets, tagged title-block
-  tables and dimensions, with the revision block wired to file history.
-- **Both PDF/UA-1 and PDF/UA-2**, end to end, validated against veraPDF.
-- **Streaming, like iText: flat memory at any scale.** Completed pages are
-  flushed to the output file the moment they close — content streams
-  Flate-compressed — instead of holding the document tree in memory. The
-  layout loop is optimized the same way: each word's width is measured once
-  and packed greedily (O(n), no candidate re-measurement), operators go
-  through reusable buffers, and object ids are preallocated so pages never
-  need patching. This is the path for high-volume and massive documents.
-- **Fonts by name.** Call `doc.font("Arial", "Bold")` and get the real Arial
-  from your system — licensed fonts you own work; the built-in catalog ships
-  free look-alikes (Liberation = Helvetica/Times/Courier metrics) so
-  documents work everywhere.
-- **Read and retag existing PDFs.** Open any file — even untagged ones —
-  tag it, and save it fully compliant.
-- **Rust, Python and Kotlin** from one core (Java works via the same JNA jar).
-- **Complex scripts shaped correctly.** HarfBuzz shaping and Unicode bidi run
-  on every non-Latin text path — Arabic, Myanmar, Thai render the way they
-  should, not as disconnected cmap lookups.
-- **The verification is reproducible.** CI downloads veraPDF and validates
-  every generated fixture against PDF/UA-1 and PDF/UA-2, failing on any
-  check — "verified by veraPDF" is a build status, not a claim.
+Revisions live in the file itself. You can commit, list history, diff
+and revert a PDF without any external VCS, using appended incremental
+saves. The revision block of an engineering drawing can be wired
+directly to that history.
 
-## What's done — verified by veraPDF 1.30.2, not self-graded
+Both PDF/UA-1 and PDF/UA-2 are implemented end to end, and complex
+scripts (Arabic, Myanmar, Thai) are shaped with HarfBuzz plus Unicode
+bidi, so they render correctly and extract back as the text you wrote.
 
-| Area | What works today |
+Verification is reproducible. CI installs veraPDF 1.30.2 and validates
+every generated fixture against the profile it claims, failing on any
+check.
+
+## What works
+
+| Area | Status |
 |---|---|
-| Writer (in-memory) | Tagged PDF/UA-1 + PDF/UA-2 output; structure tree; embedded TrueType; XMP |
-| Writer (streaming) | Event-oriented chunk API; pages flush to disk as they close; Flate-compressed content; O(n) incremental wrap; 500-section doc → **91,931/91,931 checks** |
-| Revisions | `commit`/`history`/`diff`/`revert` inside the file itself: appended incremental saves with message + author, byte-exact restore, object-level diff — a 3-revision file passes veraPDF 198/198 |
-| Validator + CLI | Matterhorn machine checks with checkpoint IDs (`pdfgen validate`), cross-checked against veraPDF verdicts on every fixture |
-| Forms | Interactive AcroForm text fields with `/TU` accessible names, widget annotations, and incremental-save `fill_text_field` |
-| Outline | Bookmarks generated from headings, nested by level |
-| Extraction | `extract_text` pulls text blocks from any PDF, tagged or not, Flate-compressed included |
-| HTML-to-PDF | Structural HTML subset → streamed tagged PDF/UA (headings, lists, tables, images with alt) |
-| Drawing kit | ASME Y14 sheets A–F, tagged title-block table, Y14.5 dimensions, Y14.35 revision block wired to file history — bracket drawing passes veraPDF **942/942** |
-| Layout | Word wrap with real font metrics, page breaks, cross-page paragraphs (MCR), keep-with-next |
-| Content | Headings, paragraphs, bullet lists (`L/LI/Lbl/LBody`), tables (`Table/TR/TH` with `Scope`/`TD`), figures with alt text, PNG + JPEG, header/footer artifacts |
-| Fonts | By-name registry: built-in catalog (Liberation + Noto incl. Myanmar/Thai/Arabic/CJK JP + accessibility faces, OFL), system fonts (recursive scan), standard-14 aliases, user-registered files, TrueType CID subsetting, substitution notes |
-| Reader | Classic + xref-stream + hybrid xref, lazy resolution, repair mode for broken files |
-| Retag | Import any PDF, extract text, auto/manual tagging, save compliant |
-| Reports | Machine checks with Matterhorn IDs + human-review checklist on every save |
-| Bindings | Python (PyO3, abi3 ≥ 3.9, `PdfUaWarning` on non-compliant saves), Kotlin/Java (UniFFI + JNA, Java 11+), and Java 22+ (`java.lang.foreign` FFM, no JNI/JNA) — all generate veraPDF-valid PDFs |
-| CID fonts + shaping | Text WinAnsi can't encode flows through Type0 Identity-H composite fonts automatically, shaped with HarfBuzz (rustybuzz) + Unicode bidi: Arabic joins and runs right-to-left, Myanmar marks and medials reorder, kerning applies. TTC collections slice to standalone programs; tests assert contextual forms differ from isolated cmap glyphs and rasterized output leaves real ink |
+| Writers | Tagged PDF/UA-1 + UA-2 output, in-memory or streaming; structure trees, XMP, embedded TrueType |
+| Streaming | Event API; completed pages flush to disk; a 500-section document passes 91,931/91,931 veraPDF checks |
+| Revisions | `commit` / `history` / `diff` / `revert` inside the file, byte-exact restore, object-level diff |
+| Layout | Word wrap with real metrics, page breaks, cross-page paragraphs, keep-with-next |
+| Content | Headings, paragraphs, lists, tables (TH with Scope), figures with alt, PNG + JPEG, header/footer artifacts |
+| Fonts | Registry by name: bundled catalog (Liberation, Noto incl. Myanmar/Thai/Arabic, Atkinson Hyperlegible, OpenDyslexic), system fonts, standard-14 aliases, TrueType CID subsetting |
+| Shaping | HarfBuzz + bidi; RTL runs, contextual forms, reordering; ActualText keeps extraction logically ordered |
+| Forms | AcroForm text fields with /TU accessible names; incremental-save `fill_text_field` |
+| HTML to PDF | Structural subset (headings, lists, tables, images, implied paragraphs, entities) to streamed tagged PDF |
+| Drawing kit | ASME Y14 sheets A-F, tagged title block, Y14.5 dimensions, Y14.35 revision block from file history |
+| Reader | Classic, xref-stream and hybrid xref; lazy resolution; repair mode |
+| Retag | Open any PDF (even untagged), tag it, save it compliant |
+| Extraction | Text blocks from any PDF, tagged or not; honors ActualText |
+| Validator | Matterhorn machine checks (`pdfgen validate`), cross-checked against veraPDF |
+| Bindings | Python (PyO3, abi3 >= 3.9), Kotlin/Java 11+ (UniFFI + JNA), Java 22+ (FFM, no JNI); all produce veraPDF-valid files |
 
-## Optional CJK fonts
+## How to install veraPDF locally
 
-The two Noto Sans CJK JP faces (16 MB each) are **not committed** — clone
-size stays small. Fetch them when needed:
-
-```bash
-bash scripts/fetch-cjk-fonts.sh
-```
-
-CI fetches them automatically; the CJK test skips when they are absent.
-
-## Fonts in packaged installs
-
-The bundled font files (OFL) live in `fonts/vendor/` at the repo root — outside any crate directory, so **crate packages never ship the fonts** (crates.io caps packages at 10 MB; the CJK faces alone are 16 MB each). Resolution order at runtime:
-
-1. `PDFGEN_FONTS_DIR` (build-time env var, relocated installs)
-2. The repo checkout (`fonts/` relative to the workspace)
-3. System fonts by family name (licensed fonts you own work here)
-4. A bundled-catalog look-alike (with a substitution note in the save report)
-5. Any system sans-serif, flagged as substituted — the save always succeeds
-
-So a `cargo add pdfgen`-style install degrades gracefully: documents still build with system fonts and the report shows what was substituted. Clone the repo (or point `PDFGEN_FONTS_DIR` at our `fonts/`) to use the full bundled catalog.
-
-## What's coming next
-
-- ~~More Matterhorn checks~~ (28-001/28-002 form-field checks added; negative-tested)
-- ~~CID subsetting~~ (done: TrueType CID fonts subset to used glyphs via glyf/loca surgery; CFF embeds stay whole-font for now)
-- ~~CJK fonts~~ (done: Noto Sans CJK JP cataloged, FontFile3/ CIDFontType0 embedding)
-- ~~Accessibility fonts~~ (done: Atkinson Hyperlegible + OpenDyslexic cataloged, veraPDF-verified)
-- ~~Rendering~~ (done: `pdfgen render` / `pdfgen print`, embedded-font glyph rasterizer)
-- **Complex-script shaping** (rustybuzz + unicode-bidi) so Arabic, Myanmar and Thai render visually correct, not just structurally valid
-- CFF subsetting (shrink the whole-program CJK embeds)
-- Maven Central, PyPI and crates.io publishing
-- Full plan with milestones: [`docs/PLAN.md`](docs/PLAN.md)
-
-## Layout
-
-```
-crates/
-  pdfgen-core      PDF object model, serializer, xref writer
-  pdfgen-parse     reader: lexer, xref (classic/stream/hybrid), repair mode
-  pdfgen-font      font loading (ttf-parser), WinAnsi, embedding permissions
-  pdfgen-fonts     registry: built-in catalog, system fonts, name resolution
-  pdfgen-canvas    content streams, marked content (BDC/EMC), artifacts
-  pdfgen-profile   PDF/UA-1 + UA-2 profiles, XMP, the save report
-  pdfgen           the public API: Document, Flow, StreamWriter, TagSession,
-                   extract_text, HTML-to-PDF, forms, bookmarks
-  pdfgen-api       bindings-friendly facade (owned types, no lifetimes)
-  pdfgen-py        Python bindings (PyO3)
-  pdfgen-uniffi    Kotlin/Java bindings (UniFFI)
-  pdfgen-validate  Matterhorn machine checks (the `pdfgen validate` engine)
-  pdfgen-revision  commit / history / diff / revert inside the PDF
-  pdfgen-draw      ASME Y14 + ISO 5457 drawing kit (sheets, title block,
-                  dimensions, revision block)
-  pdfgen-ffi       C-ABI layer (cdylib) consumed by the Java FFM binding
-  pdfgen-cli       the `pdfgen` command-line tool
-fonts/vendor/      bundled OFL fonts (Liberation, Noto incl. Myanmar/Thai/Arabic)
-bindings/          kotlin (UniFFI/JNA), java (FFM), python (PyO3 wheel)
-tests/output/      generated PDFs (gitignored) — all veraPDF-validated
-tools/verapdf/     local veraPDF install used as the external checker
-```
-
-## Publishing
-
-Releases go to crates.io in dependency order (the internal crates must
-land before the ones that use them):
-
-    ./scripts/publish.sh            # all 12 crates, ordered
-    ./scripts/publish.sh --dry-run  # pack order check
-
-The Python wheel builds with maturin (see `bindings/python/`); Java/Kotlin
-consume the JNA jar or the Java 22+ FFM cdylib. Publishing credentials
-are required: `cargo login` for crates.io and `twine` for PyPI.
+`tools/verapdf/` is a local install, not part of the repo. CI downloads
+veraPDF 1.30.2 from
+`https://software.verapdf.org/releases/1.30/verapdf-greenfield-1.30.2-installer.zip`
+and installs it headlessly (see `.github/workflows/ci.yml`). For a local
+install, download the same zip and run the installer, or use the izpack
+auto-install XML from the CI job.
 
 ## Development
 
@@ -180,19 +98,99 @@ tools/verapdf/verapdf -f ua1 tests/output/hello_ua1.pdf           # external gat
 tools/verapdf/verapdf -f ua2 tests/output/hello_ua2.pdf
 ```
 
-Pass = `isCompliant="true"`, `failedChecks="0"`.
+Pass means `isCompliant="true"` and `failedChecks="0"`. The gate script
+`scripts/verapdf-gate.sh` validates every generated fixture except the
+files listed (with reasons) in `tests/verapdf-skip.txt`; all other
+`tests/output/` files are veraPDF-validated. Nightly cargo-fuzz runs
+cover the parser and font loader (`.github/workflows/fuzz.yml`).
 
-- **Commits**: Conventional Commits (`feat(writer): …`).
-- **License hygiene**: `deny.toml` allow-lists only MIT/Apache/BSD/ISC/Zlib
-  dependencies; vendored fonts are OFL-1.1 with their license files.
-- **veraPDF is a test tool only** — never linked, never bundled in output.
+Commits follow Conventional Commits. `deny.toml` allow-lists only
+permissive dependency licenses (MIT/Apache/BSD/ISC/Zlib); vendored fonts
+are OFL-1.1 with their license files kept alongside. veraPDF is a test
+tool only, never linked or bundled.
+
+## Optional CJK fonts
+
+The two Noto Sans CJK JP faces (16 MB each) are not committed. Fetch them
+with `bash scripts/fetch-cjk-fonts.sh`. CI fetches them automatically;
+the CJK tests skip when they are absent.
+
+## Fonts in packaged installs
+
+Bundled fonts live in `fonts/vendor/` at the repo root, outside any crate
+directory, so crate packages never ship them (crates.io caps packages at
+10 MB). Resolution order at runtime:
+
+1. `PDFGEN_FONTS_DIR` (build-time env var, relocated installs)
+2. The repo checkout (`fonts/` relative to the workspace)
+3. System fonts by family name
+4. A bundled look-alike, with a substitution note in the save report
+5. Any system sans-serif, flagged as substituted, so the save always
+   succeeds
+
+## Internals
+
+Implementation notes that don't belong in the pitch:
+
+- The layout wrapper is O(n): each word's width is measured once and
+  packed greedily, no candidate re-measurement.
+- The streaming writer preallocates object ids, so finished pages never
+  need patching, and content streams are Flate-compressed as they flush.
+- Shaped text whose glyphs don't map one-to-one to characters is wrapped
+  in `/Span <</ActualText (...)>>` with the logical source string, so
+  extraction returns what was written, not the glyph order.
+- The structure-tree walker normalizes /K to a child list (arrays,
+  single refs and direct dicts) before descending, including THead/TBody
+  row groups.
+
+## Not done yet
+
+- CFF subsetting (CJK OTF faces embed whole; TrueType subsets fine)
+- Encryption and signatures
+- Publishing to crates.io, PyPI and Maven Central (script ready:
+  `scripts/publish.sh`, needs credentials)
+- Full plan with milestones: [`docs/PLAN.md`](docs/PLAN.md)
+
+## Limitations
+
+Early project. Not on crates.io or PyPI yet, so you build from source.
+No encryption or signature support. CFF/OTF fonts (including the CJK
+faces) embed whole, which makes CJK-heavy documents large. Complex
+scripts are shaped and verified for Arabic, Myanmar and Thai; other
+scripts should work through the same HarfBuzz path but aren't tested.
+
+## Layout
+
+```
+crates/
+  pdfgen-core      PDF object model, serializer, xref writer
+  pdfgen-parse     reader: lexer, xref (classic/stream/hybrid), repair mode
+  pdfgen-font      font loading (ttf-parser), WinAnsi, shaping
+  pdfgen-fonts     registry: built-in catalog, system fonts, name resolution
+  pdfgen-canvas    content streams, marked content (BDC/EMC), artifacts
+  pdfgen-profile   PDF/UA-1 + UA-2 profiles, XMP, the save report
+  pdfgen           the public API: Document, Flow, StreamWriter, TagSession,
+                   extract_text, HTML-to-PDF, forms, bookmarks
+  pdfgen-api       bindings-friendly facade (owned types, no lifetimes)
+  pdfgen-py        Python bindings (PyO3)
+  pdfgen-uniffi    Kotlin/Java bindings (UniFFI)
+  pdfgen-validate  Matterhorn machine checks (the `pdfgen validate` engine)
+  pdfgen-revision  commit / history / diff / revert inside the PDF
+  pdfgen-draw      ASME Y14 + ISO 5457 drawing kit
+  pdfgen-ffi       C-ABI layer (cdylib) consumed by the Java FFM binding
+  pdfgen-render    software rasterizer (PNG output, print pipeline)
+  pdfgen-cli       the `pdfgen` command-line tool
+fonts/vendor/      bundled OFL fonts (Liberation, Noto incl. Myanmar/Thai/Arabic)
+bindings/          kotlin (UniFFI/JNA), java (FFM), python (PyO3 wheel)
+tests/output/      generated PDFs (gitignored)
+```
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Vendored fonts keep their own licenses in
+MIT, see [LICENSE](LICENSE). Vendored fonts keep their own licenses in
 `fonts/vendor/*/LICENSE` (SIL OFL 1.1).
 
-PDF/UA-1 (ISO 14289-1), PDF/UA-2 (ISO 14289-2) and PDF 2.0 (ISO 32000-2) are
-freely available from the [PDF Association](https://pdfa.org/sponsored-standards/);
-this project implements from those specifications, not from iText or PDFBox
-source code.
+PDF/UA-1 (ISO 14289-1), PDF/UA-2 (ISO 14289-2) and PDF 2.0 (ISO 32000-2)
+are freely available from the [PDF Association](https://pdfa.org/sponsored-standards/);
+this project implements from those specifications, not from iText or
+PDFBox source code.
