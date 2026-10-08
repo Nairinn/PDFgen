@@ -41,6 +41,25 @@ impl Content {
         self.ops.push_str("EMC\n");
     }
 
+    /// Begin a `/Span` marked-content sequence carrying `/ActualText`
+    /// (the logical source text for what follows, for shaped or
+    /// reordered content). The string is UTF-16BE with BOM per the
+    /// spec for text strings.
+    pub fn begin_actual_text(&mut self, logical: &str) {
+        self.ops.push_str("/Span <</ActualText (");
+        let mut s16: Vec<u8> = vec![0xFE, 0xFF];
+        for unit in logical.encode_utf16() {
+            s16.extend_from_slice(&unit.to_be_bytes());
+        }
+        self.ops.push_str(&escape_literal(&s16));
+        self.ops.push_str(")>> BDC\n");
+    }
+
+    /// End the innermost `/Span` opened by `begin_actual_text`.
+    pub fn end_actual_text(&mut self) {
+        self.ops.push_str("EMC\n");
+    }
+
     /// Draw one line of text at `(x, y)` in the given font resource and size.
     pub fn text(&mut self, font_res: &str, size: f64, x: f64, y: f64, bytes: &[u8]) {
         self.ops.push_str("BT\n");

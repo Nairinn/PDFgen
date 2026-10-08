@@ -64,11 +64,33 @@ fn winansi_to_string(bytes: &[u8]) -> String {
 
 /// Extract text-showing runs from a content stream using the shared
 /// pdfgen-parse string decoders (octal escapes, hex strings, nesting).
+/// `/Span <</ActualText (...)>> BDC ... EMC` regions contribute the
+/// ActualText string INSTEAD of the drawn glyph codes, so shaped text
+/// extracts in logical order.
 pub(crate) fn extract_text_runs(content: &[u8]) -> Vec<String> {
     let mut runs = Vec::new();
     let mut i = 0usize;
     let mut current = String::new();
     while i < content.len() {
+        // /Span <</ActualText (...>> BDC : find the span, decode the
+        // logical text, skip drawing ops until the matching EMC.
+        if content[i..].starts_with(b"/Span") {
+            if let Some(at) = find_actual_text(content, i) {
+                let (text, bdc_end) = at;
+                let emc = find_emc(content, bdc_end);
+                // The span's drawn bytes are superseded by ActualText.
+                if current.trim().is_empty() {
+                    current.clear();
+                } else {
+                    runs.push(std::mem::take(&mut current));
+                }
+                runs.push(text);
+                i = emc;
+                continue;
+            }
+            i += 5;
+            continue;
+        }
         match content[i] {
             b'(' => {
                 if let Some((bytes, next)) = pdfgen_parse::read_literal(content, i) {
@@ -106,6 +128,67 @@ pub(crate) fn extract_text_runs(content: &[u8]) -> Vec<String> {
         runs.push(current);
     }
     runs
+}
+
+/// Find `/Span <</ActualText (....)>> BDC` at `i`; return the decoded
+/// logical text and the byte offset just past the BDC keyword.
+fn find_actual_text(content: &[u8], i: usize) -> Option<(String, usize)> {
+    let rest = &content[i..];
+    let marker = b"/ActualText";
+    let at = rest.windows(marker.len()).position(|w| w == marker)?;
+    let lit_start = i + at + marker.len();
+    // Skip spaces to the literal string.
+    let mut s = lit_start;
+    while s < content.len() && (content[s] == b' ' || content[s] == b'\n' || content[s] == b'\r') {
+        s += 1;
+    }
+    let (bytes, next) = pdfgen_parse::read_literal(content, s)?;
+    let text = decode_pdf_text_bytes(&bytes);
+    // Advance past the ">> BDC".
+    let bdc = content[next..]
+        .windows(3)
+        .position(|w| w == b"BDC")
+        .map(|p| next + p + 3)?;
+    Some((text, bdc))
+}
+
+/// Decode a PDF text string (UTF-16BE with BOM, or PDFDocEncoding-ish
+/// bytes) to Unicode.
+fn decode_pdf_text_bytes(bytes: &[u8]) -> String {
+    if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
+        let mut out = String::with_capacity(bytes.len() / 2);
+        let units: Vec<u16> = bytes[2..]
+            .chunks_exact(2)
+            .map(|p| u16::from_be_bytes([p[0], p[1]]))
+            .collect();
+        out.extend(char::decode_utf16(units).map(|r| r.unwrap_or('\u{FFFD}')));
+        return out;
+    }
+    // No BOM: treat as Latin-1-ish (our writer always uses the BOM for
+    // non-ASCII).
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+/// End of the marked-content sequence containing `from`: the matching
+/// EMC at the same nesting depth.
+fn find_emc(content: &[u8], from: usize) -> usize {
+    let mut depth = 1usize;
+    let mut i = from;
+    while i < content.len() {
+        if content[i..].starts_with(b"BDC") {
+            depth += 1;
+            i += 3;
+        } else if content[i..].starts_with(b"EMC") {
+            depth -= 1;
+            if depth == 0 {
+                return i + 3;
+            }
+            i += 3;
+        } else {
+            i += 1;
+        }
+    }
+    content.len()
 }
 
 impl TagSession {

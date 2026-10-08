@@ -157,21 +157,32 @@ impl<'a> Flow<'a> {
                 // CID path: WinAnsi cannot encode this text. SHAPE it
                 // (HarfBuzz via rustybuzz) so complex scripts come out
                 // correct: Arabic joins and runs RTL, Myanmar marks
-                // reorder, kerning applies. The shaped (gid, cluster)
-                // pairs are recorded so save() emits a Type0 font with
-                // CID widths and a matching ToUnicode. CID text uses
-                // the separate F<idx>cid resource.
+                // reorder, kerning applies. The shaped run is drawn in
+                // visual order; when the glyphs don't map 1:1 onto the
+                // source (ligatures, reordering, RTL), an /ActualText
+                // span carries the LOGICAL string so extraction and
+                // screen readers see the real text.
                 let f = &self.doc.fonts[font];
                 let shaped = pdfgen_font::shape::shape(f, line);
                 let used = self.doc.cid_fonts.entry(font).or_default();
-                for g in &shaped {
-                    used.insert((g.cluster, g.gid));
+                for g in &shaped.glyphs {
+                    let ch = line
+                        .get(g.cluster as usize..)
+                        .and_then(|s| s.chars().next())
+                        .unwrap_or('\u{fffd}');
+                    used.insert((ch, g.gid));
                 }
-                let mut bytes = Vec::with_capacity(shaped.len() * 2);
-                for g in &shaped {
+                let mut bytes = Vec::with_capacity(shaped.glyphs.len() * 2);
+                for g in &shaped.glyphs {
                     bytes.extend_from_slice(&g.gid.to_be_bytes());
                 }
-                pd.content.text(&format!("F{font}cid"), size, x, y, &bytes);
+                if shaped.needs_actual_text(line) {
+                    pd.content.begin_actual_text(line);
+                    pd.content.text(&format!("F{font}cid"), size, x, y, &bytes);
+                    pd.content.end_actual_text();
+                } else {
+                    pd.content.text(&format!("F{font}cid"), size, x, y, &bytes);
+                }
             }
             y -= lh;
         }

@@ -21,7 +21,7 @@ fn arabic_shapes_into_contextual_forms() {
     let shaped = shape(&f, text);
     // Naive cmap glyphs:
     let naive: Vec<u16> = text.chars().filter_map(|c| f.glyph_index(c)).collect();
-    let shaped_gids: Vec<u16> = shaped.iter().map(|g| g.gid).collect();
+    let shaped_gids: Vec<u16> = shaped.glyphs.iter().map(|g| g.gid).collect();
     // HarfBuzz must pick medial/initial forms that differ from the
     // isolated cmap glyphs for at least some letters (joining behavior).
     let diffs = shaped_gids
@@ -46,8 +46,8 @@ fn myanmar_marks_reorder() {
     // The glyph COUNT can differ from char count (ligatures); the
     // important property is that shaping SUCCEEDS and produces a
     // sequence of in-range gids.
-    assert!(!shaped.is_empty(), "shaping produced nothing");
-    for g in &shaped {
+    assert!(!shaped.glyphs.is_empty(), "shaping produced nothing");
+    for g in &shaped.glyphs {
         assert!(g.gid != 0, "shaped to .notdef (gid 0) - font lacks forms");
     }
 }
@@ -61,7 +61,7 @@ fn ltr_latin_passes_through_shaping() {
     .unwrap();
     let shaped = shape(&f, "Hello");
     let naive: Vec<u16> = "Hello".chars().filter_map(|c| f.glyph_index(c)).collect();
-    let gids: Vec<u16> = shaped.iter().map(|g| g.gid).collect();
+    let gids: Vec<u16> = shaped.glyphs.iter().map(|g| g.gid).collect();
     assert_eq!(gids, naive, "Latin LTR should be unchanged by shaping");
 }
 
@@ -70,12 +70,14 @@ fn rtl_paragraph_gives_visual_order() {
     let f = LoadedFont::load(ARABIC).unwrap();
     let text = "\u{0645}\u{0631}\u{062D}\u{0628}\u{0627}"; // marhaba
     let shaped = shape(&f, text);
-    // Cluster chars: the FIRST shaped glyph's cluster should be the
-    // LAST character of the original (b) because the paragraph is RTL
-    // and the visual string is reversed before shaping.
-    let first_cluster = shaped[0].cluster;
+    // Clusters are byte offsets into the logical string. In an RTL
+    // paragraph HarfBuzz emits glyphs in visual order, so the FIRST
+    // shaped glyph belongs to the LAST logical character (alef, byte 8).
+    let first_cluster = shaped.glyphs[0].cluster as usize;
+    let ch = text.get(first_cluster..).and_then(|s| s.chars().next());
     assert_eq!(
-        first_cluster, '\u{0627}',
-        "RTL visual order: last char first"
+        ch,
+        Some('\u{0627}'),
+        "RTL visual order: last char first, got cluster {first_cluster}"
     );
 }
