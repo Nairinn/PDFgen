@@ -560,6 +560,11 @@ impl StreamWriter {
         id
     }
 
+    /// Allocate an object id for an image /SMask stream.
+    fn alloc_image_smask(&mut self) -> u32 {
+        self.alloc()
+    }
+
     /// Serialize one object to disk at the cursor and record its offset.
     fn write_object(&mut self, id: u32, obj: &Object) -> Result<(), StreamError> {
         let off = self.cursor;
@@ -1040,7 +1045,9 @@ pub(crate) fn flate_compress(data: &[u8]) -> Vec<u8> {
     enc.finish().unwrap_or_else(|_| data.to_vec())
 }
 
-/// Emit one image XObject (RGB raw or JPEG DCTDecode pass-through).
+/// Emit one image XObject. RGB payloads Flate-compress and carry an
+/// /SMask when the source had alpha; JPEG passes through as DCTDecode
+/// with the color space read from the SOF component count.
 fn emit_image_xobject(
     w: &mut StreamWriter,
     id: u32,
@@ -1051,15 +1058,64 @@ fn emit_image_xobject(
     d.set("Subtype", "Image");
     d.set("Width", img.w as i64);
     d.set("Height", img.h as i64);
-    d.set("ColorSpace", "DeviceRGB");
     d.set("BitsPerComponent", 8);
     let stream = match &img.kind {
-        crate::image::ImageKind::Rgb(rgb) => Stream {
-            dict: d,
-            data: rgb.clone(),
-        },
-        crate::image::ImageKind::Jpeg(bytes) => {
+        crate::image::ImageKind::Rgb { rgb, smask } => {
+            d.set("ColorSpace", "DeviceRGB");
+            d.set("Filter", "FlateDecode");
+            if let Some(alpha) = smask {
+                // Soft mask: a grayscale image of the alpha channel.
+                let sid = w.alloc_image_smask();
+                let mut sd = Dict::new();
+                sd.set("Type", "XObject");
+                sd.set("Subtype", "Image");
+                sd.set("Width", img.w as i64);
+                sd.set("Height", img.h as i64);
+                sd.set("ColorSpace", "DeviceGray");
+                sd.set("BitsPerComponent", 8);
+                sd.set("Filter", "FlateDecode");
+                let smask_stream = Stream {
+                    dict: sd,
+                    data: flate_compress(alpha),
+                };
+                w.write_object(sid, &Object::Stream(smask_stream))?;
+                d.set("SMask", Object::Ref(Ref { id: sid, gen: 0 }));
+            }
+            Stream {
+                dict: d,
+                data: flate_compress(rgb),
+            }
+        }
+        crate::image::ImageKind::Jpeg { components, bytes } => {
             d.set("Filter", "DCTDecode");
+            match components {
+                1 => {
+                    d.set("ColorSpace", "DeviceGray");
+                }
+                3 => {
+                    d.set("ColorSpace", "DeviceRGB");
+                }
+                4 => {
+                    // Adobe CMYK JPEGs are inverted.
+                    d.set("ColorSpace", "DeviceCMYK");
+                    d.set(
+                        "Decode",
+                        Object::Array(vec![
+                            Object::Int(1),
+                            Object::Int(0),
+                            Object::Int(1),
+                            Object::Int(0),
+                            Object::Int(1),
+                            Object::Int(0),
+                            Object::Int(1),
+                            Object::Int(0),
+                        ]),
+                    );
+                }
+                _ => {
+                    d.set("ColorSpace", "DeviceRGB");
+                }
+            }
             Stream {
                 dict: d,
                 data: bytes.clone(),

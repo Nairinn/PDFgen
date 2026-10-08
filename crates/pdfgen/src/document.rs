@@ -416,14 +416,57 @@ impl Document {
             d.set("Subtype", "Image");
             d.set("Width", img.w as i64);
             d.set("Height", img.h as i64);
-            d.set("ColorSpace", "DeviceRGB");
             d.set("BitsPerComponent", 8);
             match &img.kind {
-                ImageKind::Rgb(rgb) => {
-                    doc.set_stream(xref, Stream::new(d, rgb.clone()));
+                ImageKind::Rgb { rgb, smask } => {
+                    d.set("ColorSpace", "DeviceRGB");
+                    d.set("Filter", "FlateDecode");
+                    if let Some(alpha) = smask {
+                        // Soft mask: a grayscale image of the alpha channel.
+                        let sref = doc.alloc();
+                        let mut sd = Dict::new();
+                        sd.set("Type", "XObject");
+                        sd.set("Subtype", "Image");
+                        sd.set("Width", img.w as i64);
+                        sd.set("Height", img.h as i64);
+                        sd.set("ColorSpace", "DeviceGray");
+                        sd.set("BitsPerComponent", 8);
+                        sd.set("Filter", "FlateDecode");
+                        doc.set_stream(sref, Stream::new(sd, flate_compress(alpha)));
+                        d.set("SMask", sref);
+                    }
+                    doc.set_stream(xref, Stream::new(d, flate_compress(rgb)));
                 }
-                ImageKind::Jpeg(bytes) => {
+                ImageKind::Jpeg { components, bytes } => {
                     d.set("Filter", "DCTDecode");
+                    match components {
+                        1 => {
+                            d.set("ColorSpace", "DeviceGray");
+                        }
+                        3 => {
+                            d.set("ColorSpace", "DeviceRGB");
+                        }
+                        4 => {
+                            // Adobe CMYK JPEGs are inverted.
+                            d.set("ColorSpace", "DeviceCMYK");
+                            d.set(
+                                "Decode",
+                                Object::Array(vec![
+                                    Object::Int(1),
+                                    Object::Int(0),
+                                    Object::Int(1),
+                                    Object::Int(0),
+                                    Object::Int(1),
+                                    Object::Int(0),
+                                    Object::Int(1),
+                                    Object::Int(0),
+                                ]),
+                            );
+                        }
+                        _ => {
+                            d.set("ColorSpace", "DeviceRGB");
+                        }
+                    }
                     doc.set_stream(xref, Stream::new(d, bytes.clone()));
                 }
             }

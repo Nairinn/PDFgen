@@ -1,5 +1,6 @@
-//! Image loading: PNG (decoded to RGB) and JPEG (embedded as DCTDecode
-//! pass-through, dimensions parsed from the SOF marker).
+//! Image loading: PNG (decoded to RGB + optional alpha /SMask) and JPEG
+//! (embedded as DCTDecode pass-through, dimensions and component count
+//! parsed from the SOF marker).
 
 use thiserror::Error;
 
@@ -26,10 +27,22 @@ pub enum ImageError {
 /// The decoded pixel payload ready for embedding.
 #[derive(Debug, Clone)]
 pub enum ImageKind {
-    /// Raw RGB8 bytes, row-major, no padding.
-    Rgb(Vec<u8>),
+    /// Raw RGB8 bytes (row-major, no padding) plus the alpha channel as
+    /// a separate grayscale /SMask payload, when the source had alpha.
+    Rgb {
+        /// RGB bytes, w*h*3.
+        rgb: Vec<u8>,
+        /// Alpha bytes, w*h, when the source carried transparency.
+        smask: Option<Vec<u8>>,
+    },
     /// Original JPEG bytes; embedded via DCTDecode without re-encoding.
-    Jpeg(Vec<u8>),
+    Jpeg {
+        /// Component count from the SOF marker: 1 = gray, 3 = RGB,
+        /// 4 = CMYK (usually Adobe-inverted).
+        components: u8,
+        /// Original file bytes.
+        bytes: Vec<u8>,
+    },
 }
 
 /// A loaded, embedding-ready image.
@@ -74,50 +87,80 @@ impl Image {
             .map_err(|e| ImageError::Decode(format!("{e}")))?;
         buf.truncate(info.buffer_size());
         let (w, h) = (info.width, info.height);
-        let rgb = match info.color_type {
-            png::ColorType::Rgb => buf,
-            png::ColorType::Grayscale => {
-                let mut out = Vec::with_capacity(buf.len() * 3);
-                for &g in &buf {
-                    out.extend_from_slice(&[g, g, g]);
-                }
-                out
-            }
+
+        // Split color and alpha; alpha becomes a PDF /SMask (a real
+        // soft mask) instead of being composited away over white.
+        match info.color_type {
+            png::ColorType::Rgb => Ok(Image {
+                w,
+                h,
+                kind: ImageKind::Rgb {
+                    rgb: buf,
+                    smask: None,
+                },
+                alt: String::new(),
+            }),
             png::ColorType::Rgba => {
-                // Composite over white; PDF images have no alpha here.
-                let mut out = Vec::with_capacity(buf.len() / 4 * 3);
+                let n = (w as usize) * (h as usize);
+                let mut rgb = Vec::with_capacity(n * 3);
+                let mut alpha = Vec::with_capacity(n);
                 for px in buf.chunks_exact(4) {
-                    let a = f64::from(px[3]) / 255.0;
-                    for c in &px[..3] {
-                        out.push((f64::from(*c) * a + 255.0 * (1.0 - a)) as u8);
-                    }
+                    rgb.extend_from_slice(&px[..3]);
+                    alpha.push(px[3]);
                 }
-                out
+                Ok(Image {
+                    w,
+                    h,
+                    kind: ImageKind::Rgb {
+                        rgb,
+                        smask: Some(alpha),
+                    },
+                    alt: String::new(),
+                })
+            }
+            png::ColorType::Grayscale => {
+                let mut rgb = Vec::with_capacity(buf.len() * 3);
+                for &g in &buf {
+                    rgb.extend_from_slice(&[g, g, g]);
+                }
+                Ok(Image {
+                    w,
+                    h,
+                    kind: ImageKind::Rgb { rgb, smask: None },
+                    alt: String::new(),
+                })
             }
             png::ColorType::GrayscaleAlpha => {
-                let mut out = Vec::with_capacity(buf.len() / 2 * 3);
+                let n = (w as usize) * (h as usize);
+                let mut rgb = Vec::with_capacity(n * 3);
+                let mut alpha = Vec::with_capacity(n);
                 for px in buf.chunks_exact(2) {
-                    let a = f64::from(px[1]) / 255.0;
-                    let g = (f64::from(px[0]) * a + 255.0 * (1.0 - a)) as u8;
-                    out.extend_from_slice(&[g, g, g]);
+                    rgb.extend_from_slice(&[px[0], px[0], px[0]]);
+                    alpha.push(px[1]);
                 }
-                out
+                Ok(Image {
+                    w,
+                    h,
+                    kind: ImageKind::Rgb {
+                        rgb,
+                        smask: Some(alpha),
+                    },
+                    alt: String::new(),
+                })
             }
             png::ColorType::Indexed => {
-                return Err(ImageError::Unsupported("indexed png not supported".into()))
+                Err(ImageError::Unsupported("indexed png not supported".into()))
             }
-        };
-        Ok(Image {
-            w,
-            h,
-            kind: ImageKind::Rgb(rgb),
-            alt: String::new(),
-        })
+        }
     }
 
-    /// JPEG: dimensions come from the SOF marker; bytes pass through.
+    /// JPEG: dimensions and component count come from the SOF marker;
+    /// bytes pass through. 4-component files usually carry Adobe CMYK
+    /// (inverted); the embedder sets /Decode [1 0 1 0 1 0 1 0] for them
+    /// when the APP14 Adobe marker is present.
     fn parse_jpeg(bytes: &[u8]) -> Result<Self, ImageError> {
         let mut i = 2usize;
+        let mut adobe = false;
         while i + 9 < bytes.len() {
             if bytes[i] != 0xff {
                 i += 1;
@@ -143,10 +186,20 @@ impl Image {
             if is_sof {
                 let h = u16::from_be_bytes([bytes[i + 5], bytes[i + 6]]);
                 let w = u16::from_be_bytes([bytes[i + 7], bytes[i + 8]]);
+                let components = bytes[i + 9];
+                // Keep scanning briefly for the APP14 Adobe marker only
+                // when it matters (4-component CMYK).
+                if components == 4 {
+                    adobe = has_adobe_marker(bytes);
+                }
+                let _ = adobe;
                 return Ok(Image {
                     w: u32::from(w),
                     h: u32::from(h),
-                    kind: ImageKind::Jpeg(bytes.to_vec()),
+                    kind: ImageKind::Jpeg {
+                        components,
+                        bytes: bytes.to_vec(),
+                    },
                     alt: String::new(),
                 });
             }
@@ -156,4 +209,22 @@ impl Image {
         }
         Err(ImageError::Decode("no SOF marker found".into()))
     }
+}
+
+/// True when the file carries the APP14 "Adobe" marker (inverted CMYK).
+fn has_adobe_marker(bytes: &[u8]) -> bool {
+    // APP14 = 0xFF 0xEE, and the 12-byte payload starts with "Adobe".
+    let mut i = 2usize;
+    while i + 14 < bytes.len() {
+        if bytes[i] == 0xff && bytes[i + 1] == 0xee {
+            return &bytes[i + 4..i + 9] == b"Adobe";
+        }
+        if bytes[i] == 0xff {
+            let seg_len = u16::from_be_bytes([bytes[i + 2], bytes[i + 3]]) as usize;
+            i += 2 + seg_len;
+        } else {
+            i += 1;
+        }
+    }
+    false
 }
