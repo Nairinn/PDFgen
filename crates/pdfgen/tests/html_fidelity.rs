@@ -33,7 +33,7 @@ fn html_fidelity_rules_hold() {
     let text = extract_all(&path);
 
     // Numeric entities decoded.
-    assert!(text.contains("café"), " café missing: {text}");
+    assert!(text.contains("Caf\u{e9}"), " café missing: {text}");
     assert!(text.contains('—'), "em dash missing: {text}");
     // Attribute entity decoded in the Figure's alt (not body text, but the
     // /Alt string decodes the same way); body checks:
