@@ -14,6 +14,7 @@ use pdfgen_api::{PdfDocument, TargetProfile};
 use pyo3::create_exception;
 use pyo3::exceptions::PyWarning;
 use pyo3::prelude::*;
+use std::collections::HashSet;
 
 create_exception!(pdfgen, PdfError, pyo3::exceptions::PyValueError);
 create_exception!(pdfgen, PdfUaWarning, PyWarning);
@@ -89,15 +90,15 @@ impl Report {
 #[pyclass]
 struct Document {
     doc: PdfDocument,
-    /// Warnings already emitted (avoid duplicates for the same note).
-    warned: Vec<String>,
+    /// Notes already warned about (dedupe repeated saves).
+    warned: HashSet<String>,
 }
 
 #[pymethods]
 impl Document {
     #[new]
     #[pyo3(signature = (profile, *, title=None, lang=None))]
-    fn new(profile: Profile, title: Option<String>, lang: Option<String>) -> PyResult<Self> {
+    fn new(profile: Profile, title: Option<String>, lang: Option<String>) -> Self {
         let doc = PdfDocument::new(profile.into());
         if let Some(t) = &title {
             doc.set_title(t);
@@ -105,10 +106,10 @@ impl Document {
         if let Some(l) = &lang {
             doc.set_lang(l);
         }
-        Ok(Document {
+        Document {
             doc,
-            warned: Vec::new(),
-        })
+            warned: HashSet::new(),
+        }
     }
 
     /// Set the document title.
@@ -186,22 +187,18 @@ impl Document {
 
     /// Save the file (ALWAYS writes it) and return the accessibility
     /// report. Emits a PdfUaWarning when not compliant yet.
-    fn save(&mut self, path: String) -> PyResult<Py<Report>> {
+    fn save(&mut self, py: Python<'_>, path: String) -> PyResult<Py<Report>> {
         let report = self.doc.save(&path).map_err(PdfError::new_err)?;
-        if !report.compliant && !self.warned.contains(&report.note) {
-            self.warned.push(report.note.clone());
-            Python::with_gil(|py| {
-                use pyo3::PyTypeInfo;
-                use std::ffi::CString;
-                let note = CString::new(report.note.as_str()).unwrap();
-                let ty = PdfUaWarning::type_object(py);
-                let _ = PyErr::warn(py, ty.as_any(), note.as_c_str(), 1);
-            });
+        if !report.compliant && self.warned.insert(report.note.clone()) {
+            use pyo3::PyTypeInfo;
+            use std::ffi::CString;
+            let note = CString::new(report.note.as_str())
+                .map_err(|_| PdfError::new_err("note contains an interior NUL byte"))?;
+            let ty = PdfUaWarning::type_object(py);
+            let _ = PyErr::warn(py, ty.as_any(), note.as_c_str(), 1);
         }
-        Python::with_gil(|py| {
-            let r = Report { inner: report };
-            Py::new(py, r)
-        })
+        let r = Report { inner: report };
+        Py::new(py, r)
     }
 
     /// Context-manager support.
@@ -209,8 +206,15 @@ impl Document {
         slf
     }
 
-    #[allow(unused_variables)]
-    fn __exit__(&mut self, _exc_type: PyObject, _exc_value: PyObject, _tb: PyObject) {}
+    fn __exit__(
+        &mut self,
+        _exc_type: PyObject,
+        _exc_value: PyObject,
+        _tb: PyObject,
+    ) -> PyResult<bool> {
+        // Swallow nothing; the document just goes out of scope.
+        Ok(false)
+    }
 }
 
 /// Module init: expose the classes and exceptions. The pymodule name MUST
