@@ -93,36 +93,7 @@ impl<'a> Flow<'a> {
         size: f64,
         max_w: f64,
     ) -> Result<Vec<String>, FontError> {
-        let Some(f) = self.doc.fonts.get(font) else {
-            // No font loaded (or bad handle): the caller relied on a
-            // default that does not exist. Fail with a clear message
-            // rather than panic.
-            return Err(FontError::MissingGlyph('?', 0));
-        };
-        let f: &pdfgen_font::LoadedFont = f;
-        let scale = f64::from(f.units_per_em);
-        Ok(crate::wrap::wrap(text, max_w, |word| {
-            // Measure with the real encoding: WinAnsi bytes when the
-            // word encodes, per-glyph advances otherwise.
-            if let Ok(bytes) = pdfgen_font::winansi::encode(word) {
-                bytes
-                    .iter()
-                    .filter_map(|&b| f.width_for_byte(b))
-                    .map(|w| f64::from(w) / scale * size)
-                    .sum()
-            } else {
-                // CID measurement: per-char cmap advances.
-                let mut total = 0.0f64;
-                for ch in word.chars() {
-                    if let Some(g) = f.glyph_index(ch) {
-                        if let Some(w) = f.glyph_width_units(g) {
-                            total += w as f64 / scale * size;
-                        }
-                    }
-                }
-                total
-            }
-        }))
+        self.doc.wrap_text(font, size, text, max_w)
     }
 
     fn wrap(&self, text: &str, font: usize, size: f64) -> Result<Vec<String>, FontError> {

@@ -181,6 +181,122 @@ impl Document {
         self.pages[page].nodes.push(node);
     }
 
+    /// Record an interactive form field. The AcroForm emission at save
+    /// consumes it; draw the widget rectangle yourself (usually as an
+    /// artifact) at the same spot.
+    pub fn push_field(&mut self, spec: crate::form::FieldSpec) {
+        self.fields.push(spec);
+    }
+
+    /// Place a registered image XObject resource at an absolute rect.
+    /// Call inside a `Figure` tag (real content) or an artifact
+    /// (decorative). The resource id comes from [`Document::register_image`].
+    pub fn place_image(&mut self, page: usize, res: &str, x: f64, y: f64, w: f64, h: f64) {
+        self.pages[page].content.image(res, x, y, w, h);
+    }
+
+    /// Wrap `text` to `max_w` points with real font metrics (the shared
+    /// O(n) wrapper: WinAnsi bytes, per-glyph CID fallback, hard breaks
+    /// for oversized words). Public entry for absolute-layout text
+    /// frames; the flow API uses the same engine.
+    pub fn wrap_text(
+        &self,
+        font: usize,
+        size: f64,
+        text: &str,
+        max_w: f64,
+    ) -> Result<Vec<String>, pdfgen_font::FontError> {
+        let Some(f) = self.fonts.get(font) else {
+            return Err(pdfgen_font::FontError::MissingGlyph('?', 0));
+        };
+        let scale = f64::from(f.units_per_em);
+        Ok(crate::wrap::wrap(text, max_w, |word| {
+            if let Ok(bytes) = pdfgen_font::winansi::encode(word) {
+                bytes
+                    .iter()
+                    .filter_map(|&b| f.width_for_byte(b))
+                    .map(|w| f64::from(w) / scale * size)
+                    .sum()
+            } else {
+                let mut total = 0.0f64;
+                for ch in word.chars() {
+                    if let Some(g) = f.glyph_index(ch) {
+                        if let Some(w) = f.glyph_width_units(g) {
+                            total += w as f64 / scale * size;
+                        }
+                    }
+                }
+                total
+            }
+        }))
+    }
+
+    /// Draw ONE line of text at an absolute baseline on an explicit page,
+    /// with an optional fill color (0..1 RGB). WinAnsi text goes through
+    /// the simple font and records byte usage for subsetting; anything
+    /// WinAnsi cannot encode switches to the CID path with HarfBuzz
+    /// shaping and an /ActualText span, exactly like the flow engine.
+    ///
+    /// This does NOT open or close marked content: wrap it in
+    /// [`Document::begin_tag`] / [`Document::end_tag`] (or an artifact)
+    /// so the glyphs are never unmarked.
+    pub fn frame_text(
+        &mut self,
+        page: usize,
+        x: f64,
+        baseline: f64,
+        font: usize,
+        size: f64,
+        rgb: (f64, f64, f64),
+        text: &str,
+    ) {
+        if let Ok(encoded) = pdfgen_font::winansi::encode(text) {
+            let slot = self.winansi_used.entry(font).or_insert([false; 256]);
+            for &b in &encoded {
+                slot[usize::from(b)] = true;
+            }
+            let pd = &mut self.pages[page];
+            pd.content.raw_ops(&format!(
+                "{} {} {} rg\n",
+                pdfgen_core::fmt_real(rgb.0),
+                pdfgen_core::fmt_real(rgb.1),
+                pdfgen_core::fmt_real(rgb.2)
+            ));
+            pd.content
+                .text(&format!("F{font}"), size, x, baseline, &encoded);
+        } else {
+            let shaped = pdfgen_font::shape::shape_mixed(&self.fonts[font], text);
+            let used = self.cid_fonts.entry(font).or_default();
+            for g in &shaped.glyphs {
+                let ch = text
+                    .get(g.cluster as usize..)
+                    .and_then(|s| s.chars().next())
+                    .unwrap_or('\u{fffd}');
+                used.insert((ch, g.gid));
+            }
+            let mut bytes = Vec::with_capacity(shaped.glyphs.len() * 2);
+            for g in &shaped.glyphs {
+                bytes.extend_from_slice(&g.gid.to_be_bytes());
+            }
+            let pd = &mut self.pages[page];
+            pd.content.raw_ops(&format!(
+                "{} {} {} rg\n",
+                pdfgen_core::fmt_real(rgb.0),
+                pdfgen_core::fmt_real(rgb.1),
+                pdfgen_core::fmt_real(rgb.2)
+            ));
+            if shaped.needs_actual_text(text) {
+                pd.content.begin_actual_text(text);
+                pd.content
+                    .text(&format!("F{font}cid"), size, x, baseline, &bytes);
+                pd.content.end_actual_text();
+            } else {
+                pd.content
+                    .text(&format!("F{font}cid"), size, x, baseline, &bytes);
+            }
+        }
+    }
+
     /// Load a font by family name ("Liberation Sans", "Helvetica", "Arial",
     /// a system font, …) and style ("Regular", "Bold", "Italic",
     /// "Bold Italic"). Standard-14 names resolve to embedded look-alikes.

@@ -25,13 +25,13 @@
 mod document;
 mod extract;
 mod flow;
-mod form;
+pub mod form;
 mod html;
 mod image;
 mod page;
 mod retag;
 mod stream;
-mod structure;
+pub mod structure;
 mod tounicode;
 pub mod wrap;
 
