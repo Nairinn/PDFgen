@@ -27,6 +27,10 @@ COMMANDS:
     print <file.pdf>                 Send to the system printer
         --dpi N                      Raster fallback resolution
         --printer NAME               Target a named printer/queue
+    build <config.json>              Build a tagged PDF from a
+                                     pdfgen-doc definition (the format the
+                                     visual editor exports)
+        --out FILE.pdf               Output path (default <config>.pdf)
     help                             Print this message
 
 PDF/UA conformance: pdfgen save() never blocks output. Files claim
@@ -107,6 +111,56 @@ fn main() -> ExitCode {
                 Ok(n) => {
                     println!("spooled {n} page(s) of {path} to the print queue");
                     ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        Some("build") => {
+            let (config, out) = match parse_args(&args[1..], &["--out"]) {
+                Ok((c, pairs)) => {
+                    let out = if let Some((_, v)) = pairs.iter().find(|(k, _)| k == "--out") {
+                        v.clone()
+                    } else if std::path::Path::new(&c).extension().is_some() {
+                        c.trim_end_matches(".json").to_string() + ".pdf"
+                    } else {
+                        c.clone() + ".pdf"
+                    };
+                    (c, out)
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            let json = match std::fs::read(&config) {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("error: cannot read {config}: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            let def = match pdfgen_def::parse_def(&json) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            match pdfgen_def::build_to_file(&def, &out) {
+                Ok(report) => {
+                    if report.status == pdfgen_profile::Status::Compliant {
+                        println!("wrote {out} ({} compliant)", report.profile.name());
+                        ExitCode::SUCCESS
+                    } else {
+                        println!("wrote {out} (not compliant yet)");
+                        for v in &report.violations {
+                            println!("  {}: {} — {}", v.id, v.message, v.fix);
+                        }
+                        ExitCode::SUCCESS // never block output
+                    }
                 }
                 Err(e) => {
                     eprintln!("error: {e}");
