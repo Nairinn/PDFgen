@@ -1,0 +1,116 @@
+{
+  "format": "pdfgen-doc",
+  "version": 1,
+  "profile": "ua1",
+  "title": "Product Requirements",
+  "lang": "en-US",
+  "pages": [
+    {
+      "size": [612, 792],
+      "elements": [
+        {
+          "type": "rect",
+          "rect": [36, 720, 540, 36],
+          "fill": "#1a3a5c",
+          "order": 90
+        },
+        {
+          "type": "heading",
+          "level": 1,
+          "text": "Product Requirements",
+          "rect": [72, 726, 468, 24],
+          "font": { "family": "Liberation Sans", "style": "Bold", "size": 22, "color": "#ffffff" },
+          "order": 1
+        },
+        {
+          "type": "paragraph",
+          "text": "A one-paragraph overview of what the product must do, with enough words to wrap across several lines inside its frame and exercise the real font metrics of the wrapper.",
+          "rect": [72, 560, 468, 100],
+          "font": { "family": "Liberation Sans", "style": "Regular", "size": 11, "color": "#222222" },
+          "order": 2
+        },
+        {
+          "type": "list",
+          "items": [
+            "First requirement with a little more text to show wrapping inside the list frame",
+            "Second requirement",
+            "Third requirement"
+          ],
+          "rect": [72, 440, 468, 90],
+          "font": { "family": "Liberation Sans", "style": "Regular", "size": 11, "color": "#000000" },
+          "order": 3
+        },
+        {
+          "type": "table",
+          "rect": [72, 280, 468, 120],
+          "header": ["Pin", "Signal", "Color"],
+          "rows": [
+            ["1", "VCC", "Red"],
+            ["2", "GND", "Black with a longer note that wraps inside the cell"]
+          ],
+          "widths": [60, 120, 288],
+          "font": { "family": "Liberation Sans", "style": "Regular", "size": 10, "color": "#000000" },
+          "order": 4
+        },
+        {
+          "type": "paragraph",
+          "text": "\u1000\u1001\u1002\u1019\u103C\u102D\u1004\u103A",
+          "rect": [72, 224, 468, 24],
+          "font": { "family": "Noto Sans Myanmar", "style": "Regular", "size": 12, "color": "#000000" },
+          "order": 5
+        },
+        {
+          "type": "paragraph",
+          "text": "\u0645\u0631\u062D\u0628\u0627",
+          "rect": [72, 192, 468, 24],
+          "font": { "family": "Noto Sans Arabic", "style": "Regular", "size": 12, "color": "#000000" },
+          "order": 6
+        },
+        {
+          "type": "form_field",
+          "label": "Reviewed by",
+          "name": "reviewer",
+          "rect": [72, 120, 468, 22],
+          "font": { "family": "Liberation Sans", "style": "Regular", "size": 11, "color": "#000000" },
+          "order": 7
+        },
+        {
+          "type": "image",
+          "src": "../../tests/fixtures/red_box.png",
+          "alt": "A solid red square",
+          "rect": [72, 36, 24, 24],
+          "order": 8
+        },
+        {
+          "type": "line",
+          "from": [36, 30],
+          "to": [576, 30],
+          "stroke": "#888888",
+          "stroke_width": 0.8,
+          "rect": [36, 29.2, 540, 1.6],
+          "order": 91
+        }
+      ]
+    },
+    {
+      "size": [612, 792],
+      "elements": [
+        {
+          "type": "heading",
+          "level": 2,
+          "text": "Second page heading",
+          "rect": [72, 720, 468, 20],
+          "font": { "family": "Liberation Sans", "style": "Bold", "size": 16, "color": "#1a3a5c" },
+          "order": 1
+        },
+        {
+          "type": "paragraph",
+          "text": "Multi-page documents keep one logical reading order across pages.",
+          "rect": [72, 660, 468, 40],
+          "font": { "family": "Liberation Sans", "style": "Regular", "size": 11, "color": "#000000" },
+          "order": 2
+        }
+      ]
+    }
+  ]
+}

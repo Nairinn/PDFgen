@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDFgen Studio</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="app">
+  <header id="toolbar">
+    <span id="logo">PDFgen <em>Studio</em></span>
+    <select id="page-size" title="Page size for new pages"></select>
+    <button id="add-page" title="Add a page">+ Page</button>
+    <span class="sep"></span>
+    <button data-add="heading">H</button>
+    <button data-add="paragraph">¶</button>
+    <button data-add="list">&#8226;</button>
+    <button data-add="table" title="Table">&#9638;</button>
+    <button data-add="image" title="Image">&#128247;</button>
+    <button data-add="form_field" title="Form field">&#9635;</button>
+    <button data-add="rect" title="Rectangle">&#9633;</button>
+    <button data-add="line" title="Line">&#9473;</button>
+    <span class="sep"></span>
+    <button id="zoom-out" title="Zoom out">&minus;</button>
+    <span id="zoom-label">100%</span>
+    <button id="zoom-in" title="Zoom in">+</button>
+    <button id="toggle-order" title="Show reading order">order</button>
+    <button id="toggle-preview" title="PDF preview">preview</button>
+    <span class="sep"></span>
+    <button id="export-pdf" class="primary">Download PDF</button>
+    <button id="export-config">Download config</button>
+    <button id="import-config" title="Open a pdfgen-doc config">Import</button>
+    <input type="file" id="config-file" accept=".json,application/json" hidden>
+    <input type="file" id="image-file" accept="image/png,image/jpeg" hidden>
+    <button id="new-doc" title="Start over">&#9851;</button>
+  </header>
+
+  <main>
+    <aside id="pages-panel">
+      <h3>Pages</h3>
+      <div id="pages-list"></div>
+    </aside>
+
+    <section id="canvas-wrap">
+      <div id="canvas"></div>
+    </section>
+
+    <aside id="props-panel">
+      <h3 id="props-title">Properties</h3>
+      <div id="props-empty">Select an element to edit its properties.
+        Drag to move; use the corner handles to resize.</div>
+      <div id="props"></div>
+      <div id="order-box">
+        <label>Reading order
+          <input type="number" id="order-input" min="0" step="1">
+        </label>
+        <small>Lower numbers are read first by screen readers.</small>
+      </div>
+    </aside>
+
+    <section id="preview-panel" hidden>
+      <div id="preview-head">
+        <h3>PDF preview</h3>
+        <button id="preview-close">&times;</button>
+      </div>
+      <iframe id="preview-frame" title="PDF preview"></iframe>
+    </section>
+  </main>
+
+  <footer id="status-bar">
+    <span id="compliance-badge" class="unknown">not built yet</span>
+    <span id="status-text">Drag elements, then Download PDF. The same layout
+      can be rebuilt from code with: pdfgen build config.json</span>
+  </footer>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

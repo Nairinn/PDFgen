@@ -109,6 +109,21 @@ permissive dependency licenses (MIT/Apache/BSD/ISC/Zlib); vendored fonts
 are OFL-1.1 with their license files kept alongside. veraPDF is a test
 tool only, never linked or bundled.
 
+## Studio: the visual editor
+
+`web/` holds a buildless single-page editor (no bundler, no framework)
+for visually laying out tagged documents: pages, headings, paragraphs,
+lists, tables, images, form fields and decorations with drag, resize,
+zoom, reading-order control and a compliance badge from every build.
+
+    cargo run -p pdfgen-server     # http://localhost:8321
+
+The editor state IS the `pdfgen-doc` JSON config. Download the PDF and
+the config side by side; feed the config to `pdfgen build` (or the
+`pdfgen-def` crate) and you get the same tagged PDF through code.
+Importing a config reopens it in the editor. Rebuilding the same config
+always produces byte-identical output.
+
 ## Optional CJK fonts
 
 The two Noto Sans CJK JP faces (16 MB each) are not committed. Fetch them
