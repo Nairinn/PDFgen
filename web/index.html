@@ -62,9 +62,14 @@
     <section id="preview-panel" hidden>
       <div id="preview-head">
         <h3>PDF preview</h3>
-        <button id="preview-close">&times;</button>
+        <button id="preview-close" title="Close preview" aria-label="Close preview">&times;</button>
       </div>
-      <iframe id="preview-frame" title="PDF preview"></iframe>
+      <div id="preview-stage">
+        <iframe id="preview-frame" title="PDF preview"></iframe>
+        <div id="preview-state" role="status" hidden>
+          <p id="preview-message">Click preview to build the PDF</p>
+        </div>
+      </div>
     </section>
   </main>
 

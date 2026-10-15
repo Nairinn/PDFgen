@@ -404,6 +404,10 @@ function elementDown(ev, e) {
   ev.stopPropagation();
 }
 
+// Resize from any combination of edges. The edges NOT in `spec` stay
+// anchored; the edges in it track the mouse. Corners resize both
+// dimensions, edge handles only one. Coordinates are PDF points with
+// y growing upward, and dy is already inverted for that.
 function handleDown(ev, e, hx, hy) {
   const startX = ev.clientX, startY = ev.clientY;
   const [x, y, w, h] = e.rect;
@@ -651,6 +655,7 @@ $("new-doc").addEventListener("click", () => {
   if (!confirm("Discard this document and start fresh?")) return;
   snapshot(); doc = newDoc(); sel = null; current = 0; renderAll();
   setBadge("not built yet", "unknown");
+  clearPreview();
 });
 
 // ---------------------------------------------------------------- files
@@ -703,8 +708,19 @@ $("config-file").addEventListener("change", async () => {
 
 // --------------------------------------------------------------- export
 
+// Show a centered state message in the preview pane; kind is "" (idle
+// placeholder), "loading" or "error". No message = hide the overlay.
+function previewState(message, kind = "") {
+  const state = $("preview-state");
+  $("preview-message").textContent = message || "";
+  state.classList.toggle("loading", kind === "loading");
+  state.classList.toggle("error", kind === "error");
+  state.hidden = !message;
+}
+
 async function buildPdf() {
   setStatus("building...");
+  if (showPreview) previewState("Building the PDF\u2026", "loading");
   try {
     const res = await fetch("/api/build", {
       method: "POST",
@@ -715,6 +731,7 @@ async function buildPdf() {
       const t = await res.text();
       setBadge("build error", "bad");
       setStatus("build failed: " + t.slice(0, 300));
+      if (showPreview) previewState("The build failed:\n" + t.slice(0, 300), "error");
       return null;
     }
     const data = await res.json();
@@ -724,6 +741,7 @@ async function buildPdf() {
   } catch (e) {
     setBadge("offline?", "bad");
     setStatus("could not reach pdfgen-server: " + e.message);
+    if (showPreview) previewState("Could not reach pdfgen-server:\n" + e.message, "error");
     return null;
   }
 }
@@ -745,22 +763,45 @@ $("export-pdf").addEventListener("click", async () => {
     downloadBlob(new Blob([bytes], { type: "application/pdf" }),
       (doc.title || "document").replace(/[^\w-]+/g, "_") + ".pdf");
     // Also refresh the preview if open.
-    if (showPreview) preview(bytes);
+    if (showPreview) showPdfInPreview(bytes);
   }
 });
 
+// Load bytes into the preview iframe (one object URL at a time).
+function showPdfInPreview(bytes) {
+  const frame = $("preview-frame");
+  if (frame.dataset.url) URL.revokeObjectURL(frame.dataset.url);
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  frame.dataset.url = url;
+  frame.src = url;
+  previewState(null); // hide any placeholder/loading/error overlay
+}
+
+function clearPreview() {
+  const frame = $("preview-frame");
+  if (frame.dataset.url) URL.revokeObjectURL(frame.dataset.url);
+  delete frame.dataset.url;
+  frame.src = "about:blank";
+  if (showPreview) previewState("Click preview to build the PDF");
+}
+
 async function preview(bytes) {
-  const b = bytes || (await buildPdf());
-  if (!b) return;
-  const url = URL.createObjectURL(new Blob([b], { type: "application/pdf" }));
-  $("preview-frame").src = url;
-  $("preview-panel").hidden = false;
-  showPreview = true;
+  if (bytes) { showPdfInPreview(bytes); return; }
+  const b = await buildPdf();
+  if (!b) return; // buildPdf already put the error into the pane
+  showPdfInPreview(b);
 }
 // Re-point the preview toggle so it builds once when opening.
 $("toggle-preview").onclick = async () => {
-  if (!showPreview) { showPreview = true; $("preview-panel").hidden = false; await preview(); }
-  else { showPreview = false; $("preview-panel").hidden = true; }
+  if (!showPreview) {
+    showPreview = true;
+    $("preview-panel").hidden = false;
+    if (!$("preview-frame").dataset.url) previewState("Click preview to build the PDF");
+    await preview();
+  } else {
+    showPreview = false;
+    $("preview-panel").hidden = true;
+  }
 };
 
 function downloadBlob(blob, name) {
