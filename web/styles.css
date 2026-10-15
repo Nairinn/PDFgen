@@ -137,6 +137,8 @@ main { display: flex; flex: 1; min-height: 0; }
   transform: translate(-50%, -50%); cursor: nwse-resize; z-index: 5;
 }
 .handle.ne, .handle.sw { cursor: nesw-resize; }
+.handle.n, .handle.s { cursor: ns-resize; }
+.handle.e, .handle.w { cursor: ew-resize; }
 
 /* ---------------------------------------------------------- properties */
 

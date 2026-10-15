@@ -351,11 +351,23 @@ function elementView(e) {
   }
 
   if (sel === e) {
-    for (const [dx, dy, cls] of [[0,0,"nw"],[1,0,"ne"],[0,1,"sw"],[1,1,"se"]]) {
-      const handle = el("div", { class: "handle " + cls,
-        style: { left: dx * 100 + "%", top: dy * 100 + "%" },
-        onmousedown: (ev) => handleDown(ev, e, dx, dy) });
-      box.append(handle);
+    // Eight resize handles: four corners (both edges track the mouse)
+    // and four edge midpoints (width-only or height-only resizing).
+    // Spec keys name which PDF edges follow the drag.
+    const HANDLES = [
+      ["nw", { left: 1, top: 1 }, "0%", "0%"],
+      ["n", { top: 1 }, "50%", "0%"],
+      ["ne", { right: 1, top: 1 }, "100%", "0%"],
+      ["e", { right: 1 }, "100%", "50%"],
+      ["se", { right: 1, bottom: 1 }, "100%", "100%"],
+      ["s", { bottom: 1 }, "50%", "100%"],
+      ["sw", { left: 1, bottom: 1 }, "0%", "100%"],
+      ["w", { left: 1 }, "0%", "50%"],
+    ];
+    for (const [cls, spec, hx, hy] of HANDLES) {
+      box.append(el("div", { class: "handle " + cls,
+        style: { left: hx, top: hy },
+        onmousedown: (ev) => handleDown(ev, e, spec) }));
     }
   }
   return box;
@@ -408,18 +420,31 @@ function elementDown(ev, e) {
 // anchored; the edges in it track the mouse. Corners resize both
 // dimensions, edge handles only one. Coordinates are PDF points with
 // y growing upward, and dy is already inverted for that.
-function handleDown(ev, e, hx, hy) {
+function handleDown(ev, e, spec) {
   const startX = ev.clientX, startY = ev.clientY;
   const [x, y, w, h] = e.rect;
   let moved = false;
   const move = (ev2) => {
-    let dx = (ev2.clientX - startX) / zoom;
-    let dy = -(ev2.clientY - startY) / zoom;
+    const dx = (ev2.clientX - startX) / zoom;
+    const dy = -(ev2.clientY - startY) / zoom;
     if (!moved) { snapshot(); moved = true; }
     let nx = x, ny = y, nw = w, nh = h;
-    if (hx === 0) { nw = snapPt(w - dx); } else { nw = snapPt(w + dx); }
-    if (hy === 0) { nh = snapPt(h - dy); ny = snapPt(y + dy + h - nh); } else { nh = snapPt(h + dy); }
-    if (nw < 8) nw = 8; if (nh < 8) nh = 8;
+    if (spec.left) {
+      nx = snapPt(x + dx);
+      nw = snapPt(w - (nx - x)); // keep the right edge anchored
+    }
+    if (spec.right) {
+      nw = snapPt(w + dx); // left edge stays put
+    }
+    if (spec.top) {
+      nh = snapPt(h + dy); // bottom edge stays put
+    }
+    if (spec.bottom) {
+      ny = snapPt(y + dy);
+      nh = snapPt(h - (ny - y)); // keep the top edge anchored
+    }
+    if (nw < 8) nw = 8;
+    if (nh < 8) nh = 8;
     e.rect = [nx, ny, nw, nh];
     if (e.type === "line") { e.from = [nx, ny + nh]; e.to = [nx + nw, ny + nh]; }
     renderCanvas(); renderProps();
