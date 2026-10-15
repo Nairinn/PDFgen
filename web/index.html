@@ -10,30 +10,30 @@
 <div id="app">
   <header id="toolbar">
     <span id="logo">PDFgen <em>Studio</em></span>
-    <select id="page-size" title="Page size for new pages"></select>
-    <button id="add-page" title="Add a page">+ Page</button>
+    <select id="page-size" title="Page size for new pages" aria-label="Page size for new pages"></select>
+    <button id="add-page" title="Add a page" aria-label="Add page">+ Page</button>
     <span class="sep"></span>
-    <button data-add="heading">H</button>
-    <button data-add="paragraph">¶</button>
-    <button data-add="list">&#8226;</button>
-    <button data-add="table" title="Table">&#9638;</button>
-    <button data-add="image" title="Image">&#128247;</button>
-    <button data-add="form_field" title="Form field">&#9635;</button>
-    <button data-add="rect" title="Rectangle">&#9633;</button>
-    <button data-add="line" title="Line">&#9473;</button>
+    <button data-add="heading" title="Add heading" aria-label="Add heading">H</button>
+    <button data-add="paragraph" title="Add paragraph" aria-label="Add paragraph">&para;</button>
+    <button data-add="list" title="Add list" aria-label="Add list">&#8226;</button>
+    <button data-add="table" title="Add table" aria-label="Add table">&#9638;</button>
+    <button data-add="image" title="Add image" aria-label="Add image">&#128247;</button>
+    <button data-add="form_field" title="Add form field" aria-label="Add form field">&#9635;</button>
+    <button data-add="rect" title="Add box" aria-label="Add box">&#9633;</button>
+    <button data-add="line" title="Add divider" aria-label="Add divider">&#9473;</button>
     <span class="sep"></span>
-    <button id="zoom-out" title="Zoom out">&minus;</button>
+    <button id="zoom-out" title="Zoom out" aria-label="Zoom out">&minus;</button>
     <span id="zoom-label">100%</span>
-    <button id="zoom-in" title="Zoom in">+</button>
-    <button id="toggle-order" title="Show reading order">order</button>
-    <button id="toggle-preview" title="PDF preview">preview</button>
+    <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+    <button id="toggle-order" title="Show reading order" aria-label="Show reading order">order</button>
+    <button id="toggle-preview" title="Toggle PDF preview" aria-label="Toggle PDF preview">preview</button>
     <span class="sep"></span>
-    <button id="export-pdf" class="primary">Download PDF</button>
-    <button id="export-config">Download config</button>
-    <button id="import-config" title="Open a pdfgen-doc config">Import</button>
+    <button id="export-pdf" class="primary" title="Download the tagged PDF" aria-label="Download PDF">Download PDF</button>
+    <button id="export-config" title="Download the pdfgen-doc config" aria-label="Download config">Download config</button>
+    <button id="import-config" title="Open a pdfgen-doc config" aria-label="Import a pdfgen-doc config">Import</button>
     <input type="file" id="config-file" accept=".json,application/json" hidden>
     <input type="file" id="image-file" accept="image/png,image/jpeg" hidden>
-    <button id="new-doc" title="Start over">&#9851;</button>
+    <button id="new-doc" title="Reset document" aria-label="Reset document">&#9851;</button>
   </header>
 
   <main>
