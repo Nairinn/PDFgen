@@ -73,6 +73,7 @@ check.
 | Forms | AcroForm text fields with /TU accessible names; incremental-save `fill_text_field` |
 | HTML to PDF | Structural subset (headings, lists, tables, images, implied paragraphs, entities) to streamed tagged PDF |
 | Drawing kit | ASME Y14 sheets A-F, tagged title block, Y14.5 dimensions, Y14.35 revision block from file history |
+| Studio | Visual editor (`cargo run -p pdfgen-server`) - drag/resize/zoom, reading-order control, compliance badge; Download PDF + config side by side; `pdfgen build` replays the config to a byte-identical PDF through code |
 | Reader | Classic, xref-stream and hybrid xref; lazy resolution; repair mode |
 | Retag | Open any PDF (even untagged), tag it, save it compliant |
 | Extraction | Text blocks from any PDF, tagged or not; honors ActualText |
