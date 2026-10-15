@@ -1,8 +1,8 @@
-/* PDFgen Studio: a buildless visual editor for pdfgen-doc documents.
+/* PDFloom Studio: a buildless visual editor for pdfloom-doc documents.
  *
- * The editor state IS the pdfgen-doc config (the same JSON you download),
+ * The editor state IS the pdfloom-doc config (the same JSON you download),
  * so importing a config restores the editor exactly, and "Download PDF"
- * and "pdfgen build" always agree. Coordinates are stored in PDF points
+ * and "pdfloom build" always agree. Coordinates are stored in PDF points
  * with a bottom-left origin; the DOM renders top-left, so the converter
  * functions below are the only places that translate.
  */
@@ -57,7 +57,7 @@ function clampStyle(family, style) {
   return "Regular";
 }
 
-let doc = null;          // the pdfgen-doc object
+let doc = null;          // the pdfloom-doc object
 let current = 0;         // current page index
 let sel = null;          // selected element (live reference into doc)
 let zoom = 1.0;
@@ -68,7 +68,7 @@ let redoStack = [];
 
 function newDoc() {
   return {
-    format: "pdfgen-doc", version: 1,
+    format: "pdfloom-doc", version: 1,
     profile: "ua1", title: "Untitled document", lang: "en-US",
     pages: [{ size: [612, 792], elements: [] }],
   };
@@ -111,7 +111,7 @@ function el(tag, attrs = {}, ...kids) {
   return n;
 }
 
-// pdfgen uses f64s; keep integers for draggability.
+// pdfloom uses f64s; keep integers for draggability.
 const snapPt = (v) => Math.round(v * 2) / 2; // 0.5pt grid
 
 function pageOf(i) { return doc.pages[i]; }
@@ -710,7 +710,7 @@ $("image-file").addEventListener("change", async () => {
 
 $("export-config").addEventListener("click", () => {
   downloadBlob(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
-    (doc.title || "document").replace(/[^\w-]+/g, "_") + ".pdfgen.json");
+    (doc.title || "document").replace(/[^\w-]+/g, "_") + ".pdfloom.json");
 });
 
 $("import-config").addEventListener("click", () => $("config-file").click());
@@ -719,7 +719,7 @@ $("config-file").addEventListener("change", async () => {
   if (!file) return;
   try {
     const parsed = JSON.parse(await file.text());
-    if (parsed.format !== "pdfgen-doc") throw new Error("not a pdfgen-doc file");
+    if (parsed.format !== "pdfloom-doc") throw new Error("not a pdfloom-doc file");
     snapshot();
     doc = parsed;
     current = 0; sel = null;
@@ -765,8 +765,8 @@ async function buildPdf() {
     return bytes;
   } catch (e) {
     setBadge("offline?", "bad");
-    setStatus("could not reach pdfgen-server: " + e.message);
-    if (showPreview) previewState("Could not reach pdfgen-server:\n" + e.message, "error");
+    setStatus("could not reach pdfloom-server: " + e.message);
+    if (showPreview) previewState("Could not reach pdfloom-server:\n" + e.message, "error");
     return null;
   }
 }
@@ -843,13 +843,13 @@ function setStatus(text) { $("status-text").textContent = text; }
 // ------------------------------------------------------------ persistence
 
 function persist() {
-  try { localStorage.setItem("pdfgen-studio-doc", JSON.stringify(doc)); } catch {}
+  try { localStorage.setItem("pdfloom-studio-doc", JSON.stringify(doc)); } catch {}
 }
 
 (function init() {
   try {
-    const saved = JSON.parse(localStorage.getItem("pdfgen-studio-doc"));
-    if (saved && saved.format === "pdfgen-doc") doc = saved;
+    const saved = JSON.parse(localStorage.getItem("pdfloom-studio-doc"));
+    if (saved && saved.format === "pdfloom-doc") doc = saved;
   } catch {}
   if (!doc) doc = newDoc();
   renderAll();

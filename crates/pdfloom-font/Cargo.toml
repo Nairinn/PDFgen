@@ -1,0 +1,25 @@
+[package]
+name = "pdfloom-font"
+description = "Font loading, metrics, encoding tables and embedding"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfloom-core = { workspace = true }
+ttf-parser = { workspace = true }
+rustybuzz = { workspace = true }
+unicode-bidi = { workspace = true }
+thiserror = "2"
+
+[features]
+default = []
+## Enable `probe()` (used by pdfloom-fonts to name system fonts).
+registry = []
+
+[lints]
+workspace = true
+
+[dev-dependencies]

@@ -2,9 +2,9 @@
 // and Python tests, verified by the returned report.
 //
 // Run: see bindings/kotlin/run.sh — compiles against the generated
-// pdfgen_uniffi.kt + the Rust cdylib via JNA.
+// pdfloom_uniffi.kt + the Rust cdylib via JNA.
 
-import uniffi.pdfgen_uniffi.*
+import uniffi.pdfloom_uniffi.*
 
 fun main() {
     val outDir = java.nio.file.Paths.get("../..", "tests", "output").toAbsolutePath().normalize()

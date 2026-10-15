@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PDFgen Studio</title>
+<title>PDFloom Studio</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <div id="app">
   <header id="toolbar">
-    <span id="logo">PDFgen <em>Studio</em></span>
+    <span id="logo">PDFloom <em>Studio</em></span>
     <select id="page-size" title="Page size for new pages" aria-label="Page size for new pages"></select>
     <button id="add-page" title="Add a page" aria-label="Add page">+ Page</button>
     <span class="sep"></span>
@@ -29,8 +29,8 @@
     <button id="toggle-preview" title="Toggle PDF preview" aria-label="Toggle PDF preview">preview</button>
     <span class="sep"></span>
     <button id="export-pdf" class="primary" title="Download the tagged PDF" aria-label="Download PDF">Download PDF</button>
-    <button id="export-config" title="Download the pdfgen-doc config" aria-label="Download config">Download config</button>
-    <button id="import-config" title="Open a pdfgen-doc config" aria-label="Import a pdfgen-doc config">Import</button>
+    <button id="export-config" title="Download the pdfloom-doc config" aria-label="Download config">Download config</button>
+    <button id="import-config" title="Open a pdfloom-doc config" aria-label="Import a pdfloom-doc config">Import</button>
     <input type="file" id="config-file" accept=".json,application/json" hidden>
     <input type="file" id="image-file" accept="image/png,image/jpeg" hidden>
     <button id="new-doc" title="Reset document" aria-label="Reset document">&#9851;</button>
@@ -76,7 +76,7 @@
   <footer id="status-bar">
     <span id="compliance-badge" class="unknown">not built yet</span>
     <span id="status-text">Drag elements, then Download PDF. The same layout
-      can be rebuilt from code with: pdfgen build config.json</span>
+      can be rebuilt from code with: pdfloom build config.json</span>
   </footer>
 </div>
 <script src="/app.js"></script>

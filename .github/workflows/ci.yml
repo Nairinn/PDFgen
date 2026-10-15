@@ -22,13 +22,13 @@ jobs:
         run: bash scripts/fetch-cjk-fonts.sh
 
       - name: Build (excluding Python extension)
-        run: cargo build --workspace --exclude pdfgen-py
+        run: cargo build --workspace --exclude pdfloom-py
 
       - name: Test
-        run: cargo test --workspace --exclude pdfgen-py
+        run: cargo test --workspace --exclude pdfloom-py
 
       - name: Clippy (blocking)
-        run: cargo clippy --workspace --exclude pdfgen-py --all-targets -- -D warnings
+        run: cargo clippy --workspace --exclude pdfloom-py --all-targets -- -D warnings
 
       - name: Format check
         run: cargo fmt --all -- --check
@@ -58,7 +58,7 @@ jobs:
         run: bash scripts/fetch-cjk-fonts.sh
 
       - name: Generate every tests/output fixture
-        run: cargo test --workspace --exclude pdfgen-py
+        run: cargo test --workspace --exclude pdfloom-py
 
       - name: Install veraPDF (pinned to 1.30.2)
         run: |
@@ -74,7 +74,7 @@ jobs:
           <AutomatedInstallation langpack="eng">
           <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
           <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
-          <installpath>/home/runner/work/PDFgen/PDFgen/tools/verapdf</installpath>
+          <installpath>/home/runner/work/PDFloom/PDFloom/tools/verapdf</installpath>
           </com.izforge.izpack.panels.target.TargetPanel>
           <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">
           <pack index="0" name="veraPDF GUI" selected="true"/>

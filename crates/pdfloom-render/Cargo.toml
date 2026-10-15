@@ -1,0 +1,16 @@
+[package]
+name = "pdfloom-render"
+version = "0.1.0"
+edition = "2021"
+description = "Rasterize PDF pages to in-memory bitmaps (display/print pipeline)"
+license = "MIT"
+
+[dependencies]
+pdfloom-core = { path = "../pdfloom-core", version = "0.1.0" }
+pdfloom-parse = { path = "../pdfloom-parse", version = "0.1.0" }
+pdfloom-font = { path = "../pdfloom-font", version = "0.1.0" }
+flate2 = "1"
+ttf-parser = "0.24"
+
+[dev-dependencies]
+pdfloom = { path = "../pdfloom", version = "0.1.0" }

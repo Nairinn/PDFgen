@@ -1,4 +1,4 @@
-# PDFgen — Project Plan
+# PDFloom — Project Plan
 
 A free (MIT), from-scratch PDF library written in Rust. It is meant to cover what PDFBox and iText do,
 and it is built around four goals:
@@ -31,7 +31,7 @@ and it is built around four goals:
   - The report lists each issue's Matterhorn or clause ID, its page, the object, and how to fix it.
 - **The file never claims compliance it doesn't have.**
   - The PDF/UA identifier (`pdfuaid:part`) is written only when all machine checks pass.
-  - Otherwise an XMP property, `pdfgen:accessibilityStatus = not-compliant` plus an issue count, travels with the file, so our CLI and validator can show the note later.
+  - Otherwise an XMP property, `pdfloom:accessibilityStatus = not-compliant` plus an issue count, travels with the file, so our CLI and validator can show the note later.
 - **Optional visible notice:** `draft_notice(true)` stamps "Draft – not yet PDF/UA compliant" in the page margin. It is marked as an artifact, so screen readers skip it.
 - **Modes:**
   - `Report` (default): always outputs and warns.
@@ -72,24 +72,24 @@ PDF/A is a separate standard and is not part of this plan. The profile system le
 
 | Crate | Responsibility |
 |---|---|
-| `pdfgen-core` | PDF object model, object IDs and generations, serializer (xref tables, xref streams, object streams), filters, content-stream reading and writing |
-| `pdfgen-parse` | Lexer, xref parsing (classic, stream, hybrid), lazy loading, repair mode for broken files, decryption |
-| `pdfgen-font` | Font engine: load TTF/OTF/TTC/WOFF/WOFF2, shape text, handle bidi and line breaking, subset, embed fonts, generate the Unicode maps, check embedding permissions |
-| `pdfgen-fonts-*` | Built-in font catalog, split into packages (see §4) |
-| `pdfgen-canvas` | Vector drawing (paths, transforms, color/ICC, images, clipping, reusable graphics) plus the tag tree: UA-1 and UA-2 namespaces, role map, attributes, Alt/ActualText/E/Lang, IDs, artifacts |
-| `pdfgen-layout` | Layout on the canvas: paragraph flow, headings, lists, tables, figures, formulas, page templates, columns, keep-together rules, footnotes, links, table of contents, bookmarks, forms |
-| `pdfgen-draw` | Engineering drawing kit (ASME first, then ISO; see §6) |
-| `pdfgen-profile` | Profiles (UA-1, UA-2). Each one fills in required entries automatically (XMP identifiers, MarkInfo, DisplayDocTitle, page tab order, `Suspects=false`) and defines the rules the reporter and validator use |
-| `pdfgen-validate` | Machine checks plus the human-review checklist. Reports in JSON, HTML and JUnit (for CI) |
-| `pdfgen-revision` | Incremental saves, list revisions, open any revision, diff, revert and truncate (see §5) |
-| `pdfgen` | Single crate that re-exports the public Rust API |
-| `pdfgen-api` | A simplified copy of the API for bindings: Arc handles, owned types, builder objects, no lifetimes or closures. Both binding layers wrap it |
-| `pdfgen-uniffi` | UniFFI layer that generates the Kotlin and Java bindings |
-| `pdfgen-py` | PyO3 layer for Python |
-| `pdfgen-cli` | `pdfgen validate / history / diff / revert / truncate / fonts / render` |
+| `pdfloom-core` | PDF object model, object IDs and generations, serializer (xref tables, xref streams, object streams), filters, content-stream reading and writing |
+| `pdfloom-parse` | Lexer, xref parsing (classic, stream, hybrid), lazy loading, repair mode for broken files, decryption |
+| `pdfloom-font` | Font engine: load TTF/OTF/TTC/WOFF/WOFF2, shape text, handle bidi and line breaking, subset, embed fonts, generate the Unicode maps, check embedding permissions |
+| `pdfloom-fonts-*` | Built-in font catalog, split into packages (see §4) |
+| `pdfloom-canvas` | Vector drawing (paths, transforms, color/ICC, images, clipping, reusable graphics) plus the tag tree: UA-1 and UA-2 namespaces, role map, attributes, Alt/ActualText/E/Lang, IDs, artifacts |
+| `pdfloom-layout` | Layout on the canvas: paragraph flow, headings, lists, tables, figures, formulas, page templates, columns, keep-together rules, footnotes, links, table of contents, bookmarks, forms |
+| `pdfloom-draw` | Engineering drawing kit (ASME first, then ISO; see §6) |
+| `pdfloom-profile` | Profiles (UA-1, UA-2). Each one fills in required entries automatically (XMP identifiers, MarkInfo, DisplayDocTitle, page tab order, `Suspects=false`) and defines the rules the reporter and validator use |
+| `pdfloom-validate` | Machine checks plus the human-review checklist. Reports in JSON, HTML and JUnit (for CI) |
+| `pdfloom-revision` | Incremental saves, list revisions, open any revision, diff, revert and truncate (see §5) |
+| `pdfloom` | Single crate that re-exports the public Rust API |
+| `pdfloom-api` | A simplified copy of the API for bindings: Arc handles, owned types, builder objects, no lifetimes or closures. Both binding layers wrap it |
+| `pdfloom-uniffi` | UniFFI layer that generates the Kotlin and Java bindings |
+| `pdfloom-py` | PyO3 layer for Python |
+| `pdfloom-cli` | `pdfloom validate / history / diff / revert / truncate / fonts / render` |
 
 ```
-PDFgen/
+PDFloom/
   Cargo.toml            # workspace
   crates/               # crates above
   fonts/manifest.toml   # font catalog: name, version, upstream URL, sha256, license
@@ -125,8 +125,8 @@ Each font's license is checked before it enters `fonts/manifest.toml`, and its l
 - **Automatic fallback:** font stacks (for example, Noto Sans → script-specific Noto → Symbols) give every character a real glyph. PDF/UA does not allow the empty `.notdef` glyph.
 - **Standard-14 names map to the look-alikes.** `Helvetica` resolves to Liberation Sans and `Times-Roman` to Liberation Serif, with a note. PDF/UA requires embedded fonts, and the standard 14 are never embedded.
 - **Packaging:**
-  - crates.io limits a crate to 10 MB, so the catalog is split into `pdfgen-fonts-core` (look-alikes, Noto Latin/Greek/Cyrillic, accessibility, math, symbols), `pdfgen-fonts-scripts`, `pdfgen-fonts-cjk-*` and `pdfgen-fonts-osifont`. These are Rust feature flags: `fonts-core` is on by default, the rest are opt-in.
-  - JVM: the same packages as separate Maven artifacts. Python: pip extras such as `pdfgen[fonts-cjk]`.
+  - crates.io limits a crate to 10 MB, so the catalog is split into `pdfloom-fonts-core` (look-alikes, Noto Latin/Greek/Cyrillic, accessibility, math, symbols), `pdfloom-fonts-scripts`, `pdfloom-fonts-cjk-*` and `pdfloom-fonts-osifont`. These are Rust feature flags: `fonts-core` is on by default, the rest are opt-in.
+  - JVM: the same packages as separate Maven artifacts. Python: pip extras such as `pdfloom[fonts-cjk]`.
   - Font files stay out of git. `cargo xtask fetch-fonts` downloads them from the pinned upstream URLs and checks each SHA-256.
 
 ### 4b. Paid / commercial fonts: bring your own
@@ -159,7 +159,7 @@ We can't bundle paid fonts, but any font the user owns works exactly like a buil
   - `revert` appends a new revision that restores the old state, like git revert, without destroying anything.
   - `truncate` cuts the file back to an earlier end-of-file marker for an exact byte-for-byte restore.
 - **Signatures:** detect any changes made after a signature (DocMDP permissions).
-- **CLI:** `pdfgen history f.pdf`, `pdfgen diff f.pdf --from 2 --to 5`, `pdfgen revert f.pdf --to 3 -m "undo pinout change"`.
+- **CLI:** `pdfloom history f.pdf`, `pdfloom diff f.pdf --from 2 --to 5`, `pdfloom revert f.pdf --to 3 -m "undo pinout change"`.
 
 ---
 
@@ -190,12 +190,12 @@ We can't bundle paid fonts, but any font the user owns works exactly like a buil
 
 | Target | Approach | Works on |
 |---|---|---|
-| Rust | `pdfgen` crate on crates.io | stable Rust |
+| Rust | `pdfloom` crate on crates.io | stable Rust |
 | **Kotlin** (and Java 11/17) | UniFFI's official Kotlin bindings (JNA) | Kotlin 1.9+, **Java 11+** |
 | **Java 22+** | `uniffi-bindgen-java` (newer FFM API, no JNA, faster) | Java 22+ |
 | **Python** | **PyO3 + maturin** | CPython 3.9+ |
 
-- **Why PyO3 for Python:** keyword arguments, context managers (`with Document(...) as doc:`), real exceptions and warnings, and `.pyi` type stubs, which make it feel like a normal Python library. One `abi3` wheel per platform covers every Python 3.9+ version. Because PyO3 wraps the same `pdfgen-api` crate as UniFFI, there's one place to change the API.
+- **Why PyO3 for Python:** keyword arguments, context managers (`with Document(...) as doc:`), real exceptions and warnings, and `.pyi` type stubs, which make it feel like a normal Python library. One `abi3` wheel per platform covers every Python 3.9+ version. Because PyO3 wraps the same `pdfloom-api` crate as UniFFI, there's one place to change the API.
 - **Native libraries** ship inside the jars and wheels for macOS (arm64/x64), Linux (x64/arm64) and Windows x64.
 - **Local JDKs are already installed:** 23 (for the Java FFM bindings), 21 Temurin (for veraPDF), and 11 Corretto (to test the Kotlin/JNA artifact on Java 11).
 
@@ -229,7 +229,7 @@ Document(Profile.PDF_UA_2).title("Cable Assembly CA-102").lang("en-US").use { do
 ```
 
 ```python
-with pdfgen.Document(profile="ua2", title="Cable Assembly CA-102", lang="en-US") as doc:
+with pdfloom.Document(profile="ua2", title="Cable Assembly CA-102", lang="en-US") as doc:
     doc.flow.heading(1, "Cable Assembly CA-102")
     report = doc.save("ca102.pdf")   # warns with PdfUaWarning if not compliant
 ```
@@ -258,7 +258,7 @@ These are steps in the build. They are not separate releases: 1.0 ships when eve
 | M1 | **Thin end-to-end slice:** object model + writer + one catalog font + tagged paragraph + XMP | A hello-world passes veraPDF `ua1` **and** `ua2` |
 | M2 | Font engine and catalog: packaging, bring-your-own and system fonts, shaping, fallback, embedding-permission checks | Every catalog font and a sample commercial-style font embed and pass |
 | M3 | Canvas and tags (UA-1 and UA-2), artifacts, images, links, annotations, bookmarks, report/strict/untagged modes | Samples pass. Inaccessible samples save, show the note and carry no claim |
-| M4 | **Bindings spike:** Kotlin/JNA and Python/PyO3 over `pdfgen-api` | Kotlin, Java 11 and Python scripts each generate the M1 PDF |
+| M4 | **Bindings spike:** Kotlin/JNA and Python/PyO3 over `pdfloom-api` | Kotlin, Java 11 and Python scripts each generate the M1 PDF |
 | M5 | Layout engine (flow, headings, lists, complex tables, table of contents, page templates, footnotes) | A multi-page report passes |
 | M6 | Parser (real-world files, repair mode, decryption, content streams, tag tree) | Fuzz and round-trip tests clean |
 | M7 | Validator: UA-1 (87 machine checks plus the human checklist) and UA-2 rule set, CLI | Results agree with the veraPDF corpus labels |

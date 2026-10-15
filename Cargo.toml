@@ -1,24 +1,24 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/pdfgen-core",
-    "crates/pdfgen-parse",
-    "crates/pdfgen-font",
-    "crates/pdfgen-fonts",
-    "crates/pdfgen-canvas",
-    "crates/pdfgen-profile",
-    "crates/pdfgen",
-    "crates/pdfgen-api",
-    "crates/pdfgen-py",
-    "crates/pdfgen-uniffi",
-    "crates/pdfgen-validate",
-    "crates/pdfgen-cli",
-    "crates/pdfgen-revision",
-    "crates/pdfgen-draw",
-    "crates/pdfgen-ffi",
-    "crates/pdfgen-render",
-    "crates/pdfgen-def",
-    "crates/pdfgen-server",
+    "crates/pdfloom-core",
+    "crates/pdfloom-parse",
+    "crates/pdfloom-font",
+    "crates/pdfloom-fonts",
+    "crates/pdfloom-canvas",
+    "crates/pdfloom-profile",
+    "crates/pdfloom",
+    "crates/pdfloom-api",
+    "crates/pdfloom-py",
+    "crates/pdfloom-uniffi",
+    "crates/pdfloom-validate",
+    "crates/pdfloom-cli",
+    "crates/pdfloom-revision",
+    "crates/pdfloom-draw",
+    "crates/pdfloom-ffi",
+    "crates/pdfloom-render",
+    "crates/pdfloom-def",
+    "crates/pdfloom-server",
 ]
 exclude = ["fuzz"]
 
@@ -26,21 +26,21 @@ exclude = ["fuzz"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/Nairinn/PDFgen"
+repository = "https://github.com/Nairinn/PDFloom"
 rust-version = "1.82"
 
 [workspace.dependencies]
-pdfgen-core = { path = "crates/pdfgen-core", version = "0.1.0" }
-pdfgen-font = { path = "crates/pdfgen-font", version = "0.1.0" }
-pdfgen-fonts = { path = "crates/pdfgen-fonts", version = "0.1.0" }
-pdfgen-canvas = { path = "crates/pdfgen-canvas", version = "0.1.0" }
-pdfgen-profile = { path = "crates/pdfgen-profile", version = "0.1.0" }
-pdfgen-parse = { path = "crates/pdfgen-parse", version = "0.1.0" }
-pdfgen = { path = "crates/pdfgen", version = "0.1.0" }
-pdfgen-api = { path = "crates/pdfgen-api", version = "0.1.0" }
-pdfgen-validate = { path = "crates/pdfgen-validate", version = "0.1.0" }
-pdfgen-revision = { path = "crates/pdfgen-revision", version = "0.1.0" }
-pdfgen-draw = { path = "crates/pdfgen-draw", version = "0.1.0" }
+pdfloom-core = { path = "crates/pdfloom-core", version = "0.1.0" }
+pdfloom-font = { path = "crates/pdfloom-font", version = "0.1.0" }
+pdfloom-fonts = { path = "crates/pdfloom-fonts", version = "0.1.0" }
+pdfloom-canvas = { path = "crates/pdfloom-canvas", version = "0.1.0" }
+pdfloom-profile = { path = "crates/pdfloom-profile", version = "0.1.0" }
+pdfloom-parse = { path = "crates/pdfloom-parse", version = "0.1.0" }
+pdfloom = { path = "crates/pdfloom", version = "0.1.0" }
+pdfloom-api = { path = "crates/pdfloom-api", version = "0.1.0" }
+pdfloom-validate = { path = "crates/pdfloom-validate", version = "0.1.0" }
+pdfloom-revision = { path = "crates/pdfloom-revision", version = "0.1.0" }
+pdfloom-draw = { path = "crates/pdfloom-draw", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ttf-parser = "0.25"

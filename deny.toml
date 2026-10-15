@@ -22,7 +22,7 @@ allow = [
     "Unicode-3.0",
     "CDLA-Permissive-2.0",
 ]
-# OFL-1.1 / Apache-2.0 are for font *files* shipped by pdfgen-fonts-* crates,
+# OFL-1.1 / Apache-2.0 are for font *files* shipped by pdfloom-fonts-* crates,
 # not compiled dependencies; they appear in font manifests, not Cargo metadata.
 confidence-threshold = 0.93
 

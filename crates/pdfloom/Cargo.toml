@@ -1,0 +1,27 @@
+[package]
+name = "pdfloom"
+description = "Free, MIT-licensed, from-scratch PDF library with PDF/UA end to end"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfloom-core = { workspace = true }
+pdfloom-font = { workspace = true }
+pdfloom-fonts = { workspace = true }
+pdfloom-canvas = { workspace = true }
+pdfloom-parse = { workspace = true }
+pdfloom-profile = { workspace = true }
+flate2 = "1"
+png = "0.17"
+thiserror = "2"
+
+[dev-dependencies]
+pdfloom-render = { path = "../pdfloom-render", version = "0.1.0" }
+pdfloom-parse = { workspace = true }
+flate2 = "1"
+
+[lints]
+workspace = true

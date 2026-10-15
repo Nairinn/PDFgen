@@ -7,7 +7,7 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    if let Ok(mut reader) = pdfgen_parse::PdfReader::from_bytes(data.to_vec()) {
+    if let Ok(mut reader) = pdfloom_parse::PdfReader::from_bytes(data.to_vec()) {
         let _ = reader.catalog();
         let _ = reader.pages();
         let _ = reader.object_offsets();

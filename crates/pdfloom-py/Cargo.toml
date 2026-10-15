@@ -1,0 +1,21 @@
+[package]
+name = "pdfloom-py"
+description = "Python bindings for pdfloom via PyO3"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+# Same name as the pdfloom rlib crate but a different artifact type
+# (cdylib), so the Python import name is `pdfloom`.
+name = "pdfloom"
+crate-type = ["cdylib"]
+
+[dependencies]
+pdfloom-api = { workspace = true }
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py39"] }
+
+[lints]
+workspace = true

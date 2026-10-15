@@ -1,0 +1,19 @@
+[package]
+name = "pdfloom-revision"
+description = "PDF version control: commit, history, diff, revert inside the file itself"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfloom-core = { workspace = true }
+pdfloom-parse = { workspace = true }
+
+[dev-dependencies]
+pdfloom = { workspace = true }
+pdfloom-validate = { workspace = true }
+
+[lints]
+workspace = true

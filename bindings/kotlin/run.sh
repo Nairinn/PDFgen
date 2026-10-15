@@ -4,20 +4,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-echo "== building pdfgen-uniffi (cdylib) =="
-cargo build -p pdfgen-uniffi
+echo "== building pdfloom-uniffi (cdylib) =="
+cargo build -p pdfloom-uniffi
 
 echo "== generating Kotlin bindings =="
 mkdir -p bindings/kotlin/generated
 uniffi-bindgen generate \
     --language kotlin \
-    --config crates/pdfgen-uniffi/uniffi.toml \
+    --config crates/pdfloom-uniffi/uniffi.toml \
     --out-dir bindings/kotlin/generated \
-    target/debug/libpdfgen_uniffi.dylib
+    target/debug/libpdfloom_uniffi.dylib
 
 echo "== compiling Kotlin smoke test =="
 cd bindings/kotlin
-kotlinc TestBinding.kt generated/uniffi/pdfgen_uniffi/pdfgen_uniffi.kt -cp ../../tools/jvm/jna.jar -include-runtime -d test.jar
+kotlinc TestBinding.kt generated/uniffi/pdfloom_uniffi/pdfloom_uniffi.kt -cp ../../tools/jvm/jna.jar -include-runtime -d test.jar
 
 echo "== running =="
 java -cp "test.jar:../../tools/jvm/jna.jar" \

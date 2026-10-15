@@ -4,13 +4,13 @@ the Rust tests and verify the report + warning behavior."""
 import pathlib
 import warnings
 
-import pdfgen
+import pdfloom
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "tests" / "output"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # --- 1. Compliant document, system font by name -------------------------
-doc = pdfgen.Document(pdfgen.Profile.UA1, title="Python bindings test", lang="en-US")
+doc = pdfloom.Document(pdfloom.Profile.UA1, title="Python bindings test", lang="en-US")
 arial = doc.font("Arial", "Bold")
 doc.heading(1, "Hello from Python")
 doc.paragraph_in(arial, 14.0, "This paragraph uses system Arial Bold, resolved by name.")
@@ -35,18 +35,18 @@ print(f"python: compliant doc OK ({report.profile_name})")
 # --- 2. Non-compliant document: still saves, warns, no claim -------------
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")
-    doc2 = pdfgen.Document(pdfgen.Profile.UA1)  # no title, no lang
+    doc2 = pdfloom.Document(pdfloom.Profile.UA1)  # no title, no lang
     doc2.paragraph("Untitled.")
     report2 = doc2.save(str(OUT / "python_noncompliant.pdf"))
 
 assert not report2.compliant
 assert report2.note and "not PDF/UA-1 compliant yet" in report2.note, report2.note
-ua_warnings = [w for w in caught if issubclass(w.category, pdfgen.PdfUaWarning)]
+ua_warnings = [w for w in caught if issubclass(w.category, pdfloom.PdfUaWarning)]
 assert ua_warnings, "expected a PdfUaWarning"
 print(f"python: non-compliant doc warns OK ({ua_warnings[0].message})")
 
 # --- 3. UA-2 profile round trip -------------------------------------------
-doc3 = pdfgen.Document(pdfgen.Profile.UA2, title="Python UA2", lang="en-US")
+doc3 = pdfloom.Document(pdfloom.Profile.UA2, title="Python UA2", lang="en-US")
 doc3.heading(1, "PDF/UA-2 from Python")
 doc3.paragraph("Modern profile, same API.")
 report3 = doc3.save(str(OUT / "python_binding_ua2.pdf"))

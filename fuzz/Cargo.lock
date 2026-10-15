@@ -106,36 +106,36 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdfgen-core"
+name = "pdfloom-core"
 version = "0.1.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
-name = "pdfgen-font"
+name = "pdfloom-font"
 version = "0.1.0"
 dependencies = [
- "pdfgen-core",
+ "pdfloom-core",
  "thiserror",
  "ttf-parser",
 ]
 
 [[package]]
-name = "pdfgen-fuzz"
+name = "pdfloom-fuzz"
 version = "0.0.0"
 dependencies = [
  "libfuzzer-sys",
- "pdfgen-font",
- "pdfgen-parse",
+ "pdfloom-font",
+ "pdfloom-parse",
 ]
 
 [[package]]
-name = "pdfgen-parse"
+name = "pdfloom-parse"
 version = "0.1.0"
 dependencies = [
  "flate2",
- "pdfgen-core",
+ "pdfloom-core",
  "thiserror",
 ]
 

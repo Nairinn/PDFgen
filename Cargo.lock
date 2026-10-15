@@ -48,7 +48,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_derive",
- "syn 3.0.6",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -245,7 +245,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 3.0.6",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -274,9 +274,9 @@ dependencies = [
 
 [[package]]
 name = "equivalent"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
+checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
 
 [[package]]
 name = "errno"
@@ -501,9 +501,9 @@ dependencies = [
 
 [[package]]
 name = "indoc"
-version = "2.0.7"
+version = "2.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79cf5c93f93228cf8efb3ba362535fb11199ac548a09ce117c9b1adc3030d706"
+checksum = "a37b2691796cffeb8a8cd305ac66e65841559f147f4e63231d0eafa4db5384d1"
 dependencies = [
  "rustversion",
 ]
@@ -629,88 +629,88 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
-name = "pdfgen"
+name = "pdfloom"
 version = "0.1.0"
 dependencies = [
  "flate2",
- "pdfgen-canvas",
- "pdfgen-core",
- "pdfgen-font",
- "pdfgen-fonts",
- "pdfgen-parse",
- "pdfgen-profile",
- "pdfgen-render",
+ "pdfloom-canvas",
+ "pdfloom-core",
+ "pdfloom-font",
+ "pdfloom-fonts",
+ "pdfloom-parse",
+ "pdfloom-profile",
+ "pdfloom-render",
  "png",
  "thiserror",
 ]
 
 [[package]]
-name = "pdfgen-api"
+name = "pdfloom-api"
 version = "0.1.0"
 dependencies = [
- "pdfgen",
+ "pdfloom",
 ]
 
 [[package]]
-name = "pdfgen-canvas"
+name = "pdfloom-canvas"
 version = "0.1.0"
 dependencies = [
- "pdfgen-core",
+ "pdfloom-core",
 ]
 
 [[package]]
-name = "pdfgen-cli"
+name = "pdfloom-cli"
 version = "0.1.0"
 dependencies = [
- "pdfgen-def",
- "pdfgen-profile",
- "pdfgen-render",
- "pdfgen-validate",
+ "pdfloom-def",
+ "pdfloom-profile",
+ "pdfloom-render",
+ "pdfloom-validate",
 ]
 
 [[package]]
-name = "pdfgen-core"
+name = "pdfloom-core"
 version = "0.1.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
-name = "pdfgen-def"
+name = "pdfloom-def"
 version = "0.1.0"
 dependencies = [
  "base64",
  "flate2",
- "pdfgen",
- "pdfgen-core",
- "pdfgen-profile",
+ "pdfloom",
+ "pdfloom-core",
+ "pdfloom-profile",
  "serde",
  "serde_json",
  "thiserror",
 ]
 
 [[package]]
-name = "pdfgen-draw"
+name = "pdfloom-draw"
 version = "0.1.0"
 dependencies = [
- "pdfgen",
- "pdfgen-core",
- "pdfgen-parse",
- "pdfgen-revision",
+ "pdfloom",
+ "pdfloom-core",
+ "pdfloom-parse",
+ "pdfloom-revision",
 ]
 
 [[package]]
-name = "pdfgen-ffi"
+name = "pdfloom-ffi"
 version = "0.1.0"
 dependencies = [
- "pdfgen-api",
+ "pdfloom-api",
 ]
 
 [[package]]
-name = "pdfgen-font"
+name = "pdfloom-font"
 version = "0.1.0"
 dependencies = [
- "pdfgen-core",
+ "pdfloom-core",
  "rustybuzz",
  "thiserror",
  "ttf-parser 0.25.1",
@@ -718,68 +718,68 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdfgen-fonts"
+name = "pdfloom-fonts"
 version = "0.1.0"
 dependencies = [
- "pdfgen-font",
+ "pdfloom-font",
  "thiserror",
 ]
 
 [[package]]
-name = "pdfgen-parse"
+name = "pdfloom-parse"
 version = "0.1.0"
 dependencies = [
  "flate2",
- "pdfgen-core",
+ "pdfloom-core",
  "thiserror",
 ]
 
 [[package]]
-name = "pdfgen-profile"
+name = "pdfloom-profile"
 version = "0.1.0"
 dependencies = [
- "pdfgen-core",
+ "pdfloom-core",
 ]
 
 [[package]]
-name = "pdfgen-py"
+name = "pdfloom-py"
 version = "0.1.0"
 dependencies = [
- "pdfgen-api",
+ "pdfloom-api",
  "pyo3",
 ]
 
 [[package]]
-name = "pdfgen-render"
+name = "pdfloom-render"
 version = "0.1.0"
 dependencies = [
  "flate2",
- "pdfgen",
- "pdfgen-core",
- "pdfgen-font",
- "pdfgen-parse",
+ "pdfloom",
+ "pdfloom-core",
+ "pdfloom-font",
+ "pdfloom-parse",
  "ttf-parser 0.24.1",
 ]
 
 [[package]]
-name = "pdfgen-revision"
+name = "pdfloom-revision"
 version = "0.1.0"
 dependencies = [
- "pdfgen",
- "pdfgen-core",
- "pdfgen-parse",
- "pdfgen-validate",
+ "pdfloom",
+ "pdfloom-core",
+ "pdfloom-parse",
+ "pdfloom-validate",
 ]
 
 [[package]]
-name = "pdfgen-server"
+name = "pdfloom-server"
 version = "0.1.0"
 dependencies = [
  "axum",
  "base64",
  "http-body-util",
- "pdfgen-def",
- "pdfgen-profile",
+ "pdfloom-def",
+ "pdfloom-profile",
  "serde",
  "serde_json",
  "tokio",
@@ -788,21 +788,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdfgen-uniffi"
+name = "pdfloom-uniffi"
 version = "0.1.0"
 dependencies = [
- "pdfgen-api",
+ "pdfloom-api",
  "thiserror",
  "uniffi",
  "uniffi_build",
 ]
 
 [[package]]
-name = "pdfgen-validate"
+name = "pdfloom-validate"
 version = "0.1.0"
 dependencies = [
- "pdfgen-core",
- "pdfgen-parse",
+ "pdfloom-core",
+ "pdfloom-parse",
 ]
 
 [[package]]
@@ -1035,14 +1035,14 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.6",
+ "syn 3.0.9",
 ]
 
 [[package]]
 name = "serde_json"
-version = "1.0.151"
+version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
+checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
 dependencies = [
  "itoa",
  "memchr",
@@ -1064,9 +1064,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "1.1.1"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
+checksum = "4e7523beb55eece201a2356bee0bbca0d1ab466c14c07703b2e0ee6d42cb0c2c"
 dependencies = [
  "serde_core",
 ]
@@ -1113,9 +1113,9 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "smallvec"
-version = "1.16.2"
+version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9395f0f0eee849a9b707b2f06bb92a6a422090e2123bb2ef8e87a0e61892a8e"
+checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
 
 [[package]]
 name = "smawk"
@@ -1158,9 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.6"
+version = "3.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8593e8e72159ed2257d083c7a454a85cbf854f37a0966d8d483aff8c8a3ebcee"
+checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1219,14 +1219,14 @@ checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.6",
+ "syn 3.0.9",
 ]
 
 [[package]]
 name = "tokio"
-version = "1.53.2"
+version = "1.53.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e95f91fcc7a621e8b030f6aa23c71fe9838ae2fb4d8118b75602a328f5144044"
+checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
 dependencies = [
  "bytes",
  "libc",
@@ -1246,7 +1246,7 @@ checksum = "78773a2a397f451582ce068015985c33193cf6dea8b74d2a639fe457b2f07b0e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.6",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -1264,9 +1264,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "1.1.6+spec-1.1.0"
+version = "1.1.8+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "920602543f0911ab71da12c50d59701da54c196d1a2bf5cb4b75667f137a406a"
+checksum = "20489e00e4d8741d6be680764cc12e270655e375a20d1011e844a9c3379e678d"
 dependencies = [
  "indexmap",
  "serde_core",
@@ -1279,27 +1279,27 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "1.1.1+spec-1.1.0"
+version = "1.1.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3165f65f62e28e0115a00b2ebdd37eb6f3b641855f9d636d3cd4103767159ad7"
+checksum = "2b86d767906c6c42421dcba507eb9d203e779497710a47782a224bb871653053"
 dependencies = [
  "serde_core",
 ]
 
 [[package]]
 name = "toml_parser"
-version = "1.1.3+spec-1.1.0"
+version = "1.1.5+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d38ac1cf9b95face32296c0a3ede1fdc270627c9d9c02a7274dd6d960dc4d56"
+checksum = "baa693a8032d7e1cada7d0041e96126df243179ff061456783ac7f12bda4744c"
 dependencies = [
  "winnow",
 ]
 
 [[package]]
 name = "toml_writer"
-version = "1.1.2+spec-1.1.0"
+version = "1.1.3+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
+checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
 
 [[package]]
 name = "tower"
@@ -1415,9 +1415,9 @@ checksum = "ce61d488bcdc9bc8b5d1772c404828b17fc481c0a582b5581e95fb233aef503e"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.26"
+version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
+checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 
 [[package]]
 name = "unicode-properties"

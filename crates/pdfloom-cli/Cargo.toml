@@ -1,0 +1,21 @@
+[package]
+name = "pdfloom-cli"
+description = "pdfloom command-line tools: validate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "pdfloom"
+path = "src/main.rs"
+
+[dependencies]
+pdfloom-validate = { workspace = true }
+pdfloom-render = { path = "../pdfloom-render" }
+pdfloom-def = { path = "../pdfloom-def" }
+pdfloom-profile = { path = "../pdfloom-profile" }
+
+[lints]
+workspace = true

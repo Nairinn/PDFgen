@@ -1,13 +1,13 @@
-# PDFgen
+# PDFloom
 
 A PDF library in Rust, MIT licensed, written from the ISO specifications.
 It exists because the established free options have drawbacks: iText is
-AGPL (or commercially licensed), and PDFBox is Java-only. PDFgen aims to
+AGPL (or commercially licensed), and PDFBox is Java-only. PDFloom aims to
 cover the same ground with PDF/UA accessibility and in-file versioning
-built in.
+built in. Formerly developed under the working name PDFgen.
 
 ```rust
-let mut doc = pdfgen::Document::new(pdfgen::Profile::PdfUa1);
+let mut doc = pdfloom::Document::new(pdfloom::Profile::PdfUa1);
 doc.title("Quarterly Report").lang("en-US");
 
 let arial = doc.font("Arial", "Bold")?;          // system font by name
@@ -28,7 +28,7 @@ For large documents, the streaming writer flushes completed pages to
 disk instead of holding the whole document in memory:
 
 ```rust
-let mut w = pdfgen::StreamWriter::create("big.pdf", Profile::PdfUa1,
+let mut w = pdfloom::StreamWriter::create("big.pdf", Profile::PdfUa1,
                                          "Big Report", "en-US")?;
 w.push(vec![
     StreamEvent::Begin { tag: "P".into(), alt: None, attrs: None },
@@ -73,11 +73,11 @@ check.
 | Forms | AcroForm text fields with /TU accessible names; incremental-save `fill_text_field` |
 | HTML to PDF | Structural subset (headings, lists, tables, images, implied paragraphs, entities) to streamed tagged PDF |
 | Drawing kit | ASME Y14 sheets A-F, tagged title block, Y14.5 dimensions, Y14.35 revision block from file history |
-| Studio | Visual editor (`cargo run -p pdfgen-server`) - drag/resize/zoom, reading-order control, compliance badge; Download PDF + config side by side; `pdfgen build` replays the config to a byte-identical PDF through code |
+| Studio | Visual editor (`cargo run -p pdfloom-server`) - drag/resize/zoom, reading-order control, compliance badge; Download PDF + config side by side; `pdfloom build` replays the config to a byte-identical PDF through code |
 | Reader | Classic, xref-stream and hybrid xref; lazy resolution; repair mode |
 | Retag | Open any PDF (even untagged), tag it, save it compliant |
 | Extraction | Text blocks from any PDF, tagged or not; honors ActualText |
-| Validator | Matterhorn machine checks (`pdfgen validate`), cross-checked against veraPDF |
+| Validator | Matterhorn machine checks (`pdfloom validate`), cross-checked against veraPDF |
 | Bindings | Python (PyO3, abi3 >= 3.9), Kotlin/Java 11+ (UniFFI + JNA), Java 22+ (FFM, no JNI); all produce veraPDF-valid files |
 
 ## How to install veraPDF locally
@@ -93,7 +93,7 @@ auto-install XML from the CI job.
 
 ```bash
 cargo test                     # generates tests/output/*.pdf and checks them
-cargo run -p pdfgen-cli -- validate tests/output/hello_ua1.pdf   # our checker
+cargo run -p pdfloom-cli -- validate tests/output/hello_ua1.pdf   # our checker
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 tools/verapdf/verapdf -f ua1 tests/output/hello_ua1.pdf           # external gate
 tools/verapdf/verapdf -f ua2 tests/output/hello_ua2.pdf
@@ -117,11 +117,11 @@ for visually laying out tagged documents: pages, headings, paragraphs,
 lists, tables, images, form fields and decorations with drag, resize,
 zoom, reading-order control and a compliance badge from every build.
 
-    cargo run -p pdfgen-server     # http://localhost:8321
+    cargo run -p pdfloom-server     # http://localhost:8321
 
-The editor state IS the `pdfgen-doc` JSON config. Download the PDF and
-the config side by side; feed the config to `pdfgen build` (or the
-`pdfgen-def` crate) and you get the same tagged PDF through code.
+The editor state IS the `pdfloom-doc` JSON config. Download the PDF and
+the config side by side; feed the config to `pdfloom build` (or the
+`pdfloom-def` crate) and you get the same tagged PDF through code.
 Importing a config reopens it in the editor. Rebuilding the same config
 always produces byte-identical output.
 
@@ -137,7 +137,7 @@ Bundled fonts live in `fonts/vendor/` at the repo root, outside any crate
 directory, so crate packages never ship them (crates.io caps packages at
 10 MB). Resolution order at runtime:
 
-1. `PDFGEN_FONTS_DIR` (build-time env var, relocated installs)
+1. `PDFLOOM_FONTS_DIR` (build-time env var, relocated installs)
 2. The repo checkout (`fonts/` relative to the workspace)
 3. System fonts by family name
 4. A bundled look-alike, with a substitution note in the save report
@@ -179,23 +179,23 @@ scripts should work through the same HarfBuzz path but aren't tested.
 
 ```
 crates/
-  pdfgen-core      PDF object model, serializer, xref writer
-  pdfgen-parse     reader: lexer, xref (classic/stream/hybrid), repair mode
-  pdfgen-font      font loading (ttf-parser), WinAnsi, shaping
-  pdfgen-fonts     registry: built-in catalog, system fonts, name resolution
-  pdfgen-canvas    content streams, marked content (BDC/EMC), artifacts
-  pdfgen-profile   PDF/UA-1 + UA-2 profiles, XMP, the save report
-  pdfgen           the public API: Document, Flow, StreamWriter, TagSession,
+  pdfloom-core      PDF object model, serializer, xref writer
+  pdfloom-parse     reader: lexer, xref (classic/stream/hybrid), repair mode
+  pdfloom-font      font loading (ttf-parser), WinAnsi, shaping
+  pdfloom-fonts     registry: built-in catalog, system fonts, name resolution
+  pdfloom-canvas    content streams, marked content (BDC/EMC), artifacts
+  pdfloom-profile   PDF/UA-1 + UA-2 profiles, XMP, the save report
+  pdfloom           the public API: Document, Flow, StreamWriter, TagSession,
                    extract_text, HTML-to-PDF, forms, bookmarks
-  pdfgen-api       bindings-friendly facade (owned types, no lifetimes)
-  pdfgen-py        Python bindings (PyO3)
-  pdfgen-uniffi    Kotlin/Java bindings (UniFFI)
-  pdfgen-validate  Matterhorn machine checks (the `pdfgen validate` engine)
-  pdfgen-revision  commit / history / diff / revert inside the PDF
-  pdfgen-draw      ASME Y14 + ISO 5457 drawing kit
-  pdfgen-ffi       C-ABI layer (cdylib) consumed by the Java FFM binding
-  pdfgen-render    software rasterizer (PNG output, print pipeline)
-  pdfgen-cli       the `pdfgen` command-line tool
+  pdfloom-api       bindings-friendly facade (owned types, no lifetimes)
+  pdfloom-py        Python bindings (PyO3)
+  pdfloom-uniffi    Kotlin/Java bindings (UniFFI)
+  pdfloom-validate  Matterhorn machine checks (the `pdfloom validate` engine)
+  pdfloom-revision  commit / history / diff / revert inside the PDF
+  pdfloom-draw      ASME Y14 + ISO 5457 drawing kit
+  pdfloom-ffi       C-ABI layer (cdylib) consumed by the Java FFM binding
+  pdfloom-render    software rasterizer (PNG output, print pipeline)
+  pdfloom-cli       the `pdfloom` command-line tool
 fonts/vendor/      bundled OFL fonts (Liberation, Noto incl. Myanmar/Thai/Arabic)
 bindings/          kotlin (UniFFI/JNA), java (FFM), python (PyO3 wheel)
 tests/output/      generated PDFs (gitignored)

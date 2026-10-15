@@ -1,0 +1,17 @@
+[package]
+name = "pdfloom-draw"
+description = "Engineering drawing kit: ASME Y14 sheets, frames, title blocks, dimensions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfloom-core = { workspace = true }
+pdfloom = { workspace = true }
+pdfloom-parse = { workspace = true }
+pdfloom-revision = { workspace = true }
+
+[lints]
+workspace = true

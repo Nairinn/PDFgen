@@ -1,5 +1,5 @@
 [package]
-name = "pdfgen-fuzz"
+name = "pdfloom-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
@@ -9,8 +9,8 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-pdfgen-parse = { path = "../crates/pdfgen-parse" }
-pdfgen-font = { path = "../crates/pdfgen-font" }
+pdfloom-parse = { path = "../crates/pdfloom-parse" }
+pdfloom-font = { path = "../crates/pdfloom-font" }
 
 [[bin]]
 name = "pdf_reader"

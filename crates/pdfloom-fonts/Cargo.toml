@@ -1,0 +1,21 @@
+[package]
+name = "pdfloom-fonts"
+description = "Font registry: built-in catalog, system fonts, name resolution and fallback"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pdfloom-font = { workspace = true }
+thiserror = "2"
+
+[lints]
+workspace = true
+
+# NOTE: the font files live at <workspace>/fonts/vendor (outside this
+# crate directory, so they are never packaged into the .crate). Runtime
+# resolution: repo checkouts find them relative to CARGO_MANIFEST_DIR;
+# installed-from-crates.io builds fall back to system fonts or
+# PDFLOOM_FONTS_DIR (see fonts_dir() in src/lib.rs).

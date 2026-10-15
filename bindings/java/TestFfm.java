@@ -1,4 +1,4 @@
-// Java 22+ FFM end-to-end test for the pdfgen bindings: build a tagged
+// Java 22+ FFM end-to-end test for the pdfloom bindings: build a tagged
 // kitchen-sink document, save, verify the report and the file.
 //
 // Run: see bindings/java/run.sh
@@ -11,15 +11,15 @@ public class TestFfm {
         String lib = args[0];
         String out = args[1];
 
-        try (PdfGen pdfgen = PdfGen.load(lib)) {
-            try (PdfGen.Document doc = pdfgen.create(PdfGen.Profile.UA1)) {
+        try (PdfLoom pdfloom = PdfLoom.load(lib)) {
+            try (PdfLoom.Document doc = pdfloom.create(PdfLoom.Profile.UA1)) {
                 doc.setTitle("Java FFM bindings test")
                    .setLang("en-US");
 
                 // System font by name (registry + aliases).
                 int arial = doc.font("Arial", "Bold");
 
-                doc.heading(1, "PDFgen from Java 22+ FFM");
+                doc.heading(1, "PDFloom from Java 22+ FFM");
                 doc.paragraphIn(arial, 14.0,
                     "This paragraph uses Arial Bold resolved through the font registry.");
                 doc.paragraph("A default-font paragraph with enough words to exercise word "
@@ -41,10 +41,10 @@ public class TestFfm {
             }
 
             // Re-open just to read the report of a compliant save.
-            try (PdfGen.Document doc = pdfgen.create(PdfGen.Profile.UA1)) {
+            try (PdfLoom.Document doc = pdfloom.create(PdfLoom.Profile.UA1)) {
                 doc.setTitle("Report probe").setLang("en-US");
                 doc.heading(2, "Probe");
-                try (PdfGen.Report r = doc.save(out + ".probe.pdf")) {
+                try (PdfLoom.Report r = doc.save(out + ".probe.pdf")) {
                     if (!r.compliant()) throw new AssertionError("expected compliant: " + r.note());
                 }
             }
