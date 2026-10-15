@@ -26,6 +26,36 @@ const FONT_FAMILIES = [
   "Helvetica", "Times-Roman", "Courier", "Arial",
 ];
 const FONT_STYLES = ["Regular", "Bold", "Italic", "Bold Italic"];
+// Which styles actually exist per family in the bundled catalog (the
+// same faces the PDF embeds). Families absent from this map ship only
+// Regular + Bold. The Style dropdown offers exactly these, so every
+// Family/Style combo the inspector offers can be honored by the PDF;
+// the canvas, the config, and the embedded font face always agree.
+// Standard-14 aliases resolve to the Liberation look-alikes, which
+// have all four faces.
+const CATALOG_STYLES = {
+  "Liberation Sans": FONT_STYLES,
+  "Liberation Serif": FONT_STYLES,
+  "Liberation Mono": FONT_STYLES,
+  "Noto Sans": FONT_STYLES,
+  "Helvetica": FONT_STYLES,
+  "Times-Roman": FONT_STYLES,
+  "Courier": FONT_STYLES,
+  "Arial": FONT_STYLES,
+};
+
+function stylesFor(family) {
+  return CATALOG_STYLES[family] || ["Regular", "Bold"];
+}
+
+// When the family changes, keep the style valid for the new family:
+// Bold Italic -> Bold (keep the weight), anything else -> Regular.
+function clampStyle(family, style) {
+  const offered = stylesFor(family);
+  if (offered.includes(style)) return style;
+  if (/Bold/.test(style) && offered.includes("Bold")) return "Bold";
+  return "Regular";
+}
 
 let doc = null;          // the pdfgen-doc object
 let current = 0;         // current page index
@@ -71,6 +101,7 @@ const $ = (id) => document.getElementById(id);
 function el(tag, attrs = {}, ...kids) {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
+    if (v == null) continue; // null = explicitly do not set the attribute
     if (k === "style") Object.assign(n.style, v);
     else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
     else if (k === "value" || k === "checked") n[k] = v;
@@ -536,12 +567,22 @@ function docProps() {
 
 function fontProps() {
   const f = sel.font || defaultFont(11);
+  const setFont = (mut) => {
+    snapshot();
+    const fo = sel.font ||= defaultFont(11);
+    mut(fo);
+    renderAll();
+  };
   return el("div", { class: "font-props" },
-    labeled("Family", selectFor(FONT_FAMILIES, f.family, (v) => { snapshot(); (sel.font ||= defaultFont(11)).family = v; renderAll(); })),
-    labeled("Style", selectFor(FONT_STYLES, f.style, (v) => { snapshot(); (sel.font ||= defaultFont(11)).style = v; renderAll(); })),
-    labeled("Size (pt)", number(4, 96, 0.5, f.size, (v) => { snapshot(); (sel.font ||= defaultFont(11)).size = v; renderAll(); })),
+    labeled("Family", selectFor(FONT_FAMILIES, f.family, (v) => setFont((fo) => {
+      fo.family = v;
+      fo.style = clampStyle(v, fo.style); // keep the combo buildable
+    }))),
+    labeled("Style", selectFor(stylesFor(f.family), f.style,
+      (v) => setFont((fo) => { fo.style = v; }))),
+    labeled("Size (pt)", number(4, 96, 0.5, f.size, (v) => setFont((fo) => { fo.size = v; }))),
     labeled("Color", el("input", { type: "color", value: /^#[0-9a-f]{6}$/i.test(f.color) ? f.color : "#000000",
-      oninput: (ev) => { snapshot(); (sel.font ||= defaultFont(11)).color = ev.target.value; renderAll(); } })),
+      oninput: (ev) => setFont((fo) => { fo.color = ev.target.value; }) })),
   );
 }
 
