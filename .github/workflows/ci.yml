@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:   # on-demand re-runs from the Actions tab
 
 jobs:
   test:
